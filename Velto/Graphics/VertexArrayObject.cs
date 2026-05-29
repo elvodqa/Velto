@@ -1,3 +1,5 @@
+using System;
+
 namespace Velto.Graphics;
 
 using OpenTK.Graphics.OpenGL;
