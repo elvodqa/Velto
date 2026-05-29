@@ -186,7 +186,7 @@ public class Beatmap
             }
         }
 
-        CalculatePrepass();
+        //CalculatePrepass();
     }
 
     // General
@@ -220,6 +220,19 @@ public class Beatmap
 
         foreach (var hitobject in HitObjects)
         {
+            float preempt;
+            if (ApproachRate < 5)
+                preempt = 1200 + 600 * (5 - ApproachRate) / 5;
+            else
+                preempt = 1200 - 750 * (ApproachRate - 5) / 5;
+
+            float pretime = 500;
+            float posttime = 150;
+
+            hitobject.Preempt = preempt;
+            hitobject.Pretime = pretime;
+            hitobject.Posttime = posttime;
+            
             if (hitobject.NewCombo)
             {
                 colorCounter++;

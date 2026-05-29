@@ -13,10 +13,10 @@ public unsafe class GameDisplay : IDisposable
     private const int PLAYFIELD_H = 384;
     private const double WAITINGTIME = 0f;
     private readonly Texture _approachCircleTexture;
-    private readonly Texture _backgroundTexture;
+    private Texture _backgroundTexture;
     private float _baseCircleSize;
 
-    private readonly Beatmap _beatmap;
+    private Beatmap _beatmap;
     private readonly Texture _circleTexture;
     private int _colorCounter = 0;
 
@@ -27,7 +27,7 @@ public unsafe class GameDisplay : IDisposable
     private readonly Texture _hitcircleTexture;
     private bool _isPaused;
     private readonly MSDFFont _msdfFont;
-    private readonly int _musicChannel;
+    private int _musicChannel;
     private bool _musicStarted;
     private float _musicVolume;
     private readonly Dictionary<int, Texture> _numberTextures = new();
@@ -37,10 +37,11 @@ public unsafe class GameDisplay : IDisposable
     private readonly string _skinName = "rafis";
     private readonly Texture _sliderballTexture;
     private double _songCursor;
-    private readonly double _songLength;
+    private double _songLength;
     private IOrderedEnumerable<HitObject> _sortedObjects;
     private double _startingTimer;
     private readonly Texture _whiteTexture;
+    private bool _isMenuOpen = false;
 
     private SDL_Window* _window;
 
@@ -82,9 +83,8 @@ public unsafe class GameDisplay : IDisposable
         shader = new Shader("sprite"); // pippidonclear0
 
         //_beatmap = new(Resources.GetPath("Resources/Songs/lotus/Susumu Hirasawa - SWITCHED-ON LOTUS (Starrodkirby86) [KIRBY Mix Deluxe].osu"));
-        _beatmap = new Beatmap(Resources.GetPath(
-            "Resources/Songs/Wakeshima Kanon/ASCA - Nisemono no Koi ni Sayounara with Wakeshima Kanon (timemon) [Kyou's Extra].osu"));
-        //_beatmap = new(Resources.GetPath("Resources/Songs/Centipede/Knife Party - Centipede (Sugoi-_-Desu) [This isn't a map, just a simple visualisation].osu"));
+        // _beatmap = new Beatmap(Resources.GetPath("Resources/Songs/Wakeshima Kanon/ASCA - Nisemono no Koi ni Sayounara with Wakeshima Kanon (timemon) [Kyou's Extra].osu"));
+        _beatmap = new(Resources.GetPath("Resources/Songs/Centipede/Knife Party - Centipede (Sugoi-_-Desu) [This isn't a map, just a simple visualisation].osu"));
         //_beatmap = new(Resources.GetPath("Resources/Songs/exit/Camellia - Exit This Earth's Atomosphere (Camellia's ''PLANETARY200STEP'' Remix) (ProfessionalBox) [Primordial Nucleosynthesis].osu"));
 
         _backgroundTexture = new Texture(Path.Combine(_beatmap.Folder, _beatmap.BackgroundFile));
@@ -114,6 +114,8 @@ public unsafe class GameDisplay : IDisposable
         _songLength = 1000 * Bass.ChannelBytes2Seconds(_musicChannel, Bass.ChannelGetLength(_musicChannel));
 
         _startingTimer = WAITINGTIME + _beatmap.AudioLeadIn;
+        
+        _beatmap.CalculatePrepass();
     }
 
     public void Dispose()
@@ -138,6 +140,16 @@ public unsafe class GameDisplay : IDisposable
         foreach (var pair in _numberTextures) pair.Value.Dispose();
     }
 
+    public class BeatmapBox
+    {
+        public Beatmap Beatmap;
+        public Vector2 Position;
+        public Vector2 Size;
+        public bool IsHovered = false;
+    }
+
+    private List<BeatmapBox> _beatmapBoxes = new();
+
     public void Update(double delta)
     {
         var windowSizes = _renderer.WindowSizeInPixels;
@@ -148,7 +160,7 @@ public unsafe class GameDisplay : IDisposable
         if (_startingTimer <= 0 && !_musicStarted)
         {
             Bass.ChannelPlay(_musicChannel);
-            Bass.ChannelSetPosition(_musicChannel, Bass.ChannelSeconds2Bytes(_musicChannel, 60));
+            //Bass.ChannelSetPosition(_musicChannel, Bass.ChannelSeconds2Bytes(_musicChannel, 60));
             _musicStarted = true;
         }
 
@@ -175,8 +187,56 @@ public unsafe class GameDisplay : IDisposable
                 var songPointer = Util.MapRange(Input.MouseX, 0, _windowWidth, 0, (float)_songLength);
                 Bass.ChannelSetPosition(_musicChannel, Bass.ChannelSeconds2Bytes(_musicChannel, songPointer / 1000));
             }
+        
+        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_ESCAPE))
+        {
+            if (_isMenuOpen)
+            {
+                Bass.ChannelPlay(_musicChannel);
+                _isMenuOpen = false;
+                _isPaused = false;
+                _beatmapBoxes.Clear();
+            }
+            else
+            {
+                if (_isPaused)
+                    Bass.ChannelPlay(_musicChannel);
+                else
+                    Bass.ChannelPause(_musicChannel);
+                Bass.ChannelPause(_musicChannel);
+                _isPaused = true;
+                _isMenuOpen = true;
 
-        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_SPACE))
+                var height = 150;
+                var gap = 2;
+                var i = 0;
+
+                var songDirs = Directory.GetDirectories(Resources.GetPath("Resources/Songs"));
+                foreach (var dir in songDirs)
+                {
+                    var files = Directory.GetFiles(dir);
+                    foreach (var file in files)
+                    {
+                        if (Path.GetExtension(file) == ".osu")
+                        {
+                            var box = new BeatmapBox();
+                            box.Beatmap = new Beatmap(file);
+
+                            box.Position = new Vector2(0, i * (height + gap));
+                            box.Size = new Vector2(_windowWidth / 2f, height);
+                            
+                            _beatmapBoxes.Add(box);
+
+                            i++;
+                        }
+                    }
+                }
+
+            }
+            
+        }
+        
+        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_SPACE) && !_isMenuOpen)
         {
             if (_isPaused)
                 Bass.ChannelPlay(_musicChannel);
@@ -204,7 +264,42 @@ public unsafe class GameDisplay : IDisposable
             _musicVolume = Math.Clamp(_musicVolume, 0, 1);
             Bass.ChannelSetAttribute(_musicChannel, ChannelAttribute.Volume, _musicVolume);
         }
+        
+        if (_isMenuOpen)
+        {
+            foreach (var box in _beatmapBoxes)
+            {
+                box.IsHovered = false;
+                RectangleF collision = new(box.Position.X, box.Position.Y, box.Size.X, box.Size.Y);
+                if (collision.Contains(Input.MouseX, Input.MouseY))
+                {
+                    box.IsHovered = true;
+                    if (Input.IsMouseJustPressed(SDLButton.SDL_BUTTON_LEFT))
+                    {
+                        _beatmap = box.Beatmap;
+                        _beatmap.CalculatePrepass();
 
+                        Bass.StreamFree(_musicChannel);
+                        _musicChannel = Bass.CreateStream(Path.Combine(_beatmap.Folder, _beatmap.AudioFilename));
+                        Bass.ChannelSetAttribute(_musicChannel, ChannelAttribute.Volume, _musicVolume);
+                        
+                        _songLength = 1000 * Bass.ChannelBytes2Seconds(_musicChannel, Bass.ChannelGetLength(_musicChannel));
+
+                        _startingTimer = WAITINGTIME + _beatmap.AudioLeadIn;
+        
+                        _beatmap.CalculatePrepass();
+
+                        _isPaused = false;
+                        _isMenuOpen = false;
+
+                        _backgroundTexture.Dispose();
+                        _backgroundTexture = new Texture(Path.Combine(_beatmap.Folder, _beatmap.BackgroundFile));
+                        Bass.ChannelPlay(_musicChannel);
+                    }
+                }
+            }
+        }
+        
         // Handle objects bkz: https://osu.ppy.sh/wiki/en/Gameplay/Judgement/osu%21 
         foreach (var hitObject in _sortedObjects)
             if (hitObject is HitCircle circle)
@@ -294,51 +389,37 @@ public unsafe class GameDisplay : IDisposable
             new Vector4(1, 1, 1, 0.6f)
         );
 
-        var startX = (float)_windowWidth / 2 - playfieldWidth / 2;
-        var startY = (float)_windowHeight / 2 - playfieldHeight / 2;
-        // float osuRadius = 54.4f - 4.48f * _beatmap.CircleSize;
-        // float scale = playfieldWidth / PLAYFIELD_W;
-        // float circleDiameter = osuRadius * 2f * scale;
-        // float circleSize = circleDiameter;
+        
         var scale = playfieldWidth / PLAYFIELD_W;
         var osuRadius = 54.4f - 4.48f * _beatmap.CircleSize;
         _baseCircleSize = osuRadius * 2f * scale;
-
-
+        
         foreach (var hitObject in _sortedObjects)
         {
-            float preempt;
-            if (_beatmap.ApproachRate < 5)
-                preempt = 1200 + 600 * (5 - _beatmap.ApproachRate) / 5;
-            else
-                preempt = 1200 - 750 * (_beatmap.ApproachRate - 5) / 5;
-
-            float pretime = 500;
-            float posttime = 150;
-            if (hitObject is HitCircle)
+            if (hitObject is HitCircle circle)
             {
-                var posX = startX + hitObject.Position.X * scale;
-                var posY = startY + hitObject.Position.Y * scale;
-
-                if (hitObject.Time + _startingTimer - (int)_songCursor > -posttime &&
-                    hitObject.Time + _startingTimer - (int)_songCursor < pretime)
+                var posX = playfieldTopLeft.X + hitObject.Position.X * scale;
+                var posY = playfieldTopLeft.Y + hitObject.Position.Y * scale;
+                
+                if (hitObject.Time + _startingTimer - (int)_songCursor > -hitObject.Posttime &&
+                    hitObject.Time + _startingTimer - (int)_songCursor < hitObject.Pretime)
                 {
-                    var _fadein = 400 * Math.Min(1, preempt / 450);
+                    var _fadein = 400 * Math.Min(1, hitObject.Preempt / 450);
                     var objectCircleSize = _baseCircleSize;
                     var fadein =
                         Math.Clamp(
-                            Util.MapRange((float)_songCursor, hitObject.Time - _fadein, hitObject.Time - pretime / 2,
+                            Util.MapRange((float)_songCursor, hitObject.Time - _fadein, hitObject.Time - hitObject.Pretime / 2,
                                 0, 1), 0, 1);
                     var fadeout =
-                        Math.Clamp(Util.MapRange((float)_songCursor, hitObject.Time, hitObject.Time + posttime, 1, 0),
+                        Math.Clamp(Util.MapRange((float)_songCursor, hitObject.Time, hitObject.Time + hitObject.Posttime, 1, 0),
                             0, 1);
                     var drawSize = (float)(objectCircleSize + objectCircleSize * (1 - fadeout) * 0.1);
                     var approachCircleSize =
                         Math.Max(
-                            Util.MapRange((float)_songCursor, hitObject.Time - pretime, hitObject.Time + 0,
+                            Util.MapRange((float)_songCursor, hitObject.Time - hitObject.Pretime, hitObject.Time + 0,
                                 drawSize * 4, drawSize), drawSize);
-
-
+                
+                
                     _renderer.DrawTexture(_approachCircleTexture,
                         posX - approachCircleSize / 2,
                         posY - approachCircleSize / 2,
@@ -347,30 +428,24 @@ public unsafe class GameDisplay : IDisposable
                         {
                             W = Math.Min(fadein, fadeout)
                         });
-
+                
                     _renderer.DrawTexture(_hitcircleTexture,
                         posX - drawSize / 2,
                         posY - drawSize / 2,
                         drawSize,
                         drawSize, hitObject.Color with { W = Math.Min(fadein, fadeout) });
-
+                
                     _renderer.DrawTexture(_hitcircleOverlayTexture,
                         posX - drawSize / 2,
                         posY - drawSize / 2,
                         drawSize,
                         drawSize, new Vector4(1, 1, 1, 1) with { W = Math.Min(fadein, fadeout) });
-
-                    // number handling
-                    // Texture texture = _numberTextures[hitObject.ComboNumber];
-                    // var numHeight = drawSize * 0.3f;
-                    // var numRatio = numHeight / texture.Height;
-                    // var numWidth = texture.Width * numRatio;
-
+                    
                     var num = hitObject.ComboNumber.ToString();
-
+                
                     var digitScale = drawSize / 128f; // adjust baseline size
                     float digitWidthTotal = 0;
-
+                
                     // first pass: compute total width
                     foreach (var c in num)
                     {
@@ -378,18 +453,18 @@ public unsafe class GameDisplay : IDisposable
                         var tex = _numberTextures[digit];
                         digitWidthTotal += tex.Width * digitScale;
                     }
-
+                
                     // start centered
                     var cursorX = posX - digitWidthTotal / 2;
-
+                
                     foreach (var c in num)
                     {
                         var digit = c - '0';
                         var tex = _numberTextures[digit];
-
+                
                         var w = tex.Width * digitScale;
                         var h = tex.Height * digitScale;
-
+                
                         _renderer.DrawTexture(
                             tex,
                             cursorX,
@@ -398,7 +473,7 @@ public unsafe class GameDisplay : IDisposable
                             h,
                             new Vector4(1, 1, 1, 1) with { W = Math.Min(fadein, fadeout) }
                         );
-
+                
                         cursorX += w;
                     }
                 }
@@ -406,31 +481,31 @@ public unsafe class GameDisplay : IDisposable
 
             if (hitObject is Slider slider)
             {
-                var posX = startX + hitObject.Position.X * scale;
-                var posY = startY + hitObject.Position.Y * scale;
+                var posX = playfieldTopLeft.X + hitObject.Position.X * scale;
+                var posY = playfieldTopLeft.Y + hitObject.Position.Y * scale;
 
-                if (hitObject.Time + _startingTimer - (int)_songCursor > -posttime &&
-                    hitObject.Time + _startingTimer - (int)_songCursor < pretime)
+                if (hitObject.Time + _startingTimer - (int)_songCursor > -hitObject.Posttime &&
+                    hitObject.Time + _startingTimer - (int)_songCursor < hitObject.Pretime)
                 {
-                    var _fadein = 400 * Math.Min(1, preempt / 450);
+                    var _fadein = 400 * Math.Min(1, hitObject.Preempt / 450);
                     var objectCircleSize = _baseCircleSize;
                     var fadein =
                         Math.Clamp(
-                            Util.MapRange((float)_songCursor, hitObject.Time - _fadein, hitObject.Time - pretime / 2,
+                            Util.MapRange((float)_songCursor, hitObject.Time - _fadein, hitObject.Time - hitObject.Pretime / 2,
                                 0, 1), 0, 1);
                     var fadeout =
-                        Math.Clamp(Util.MapRange((float)_songCursor, hitObject.Time, hitObject.Time + posttime, 1, 0),
+                        Math.Clamp(Util.MapRange((float)_songCursor, hitObject.Time, hitObject.Time + hitObject.Posttime, 1, 0),
                             0, 1);
                     var drawSize = (float)(objectCircleSize + objectCircleSize * (1 - fadeout) * 0.1);
                     var approachCircleSize =
                         Math.Max(
-                            Util.MapRange((float)_songCursor, hitObject.Time - pretime, hitObject.Time + 0,
+                            Util.MapRange((float)_songCursor, hitObject.Time - hitObject.Pretime, hitObject.Time + 0,
                                 drawSize * 4, drawSize), drawSize);
 
                     foreach (var point in slider.Points)
                     {
-                        var scaledX = startX + point.X * scale;
-                        var scaledY = startY + point.Y * scale;
+                        var scaledX = playfieldTopLeft.X + point.X * scale;
+                        var scaledY = playfieldTopLeft.Y + point.Y * scale;
 
                         _renderer.DrawTexture(_circleTexture,
                             scaledX - drawSize / 2,
@@ -536,10 +611,31 @@ public unsafe class GameDisplay : IDisposable
             Input.MouseX - size / 2,
             Input.MouseY - size / 2,
             size, size, new Vector4(1, 1, 1, 1));
+        
+        
+        // menu
+        if (_isMenuOpen)
+        {
+            _renderer.DrawRectangle(0, 0, _windowWidth/2f, _windowHeight, new Vector4(0.1f, 0.1f, 0.1f, 0.8f));
+            foreach (var box in _beatmapBoxes)
+            {
+                var color = new Vector4(0.3f, 0.3f, 0.3f, 0.5f);
+                if (box.IsHovered)
+                {
+                    color = new Vector4(0.6f, 0.6f, 0.6f, 0.5f);
+                }
+                
+                _renderer.DrawRectangle(box.Position.X, box.Position.Y, box.Size.X, box.Size.Y, color);
+                _renderer.DrawText(_msdfFont, $"{box.Beatmap.Artist} - {box.Beatmap.Title}", 
+                    new Vector2(box.Position.X + 25, box.Position.Y + 25), 
+                    0.5f, new Vector4(1, 1, 1, 1));
+                _renderer.DrawText(_msdfFont, $"By: {box.Beatmap.Creator} | Difficulty: {box.Beatmap.Version}", 
+                    new Vector2(box.Position.X + 25, box.Position.Y + 65), 
+                    0.5f, new Vector4(1, 1, 1, 1));
+            }
+        }
 
-        _renderer.DrawText(_msdfFont, "The quick brown fox jumps over the lazy dog\n" +
-                                      "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ", new Vector2(0, 0), 0.5f,
-            new Vector4(1, 1, 1, 1));
+        
     }
 
     public class TrailInfo

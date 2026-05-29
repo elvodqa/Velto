@@ -1,4 +1,5 @@
 using OpenTK.Mathematics;
+using Velto.Graphics;
 
 namespace Velto.Gameplay;
 
