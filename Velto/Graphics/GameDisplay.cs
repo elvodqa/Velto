@@ -86,7 +86,7 @@ public unsafe class GameDisplay : IDisposable
 
         Console.WriteLine(_beatmap.AudioFilename);
         _musicChannel = Bass.CreateStream(Path.Combine(_beatmap.Folder, _beatmap.AudioFilename));
-        Bass.ChannelSetAttribute(_musicChannel, ChannelAttribute.Volume, 0.05f);
+        Bass.ChannelSetAttribute(_musicChannel, ChannelAttribute.Volume, 0.02f);
 
         _startingTimer = WAITINGTIME + _beatmap.AudioLeadIn;
     }
@@ -100,6 +100,10 @@ public unsafe class GameDisplay : IDisposable
             _musicStarted = true;
         }
 
+        if (_musicStarted)
+        {
+            _startingTimer = 0;
+        }
         var posByte = Bass.ChannelGetPosition(_musicChannel, PositionFlags.Bytes);
         var pos = Bass.ChannelBytes2Seconds(_musicChannel, posByte);
         var err = Bass.LastError;
@@ -162,7 +166,19 @@ public unsafe class GameDisplay : IDisposable
 
 
         // bg
-        drawTexture(_backgroundTexture, 0, 0, _windowWidth, _windowHeight, new(1, 1, 1, 1));
+        if (_windowWidth * ((float)_backgroundTexture.Height / _backgroundTexture.Width) > _windowHeight)
+        {
+            // sağ sol bar
+            float padding = windowWidth - (_windowHeight * (((float)_backgroundTexture.Width) / (float)_backgroundTexture.Height));
+            drawTexture(_backgroundTexture, padding/2, 0, _windowHeight*((float)_backgroundTexture.Width/_backgroundTexture.Height), _windowHeight, new(1, 1, 1, 1));
+        }
+        else
+        {
+            // üst alt bar
+            float padding = windowHeight - (_windowWidth * (((float)_backgroundTexture.Height) /
+                                                            ((float)_backgroundTexture.Width)));
+            drawTexture(_backgroundTexture, 0, padding/2, _windowWidth, _windowWidth*((float)_backgroundTexture.Height/_backgroundTexture.Width), new(1, 1, 1, 1));
+        }
 
         // hitobjects
         float ratio = PLAYFIELD_W / (float)PLAYFIELD_H;
@@ -192,10 +208,13 @@ public unsafe class GameDisplay : IDisposable
                 float posX = startX + hitObject.Position.X * ratioX;
                 float posY = startY + hitObject.Position.Y * ratioY;
 
-                float areaRatio = PLAYFIELD_W / playfieldAreaSize.X;
+                float areaRatio = w/PLAYFIELD_W;
                 float circleSize = 100f * areaRatio;
+                float pretime = 500;
+                float posttime = 500;
+                
 
-                if (Math.Abs(hitObject.Time + _startingTimer - (int)_songCursor) < 1000)
+                if ((hitObject.Time + _startingTimer - (int)_songCursor) > -posttime && (hitObject.Time + _startingTimer - (int)_songCursor) < pretime)
                 {
                     if (hitObject.NewCombo)
                     {
@@ -221,9 +240,12 @@ public unsafe class GameDisplay : IDisposable
                         hitObject.DidSetColor = true;
                     }
                     
-                    //mapRange((float)_songCursor, hitObject.Time - 500, hitObject.Time + 50, circleSize, 0);
-                    float approachCircleSize = circleSize * 2;
                     
+                    float fadein = Math.Clamp(mapRange((float)_songCursor, hitObject.Time-pretime, (hitObject.Time - pretime / 2), 0, 1),0,1);
+                    float fadeout = Math.Clamp(mapRange((float)_songCursor, hitObject.Time, hitObject.Time +posttime, 1, 0),0,1);
+                    circleSize += circleSize * (1-fadeout) * .1f;
+                    float approachCircleSize = Math.Max(mapRange((float)_songCursor, hitObject.Time - pretime, hitObject.Time + 0, circleSize*4, circleSize),circleSize);
+                    // posY += successMove;
                     drawTexture(_approachCircleTexture,
                         posX - approachCircleSize / 2,
                         posY - approachCircleSize / 2,
@@ -234,12 +256,13 @@ public unsafe class GameDisplay : IDisposable
                         posX - circleSize / 2,
                         posY - circleSize / 2,
                         circleSize,
-                        circleSize, hitObject.Color);
+                        circleSize, hitObject.Color with {W = Math.Min(fadein,fadeout)});
+                    
                     drawTexture(_hitcircleOverlayTexture,
                         posX - circleSize / 2,
                         posY - circleSize / 2,
                         circleSize,
-                        circleSize, new Vector4(1, 1, 1, 1));
+                        circleSize, new Vector4(1, 1, 1, 1) with {W = Math.Min(fadein,fadeout)});
 
                     if (_objectComboNumber >= 10) _objectComboNumber = 9; // lets not crash rn
                     if (!hitObject.DidSetCombo)
@@ -261,8 +284,10 @@ public unsafe class GameDisplay : IDisposable
 
                     _objectComboNumber++;
                 }
+                
             }
         }
+        Console.Write($"\n");
 
         // cursor
         float size = _cursorTrailTexture.Width * 1.5f;
