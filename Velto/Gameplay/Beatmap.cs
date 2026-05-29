@@ -227,13 +227,13 @@ public class Beatmap
                 comboCounter = 0;
             }
             comboCounter++;
-            if (comboCounter >= 9) comboCounter = 9;
+            //if (comboCounter >= 9) comboCounter = 9;
             Vector4 color = colorCounter switch
             {
                 0 => new Vector4(1, 0, 0, 1),
                 1 => new Vector4(0, 1, 0, 1),
                 2 => new Vector4(0, 0, 1, 1),
-                3 => new Vector4(1, 0, 1, 1),
+                3 => new Vector4(1, 1, 0, 1),
             };
 
             hitobject.Color = color;

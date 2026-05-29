@@ -6,8 +6,8 @@ using System.Linq;
 using ManagedBass;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
-using SDL;
 using Velto.Gameplay;
+using SDL;
 using static SDL.SDL3;
 
 namespace Velto.Graphics;
@@ -47,6 +47,7 @@ public unsafe class GameDisplay : IDisposable
     private Texture _approachCircleTexture;
     private Texture _sliderballTexture;
     private Texture _circleTexture;
+    private Texture _hit0Texture;
     private Dictionary<int, Texture> _numberTextures = new();
 
     private int _windowWidth, _windowHeight;
@@ -61,6 +62,10 @@ public unsafe class GameDisplay : IDisposable
     private double _startingTimer = 0;
     private bool _musicStarted = false;
     private string _skinName = "rafis";
+    private float _musicVolume;
+    private bool _isPaused = false;
+    private IOrderedEnumerable<HitObject> _sortedObjects;
+    private float _baseCircleSize;
 
 
     public GameDisplay(SDL_Window* window)
@@ -74,9 +79,9 @@ public unsafe class GameDisplay : IDisposable
         shader = new("sprite"); // pippidonclear0
 
         //_beatmap = new(Resources.GetPath("Resources/Songs/lotus/Susumu Hirasawa - SWITCHED-ON LOTUS (Starrodkirby86) [KIRBY Mix Deluxe].osu"));
-         _beatmap = new(Resources.GetPath("Resources/Songs/Wakeshima Kanon/ASCA - Nisemono no Koi ni Sayounara with Wakeshima Kanon (timemon) [Kyou's Extra].osu"));
-        //_beatmap = new(Resources.GetPath("Resources/Songs/Centipede/Knife Party - Centipede (Sugoi-_-Desu) [This isn't a map, just a simple visualisation].osu"));
-        // _beatmap = new(Resources.GetPath("Resources/Songs/exit/Camellia - Exit This Earth's Atomosphere (Camellia's ''PLANETARY200STEP'' Remix) (ProfessionalBox) [Primordial Nucleosynthesis].osu"));
+        // _beatmap = new(Resources.GetPath("Resources/Songs/Wakeshima Kanon/ASCA - Nisemono no Koi ni Sayounara with Wakeshima Kanon (timemon) [Kyou's Extra].osu"));
+        // _beatmap = new(Resources.GetPath("Resources/Songs/Centipede/Knife Party - Centipede (Sugoi-_-Desu) [This isn't a map, just a simple visualisation].osu"));
+        _beatmap = new(Resources.GetPath("Resources/Songs/exit/Camellia - Exit This Earth's Atomosphere (Camellia's ''PLANETARY200STEP'' Remix) (ProfessionalBox) [Primordial Nucleosynthesis].osu"));
 
         _backgroundTexture = new(Path.Combine(_beatmap.Folder, _beatmap.BackgroundFile));
 
@@ -87,7 +92,9 @@ public unsafe class GameDisplay : IDisposable
         _cursorTrailTexture = new(Resources.GetPath($"Resources/Textures/{_skinName}/cursortrail.png"));
         _approachCircleTexture = new(Resources.GetPath($"Resources/Textures/{_skinName}/approachcircle.png"));
         _sliderballTexture = new(Resources.GetPath($"Resources/Textures/{_skinName}/sliderb.png"));
+        _hit0Texture =new(Resources.GetPath($"Resources/Textures/{_skinName}/hit0.png"));
         _circleTexture = new(Resources.GetPath($"Resources/Textures/circle.png"));
+       
 
         for (int i = 0; i < 10; i++)
         {
@@ -96,9 +103,10 @@ public unsafe class GameDisplay : IDisposable
 
         Bass.Init();
 
-        Console.WriteLine(_beatmap.AudioFilename);
+        //Console.WriteLine(_beatmap.AudioFilename);
         _musicChannel = Bass.CreateStream(Path.Combine(_beatmap.Folder, _beatmap.AudioFilename));
         Bass.ChannelSetAttribute(_musicChannel, ChannelAttribute.Volume, 0.02f);
+        _musicVolume = 0.02f;
         _songLength = 1000 * Bass.ChannelBytes2Seconds(_musicChannel, Bass.ChannelGetLength(_musicChannel));
 
         _startingTimer = WAITINGTIME + _beatmap.AudioLeadIn;
@@ -123,35 +131,86 @@ public unsafe class GameDisplay : IDisposable
         {
             _startingTimer = 0;
         }
-
-        var posByte = Bass.ChannelGetPosition(_musicChannel, PositionFlags.Bytes);
-        var pos = Bass.ChannelBytes2Seconds(_musicChannel, posByte);
-        var err = Bass.LastError;
-        if (err != Errors.OK)
-        {
-            Console.WriteLine(err);
-        }
-
-        //Console.WriteLine(pos);
+        
+        var pos = Bass.ChannelBytes2Seconds(_musicChannel,  Bass.ChannelGetPosition(_musicChannel));
+        // var err = Bass.LastError;
+        // if (err != Errors.OK)
+        // {
+        //     Console.WriteLine(err);
+        // }
         _songCursor = (ulong)(pos * 1000);
-
-
-        //float songPointer = Util.MapRange((float)_songCursor, 0, (float)_songLength, 0, _windowWidth);
-        //drawRectangle(0, windowHeight - 40, songPointer, 40, new Vector4(242/255f, 191/255f, 36/255f, 1));
+        
+        _sortedObjects = _beatmap.HitObjects
+            .OrderByDescending(h => Math.Abs(h.Time - _songCursor));
+        
         RectangleF hitbox = new(0, _windowHeight - 40, _windowWidth, 40);
-        float mouseX, mouseY;
-        var mFlags = SDL_GetMouseState(&mouseX, &mouseY);
-        if ((mFlags & SDL_MouseButtonFlags.SDL_BUTTON_LMASK) != 0)
+        if (Input.IsMouseDown(SDLButton.SDL_BUTTON_LEFT))
         {
             // Console.WriteLine(hitbox);
-            // Console.WriteLine($"{mouseX} {mouseY}");
-            if (hitbox.Contains(mouseX, mouseY))
+            // Console.WriteLine($"{Input.MouseX} {Input.MouseY}");
+            if (hitbox.Contains(Input.MouseX, Input.MouseY))
             {
-                Console.WriteLine("Mouse inside");
-                float songPointer = Util.MapRange(mouseX, 0, _windowWidth, 0, (float)_songLength);
+                // Console.WriteLine("Mouse inside");
+                float songPointer = Util.MapRange(Input.MouseX, 0, _windowWidth, 0, (float)_songLength);
                 Bass.ChannelSetPosition(_musicChannel, Bass.ChannelSeconds2Bytes(_musicChannel, songPointer / 1000));
             }
         }
+
+        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_SPACE))
+        {
+            if (_isPaused)
+            {
+                Bass.ChannelPlay(_musicChannel);
+            }
+            else
+            {
+                Bass.ChannelPause(_musicChannel);
+            }
+            _isPaused = !_isPaused;
+        }
+
+        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_LEFT))
+        {
+            _songCursor -= 1000;
+            Bass.ChannelSetPosition(_musicChannel, Bass.ChannelSeconds2Bytes(_musicChannel, _songCursor/1000));
+        }
+        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_RIGHT))
+        {
+            _songCursor += 1000;
+            Bass.ChannelSetPosition(_musicChannel, Bass.ChannelSeconds2Bytes(_musicChannel, _songCursor/1000));
+        }
+
+        if (Math.Abs(Input.WheelY) > 0.01f)
+        {
+            _musicVolume += Input.WheelY * 0.01f;
+            _musicVolume = Math.Clamp(_musicVolume, 0, 1);
+            Bass.ChannelSetAttribute(_musicChannel, ChannelAttribute.Volume, _musicVolume);
+        }
+        
+        // Handle objects bkz: https://osu.ppy.sh/wiki/en/Gameplay/Judgement/osu%21 
+        foreach (var hitObject in _sortedObjects)
+        {
+           
+            
+            
+            if (hitObject is HitCircle circle)
+            {
+                if (_songCursor - 150 >= circle.Time)
+                {
+                    circle.HitResult = HitResult.Miss;
+                    circle.Failed = true;
+                }
+
+                if (Vector2.Distance(circle.Position, new Vector2(Input.MouseX, Input.MouseY)) <= _baseCircleSize / 2)
+                {
+                    if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_Z) || Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_X))
+                    {
+                        
+                    }
+                }
+            }
+        }
+        
     }
 
     public class TrailInfo
@@ -163,19 +222,17 @@ public unsafe class GameDisplay : IDisposable
         {
         }
     }
-
+    
     private Queue<TrailInfo> trails = new();
     private Vector2 lastPosition = Vector2.Zero;
 
     public void Draw(double delta)
     {
-        float mouseX = 0, mouseY = 0;
-        SDL_GetMouseState(&mouseX, &mouseY);
-        //mouseX *= 2;
-        //mouseY *= 2;
-        //SDL_HideCursor();
+        //Bass.ChannelSetAttribute(_musicChannel, ChannelAttribute.Volume, 0.02f);
+        Bass.ChannelGetAttribute(_musicChannel, ChannelAttribute.Volume, out var volume);
+      
 
-        if (Vector2.Distance(new Vector2(mouseX, mouseY), lastPosition) > 5)
+        if (Vector2.Distance(new Vector2(Input.MouseX, Input.MouseY), lastPosition) > 5)
         {
             trails.Enqueue(new TrailInfo()
             {
@@ -220,7 +277,7 @@ public unsafe class GameDisplay : IDisposable
         float ratio = PLAYFIELD_W / (float)PLAYFIELD_H;
 
         float max = Math.Min(_windowWidth, _windowHeight);
-        max -= 350; // some offset
+        max -= 250; // some offset
 
         float playfieldWidth = max * ratio;
         float playfieldHeight = max;
@@ -242,19 +299,18 @@ public unsafe class GameDisplay : IDisposable
         // float circleDiameter = osuRadius * 2f * scale;
         // float circleSize = circleDiameter;
         float scale = playfieldWidth / PLAYFIELD_W;
-
         float osuRadius = 54.4f - 4.48f * _beatmap.CircleSize;
-
-        float baseCircleSize = osuRadius * 2f * scale;
-
-        foreach (var hitObject in _beatmap.HitObjects)
+        _baseCircleSize = osuRadius * 2f * scale;
+        
+       
+        foreach (var hitObject in _sortedObjects)
         {
             float preempt;
             if (_beatmap.ApproachRate < 5)
                 preempt = 1200 + 600 * (5 - _beatmap.ApproachRate) / 5;
             else
                 preempt = 1200 - 750 * (_beatmap.ApproachRate - 5) / 5;
-
+            
             float pretime = 500;
             float posttime = 150;
             if (hitObject is HitCircle)
@@ -266,7 +322,7 @@ public unsafe class GameDisplay : IDisposable
                     (hitObject.Time + _startingTimer - (int)_songCursor) < pretime)
                 {
                     float _fadein = 400 * Math.Min(1, preempt / 450);
-                    float objectCircleSize = baseCircleSize;
+                    float objectCircleSize = _baseCircleSize;
                     float fadein =
                         Math.Clamp(
                             Util.MapRange((float)_songCursor, hitObject.Time - _fadein, (hitObject.Time - pretime / 2),
@@ -279,12 +335,16 @@ public unsafe class GameDisplay : IDisposable
                         Math.Max(
                             Util.MapRange((float)_songCursor, hitObject.Time - pretime, hitObject.Time + 0,
                                 drawSize * 4, drawSize), drawSize);
-
+                    
+                    
                     drawTexture(_approachCircleTexture,
                         posX - approachCircleSize / 2,
                         posY - approachCircleSize / 2,
                         approachCircleSize,
-                        approachCircleSize, hitObject.Color with { W = Math.Min(fadein, fadeout) });
+                        approachCircleSize, hitObject.Color with
+                        {
+                            W = Math.Min(fadein, fadeout)
+                        });
 
                     drawTexture(_hitcircleTexture,
                         posX - drawSize / 2,
@@ -299,15 +359,46 @@ public unsafe class GameDisplay : IDisposable
                         drawSize, new Vector4(1, 1, 1, 1) with { W = Math.Min(fadein, fadeout) });
 
                     // number handling
-                    Texture texture = _numberTextures[hitObject.ComboNumber];
-                    var numHeight = drawSize - 90;
-                    var numRatio = numHeight / texture.Height;
-                    var numWidth = texture.Width * numRatio;
+                    // Texture texture = _numberTextures[hitObject.ComboNumber];
+                    // var numHeight = drawSize * 0.3f;
+                    // var numRatio = numHeight / texture.Height;
+                    // var numWidth = texture.Width * numRatio;
 
-                    drawTexture(texture,
-                        posX - numWidth / 2,
-                        posY - numHeight / 2,
-                        numWidth, numHeight, new Vector4(1, 1, 1, 1) with { W = Math.Min(fadein, fadeout) });
+                    string num = hitObject.ComboNumber.ToString();
+
+                    float digitScale = drawSize / 128f; // adjust baseline size
+                    float digitWidthTotal = 0;
+
+                    // first pass: compute total width
+                    foreach (char c in num)
+                    {
+                        int digit = c - '0';
+                        Texture tex = _numberTextures[digit];
+                        digitWidthTotal += tex.Width * digitScale;
+                    }
+
+                    // start centered
+                    float cursorX = posX - digitWidthTotal / 2;
+
+                    foreach (char c in num)
+                    {
+                        int digit = c - '0';
+                        Texture tex = _numberTextures[digit];
+
+                        float w = tex.Width * digitScale;
+                        float h = tex.Height * digitScale;
+
+                        drawTexture(
+                            tex,
+                            cursorX,
+                            posY - h / 2,
+                            w,
+                            h,
+                            new Vector4(1, 1, 1, 1) with { W = Math.Min(fadein, fadeout) }
+                        );
+
+                        cursorX += w;
+                    }
                 }
             }
 
@@ -320,7 +411,7 @@ public unsafe class GameDisplay : IDisposable
                     (hitObject.Time + _startingTimer - (int)_songCursor) < pretime)
                 {
                     float _fadein = 400 * Math.Min(1, preempt / 450);
-                    float objectCircleSize = baseCircleSize;
+                    float objectCircleSize = _baseCircleSize;
                     float fadein =
                         Math.Clamp(
                             Util.MapRange((float)_songCursor, hitObject.Time - _fadein, (hitObject.Time - pretime / 2),
@@ -365,31 +456,74 @@ public unsafe class GameDisplay : IDisposable
                         drawSize,
                         drawSize, new Vector4(1, 1, 1, 1) with { W = Math.Min(fadein, fadeout) });
 
-                    // number handling
-                    Texture texture = _numberTextures[hitObject.ComboNumber];
-                    var numHeight = drawSize - 90;
-                    var numRatio = numHeight / texture.Height;
-                    var numWidth = texture.Width * numRatio;
+                    string num = hitObject.ComboNumber.ToString();
 
-                    drawTexture(texture,
-                        posX - numWidth / 2,
-                        posY - numHeight / 2,
-                        numWidth, numHeight, new Vector4(1, 1, 1, 1) with { W = Math.Min(fadein, fadeout) });
+                    float digitScale = drawSize / 128f; // adjust baseline size
+                    float digitWidthTotal = 0;
 
-                   
+                    // first pass: compute total width
+                    foreach (char c in num)
+                    {
+                        int digit = c - '0';
+                        Texture tex = _numberTextures[digit];
+                        digitWidthTotal += tex.Width * digitScale;
+                    }
+
+                    // start centered
+                    float cursorX = posX - digitWidthTotal / 2;
+
+                    foreach (char c in num)
+                    {
+                        int digit = c - '0';
+                        Texture tex = _numberTextures[digit];
+
+                        float w = tex.Width * digitScale;
+                        float h = tex.Height * digitScale;
+
+                        drawTexture(
+                            tex,
+                            cursorX,
+                            posY - h / 2,
+                            w,
+                            h,
+                            new Vector4(1, 1, 1, 1) with { W = Math.Min(fadein, fadeout) }
+                        );
+
+                        cursorX += w;
+                    }
                 }
             }
         }
         //Console.Write($"\n");
 
 
+        var yellow = new Vector4(242 / 255f, 191 / 255f, 36 / 255f, 1);
         // timeline
         float songPointer = Util.MapRange((float)_songCursor, 0, (float)_songLength, 0, _windowWidth);
-        drawRectangle(0, _windowHeight - 40, songPointer, 40, new Vector4(242 / 255f, 191 / 255f, 36 / 255f, 1));
+        drawRectangle(0, _windowHeight - 40, songPointer, 40, yellow);
+        
+        // volume control
+        
+        drawRectangle(0, (float)_windowHeight/2 - 150, 40, 300, new Vector4(0.1f, 0.1f, 0.1f, 1));
 
+        float length = Util.MapRange(_musicVolume, 0, 1, 0, 300);
+        drawRectangle(10, (float)_windowHeight/2 - 150, 20, length, yellow);
+        
+        // input overlay
+        Vector4 inputColor;
+        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_Z) || Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_X))
+        {
+            inputColor = new(1, 0, 0, 1);
+        }
+        else
+        {
+            inputColor = new(1, 1, 1, 1);
+        }
+        drawRectangle(0, 0, 50, 50, inputColor);
+        
         // cursor
         float size = _cursorTrailTexture.Width * 1.5f;
-        lastPosition = new(mouseX, mouseY);
+        lastPosition = new(Input.MouseX, Input.MouseY);
         int i = trails.Count;
         foreach (var trail in trails.Reverse())
         {
@@ -410,8 +544,8 @@ public unsafe class GameDisplay : IDisposable
 
         size = _cursorTexture.Width * 1.5f;
         drawTexture(_cursorTexture,
-            mouseX - size / 2,
-            mouseY - size / 2,
+            Input.MouseX - size / 2,
+            Input.MouseY - size / 2,
             size, size, new(1, 1, 1, 1),
             0);
     }
@@ -509,6 +643,7 @@ public unsafe class GameDisplay : IDisposable
         _approachCircleTexture.Dispose();
         _sliderballTexture.Dispose();
         _circleTexture.Dispose();
+        _hit0Texture.Dispose();
         foreach (var pair in _numberTextures)
         {
             pair.Value.Dispose();

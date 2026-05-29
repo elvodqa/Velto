@@ -12,7 +12,7 @@ using OpenTK.Mathematics;
 using SDL;
 using static SDL.SDL3;
 
-public unsafe class Shader
+public unsafe class Shader : IDisposable
 {
     public int Handle { get; private set; }
     
@@ -124,5 +124,10 @@ public unsafe class Shader
     public void SetMatrix4(string name, Matrix4 value)
     {
         GL.UniformMatrix4fv(GetLocation(name), 1, false, (float*)&value);
+    }
+
+    public void Dispose()
+    {
+        GL.DeleteProgram(Handle);
     }
 }

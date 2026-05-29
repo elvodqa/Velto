@@ -88,8 +88,12 @@ public unsafe class GameBase : IDisposable
         ulong tickLast = 0;
         double deltaTime = 0;
         _running = true;
+        Input.GetKeyboardState();
+        Input.UpdateMouse();
         while (_running)
         {
+            Input.FixScrollback();
+            SDL_PumpEvents();
             tickLast = tickNow;
             tickNow = SDL_GetPerformanceCounter();
             deltaTime = (tickNow - tickLast)*1000 / (double)SDL_GetPerformanceFrequency();
@@ -113,8 +117,13 @@ public unsafe class GameBase : IDisposable
                         }
                         break;
                 }
+                Input.UpdateEvents(ev);
             }
+         
+            Input.GetKeyboardState();
+            Input.UpdateMouse();
             
+          
             _gameDisplay.Update(deltaTime);
             _gameDisplay.Draw(deltaTime);
             
