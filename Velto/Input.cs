@@ -51,7 +51,7 @@ public unsafe class Input
         }
     }
 
-    public static void UpdateMouse()
+    public static void UpdateMouse(SDL_Window* window)
     {
         // store previous state
         _previousMouse = _currentMouse;
@@ -59,12 +59,16 @@ public unsafe class Input
         float x, y;
         _currentMouse = SDL_GetMouseState(&x, &y);
 
+        //float scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
+        //if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) scale = 2;
+        float scale = SDL_GetWindowDisplayScale(window);
+
         // position
         float prevX = MouseX;
         float prevY = MouseY;
 
-        MouseX = x;
-        MouseY = y;
+        MouseX = x * scale;
+        MouseY = y * scale;
 
         // delta
         DeltaX = MouseX - prevX;

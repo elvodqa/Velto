@@ -1,9 +1,12 @@
 #version 330 core
 
-uniform sampler2D texture;
-varying vec2 texcoord;
-varying vec4 col;
+uniform sampler2D oTexture;
+in vec2 texcoord;
+in vec4 col;
+
+out vec4 FragColor;
+
 void main()
 {
-    gl_FragColor = col * texture2D(texture, texcoord);
+    FragColor = col * texture(oTexture, texcoord);
 }

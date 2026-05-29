@@ -29,6 +29,7 @@ public unsafe class GameBase : IDisposable
     private GameDisplay _gameDisplay;
     private bool _running;
 
+    private Renderer _renderer;
    
     
     public GameBase()
@@ -54,7 +55,8 @@ public unsafe class GameBase : IDisposable
         SDL_GL_SetAttribute(SDL_GLAttr.SDL_GL_DEPTH_SIZE, 24);
         
         _window = SDL_CreateWindow("Velto"u8, 1280, 720, SDL_WindowFlags.SDL_WINDOW_OPENGL | SDL_WindowFlags.SDL_WINDOW_RESIZABLE
-            /*| SDL_WindowFlags.SDL_WINDOW_HIGH_PIXEL_DENSITY*/);
+            //| SDL_WindowFlags.SDL_WINDOW_HIGH_PIXEL_DENSITY
+            );
         _glContextState = SDL_GL_CreateContext(_window);
         SDL_GL_MakeCurrent(_window, _glContextState);
         SDL_GL_SetSwapInterval(1);
@@ -74,7 +76,8 @@ public unsafe class GameBase : IDisposable
         _logger.Info($"GLSL:     {GL.GetString(StringName.ShadingLanguageVersion)}");
 
         _running = false;
-        _gameDisplay = new(_window);
+        _renderer = new(_window);
+;        _gameDisplay = new(_renderer);
     }
 
     
@@ -89,7 +92,7 @@ public unsafe class GameBase : IDisposable
         double deltaTime = 0;
         _running = true;
         Input.GetKeyboardState();
-        Input.UpdateMouse();
+        Input.UpdateMouse(_window);
         while (_running)
         {
             Input.FixScrollback();
@@ -113,7 +116,7 @@ public unsafe class GameBase : IDisposable
                         if (ev.key.key == SDL_Keycode.SDLK_F1)
                         {
                             _gameDisplay.Dispose();
-                            _gameDisplay = new(_window);
+                            _gameDisplay = new(_renderer);
                         }
                         break;
                 }
@@ -121,7 +124,7 @@ public unsafe class GameBase : IDisposable
             }
          
             Input.GetKeyboardState();
-            Input.UpdateMouse();
+            Input.UpdateMouse(_window);
             
           
             _gameDisplay.Update(deltaTime);

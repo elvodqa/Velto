@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using BlurgText;
 using ManagedBass;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
@@ -67,10 +68,13 @@ public unsafe class GameDisplay : IDisposable
     private IOrderedEnumerable<HitObject> _sortedObjects;
     private float _baseCircleSize;
 
+    private Renderer _renderer;
 
-    public GameDisplay(SDL_Window* window)
+
+    public GameDisplay(Renderer renderer)
     {
-        _window = window;
+        _renderer = renderer;
+        
         vertexBuffer = new(vertices, BufferTarget.ArrayBuffer, BufferUsage.StaticDraw);
         indexBuffer = new(indices, BufferTarget.ElementArrayBuffer, BufferUsage.StaticDraw);
         vao = new VertexArrayObject<float, uint>(vertexBuffer, indexBuffer);
@@ -79,9 +83,9 @@ public unsafe class GameDisplay : IDisposable
         shader = new("sprite"); // pippidonclear0
 
         //_beatmap = new(Resources.GetPath("Resources/Songs/lotus/Susumu Hirasawa - SWITCHED-ON LOTUS (Starrodkirby86) [KIRBY Mix Deluxe].osu"));
-        // _beatmap = new(Resources.GetPath("Resources/Songs/Wakeshima Kanon/ASCA - Nisemono no Koi ni Sayounara with Wakeshima Kanon (timemon) [Kyou's Extra].osu"));
-        // _beatmap = new(Resources.GetPath("Resources/Songs/Centipede/Knife Party - Centipede (Sugoi-_-Desu) [This isn't a map, just a simple visualisation].osu"));
-        _beatmap = new(Resources.GetPath("Resources/Songs/exit/Camellia - Exit This Earth's Atomosphere (Camellia's ''PLANETARY200STEP'' Remix) (ProfessionalBox) [Primordial Nucleosynthesis].osu"));
+         _beatmap = new(Resources.GetPath("Resources/Songs/Wakeshima Kanon/ASCA - Nisemono no Koi ni Sayounara with Wakeshima Kanon (timemon) [Kyou's Extra].osu"));
+        //_beatmap = new(Resources.GetPath("Resources/Songs/Centipede/Knife Party - Centipede (Sugoi-_-Desu) [This isn't a map, just a simple visualisation].osu"));
+        //_beatmap = new(Resources.GetPath("Resources/Songs/exit/Camellia - Exit This Earth's Atomosphere (Camellia's ''PLANETARY200STEP'' Remix) (ProfessionalBox) [Primordial Nucleosynthesis].osu"));
 
         _backgroundTexture = new(Path.Combine(_beatmap.Folder, _beatmap.BackgroundFile));
 
@@ -114,10 +118,9 @@ public unsafe class GameDisplay : IDisposable
 
     public void Update(double delta)
     {
-        int windowWidth, windowHeight;
-        SDL_GetWindowSizeInPixels(_window, &windowWidth, &windowHeight);
-        _windowWidth = windowWidth;
-        _windowHeight = windowHeight;
+        var windowSizes = _renderer.WindowSizeInPixels;
+        _windowWidth = (int)windowSizes.X;
+        _windowHeight = (int)windowSizes.Y;
 
         _startingTimer -= delta;
         if (_startingTimer <= 0 && !_musicStarted)
@@ -245,22 +248,15 @@ public unsafe class GameDisplay : IDisposable
             trails.Dequeue();
         }
 
-        GL.Viewport(0, 0, _windowWidth, _windowHeight);
-        GL.Enable(EnableCap.Blend);
-        //GL.Enable(EnableCap.DepthTest);
-        GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
-        //GL.ClearColor(0.1f, 0.2f, 0.3f, 1f);
-        GL.ClearColor(0f, 0f, 0f, 1f);
-        GL.Clear(ClearBufferMask.ColorBufferBit /*| ClearBufferMask.DepthBufferBit*/);
-
-
+        _renderer.Clear(new Vector4(0, 0, 0, 1));
+        
         // bg
         if (_windowWidth * ((float)_backgroundTexture.Height / _backgroundTexture.Width) > _windowHeight)
         {
             // sağ sol bar
             float padding = _windowWidth -
                             (_windowHeight * (((float)_backgroundTexture.Width) / (float)_backgroundTexture.Height));
-            drawTexture(_backgroundTexture, padding / 2, 0,
+            _renderer.DrawTexture(_backgroundTexture, padding / 2, 0,
                 _windowHeight * ((float)_backgroundTexture.Width / _backgroundTexture.Height), _windowHeight,
                 new(1, 1, 1, 1));
         }
@@ -269,15 +265,17 @@ public unsafe class GameDisplay : IDisposable
             // üst alt bar
             float padding = _windowHeight - (_windowWidth * (((float)_backgroundTexture.Height) /
                                                              ((float)_backgroundTexture.Width)));
-            drawTexture(_backgroundTexture, 0, padding / 2, _windowWidth,
+            _renderer.DrawTexture(_backgroundTexture, 0, padding / 2, _windowWidth,
                 _windowWidth * ((float)_backgroundTexture.Height / _backgroundTexture.Width), new(1, 1, 1, 1));
         }
+        // bg dim
+        _renderer.DrawRectangle(0, 0, _windowWidth, _windowHeight, new Vector4(0, 0, 0, 0.75f));
 
         // hitobjects
         float ratio = PLAYFIELD_W / (float)PLAYFIELD_H;
 
         float max = Math.Min(_windowWidth, _windowHeight);
-        max -= 250; // some offset
+        max *= 0.82f; // some offset
 
         float playfieldWidth = max * ratio;
         float playfieldHeight = max;
@@ -285,7 +283,7 @@ public unsafe class GameDisplay : IDisposable
         Vector2 playfieldAreaTopLeftCorner = new((float)_windowWidth / 2 - playfieldWidth / 2,
             (float)_windowHeight / 2 - playfieldHeight / 2);
 
-        drawRectangle(
+        _renderer.DrawRectangle(
             playfieldAreaTopLeftCorner.X,
             playfieldAreaTopLeftCorner.Y,
             playfieldWidth, playfieldHeight, new Vector4(1, 1, 1, 0.6f));
@@ -337,7 +335,7 @@ public unsafe class GameDisplay : IDisposable
                                 drawSize * 4, drawSize), drawSize);
                     
                     
-                    drawTexture(_approachCircleTexture,
+                    _renderer.DrawTexture(_approachCircleTexture,
                         posX - approachCircleSize / 2,
                         posY - approachCircleSize / 2,
                         approachCircleSize,
@@ -346,13 +344,13 @@ public unsafe class GameDisplay : IDisposable
                             W = Math.Min(fadein, fadeout)
                         });
 
-                    drawTexture(_hitcircleTexture,
+                    _renderer.DrawTexture(_hitcircleTexture,
                         posX - drawSize / 2,
                         posY - drawSize / 2,
                         drawSize,
                         drawSize, hitObject.Color with { W = Math.Min(fadein, fadeout) });
 
-                    drawTexture(_hitcircleOverlayTexture,
+                    _renderer.DrawTexture(_hitcircleOverlayTexture,
                         posX - drawSize / 2,
                         posY - drawSize / 2,
                         drawSize,
@@ -388,7 +386,7 @@ public unsafe class GameDisplay : IDisposable
                         float w = tex.Width * digitScale;
                         float h = tex.Height * digitScale;
 
-                        drawTexture(
+                        _renderer.DrawTexture(
                             tex,
                             cursorX,
                             posY - h / 2,
@@ -430,7 +428,7 @@ public unsafe class GameDisplay : IDisposable
                         float scaledX = startX + point.X * scale;
                         float scaledY = startY + point.Y * scale;
 
-                        drawTexture(_circleTexture,
+                        _renderer.DrawTexture(_circleTexture,
                             scaledX - drawSize / 2,
                             scaledY - drawSize / 2,
                             drawSize,
@@ -438,19 +436,19 @@ public unsafe class GameDisplay : IDisposable
                             hitObject.Color with { W = Math.Min(fadein, fadeout) });
                     }
 
-                    drawTexture(_approachCircleTexture,
+                    _renderer.DrawTexture(_approachCircleTexture,
                         posX - approachCircleSize / 2,
                         posY - approachCircleSize / 2,
                         approachCircleSize,
                         approachCircleSize, hitObject.Color with { W = Math.Min(fadein, fadeout) });
 
-                    drawTexture(_hitcircleTexture,
+                    _renderer.DrawTexture(_hitcircleTexture,
                         posX - drawSize / 2,
                         posY - drawSize / 2,
                         drawSize,
                         drawSize, hitObject.Color with { W = Math.Min(fadein, fadeout) });
 
-                    drawTexture(_hitcircleOverlayTexture,
+                    _renderer.DrawTexture(_hitcircleOverlayTexture,
                         posX - drawSize / 2,
                         posY - drawSize / 2,
                         drawSize,
@@ -480,7 +478,7 @@ public unsafe class GameDisplay : IDisposable
                         float w = tex.Width * digitScale;
                         float h = tex.Height * digitScale;
 
-                        drawTexture(
+                        _renderer.DrawTexture(
                             tex,
                             cursorX,
                             posY - h / 2,
@@ -500,14 +498,14 @@ public unsafe class GameDisplay : IDisposable
         var yellow = new Vector4(242 / 255f, 191 / 255f, 36 / 255f, 1);
         // timeline
         float songPointer = Util.MapRange((float)_songCursor, 0, (float)_songLength, 0, _windowWidth);
-        drawRectangle(0, _windowHeight - 40, songPointer, 40, yellow);
+        _renderer.DrawRectangle(0, _windowHeight - 20, songPointer, 20, yellow);
         
         // volume control
         
-        drawRectangle(0, (float)_windowHeight/2 - 150, 40, 300, new Vector4(0.1f, 0.1f, 0.1f, 1));
+        _renderer.DrawRectangle(0, (float)_windowHeight/2 - 150, 40, 300, new Vector4(0.1f, 0.1f, 0.1f, 1));
 
         float length = Util.MapRange(_musicVolume, 0, 1, 0, 300);
-        drawRectangle(10, (float)_windowHeight/2 - 150, 20, length, yellow);
+        _renderer.DrawRectangle(10, (float)_windowHeight/2 - 150, 20, length, yellow);
         
         // input overlay
         Vector4 inputColor;
@@ -519,10 +517,10 @@ public unsafe class GameDisplay : IDisposable
         {
             inputColor = new(1, 1, 1, 1);
         }
-        drawRectangle(0, 0, 50, 50, inputColor);
+        _renderer.DrawRectangle(0, 0, 50, 50, inputColor);
         
         // cursor
-        float size = _cursorTrailTexture.Width * 1.5f;
+        float size = _baseCircleSize / 2f;
         lastPosition = new(Input.MouseX, Input.MouseY);
         int i = trails.Count;
         foreach (var trail in trails.Reverse())
@@ -534,7 +532,7 @@ public unsafe class GameDisplay : IDisposable
             }
 
             size -= 1;
-            drawTexture(_cursorTrailTexture,
+            _renderer.DrawTexture(_cursorTrailTexture,
                 trail.Position.X - size / 2,
                 trail.Position.Y - size / 2,
                 size, size, new(1, 1, 1, (float)i / trails.Count),
@@ -542,89 +540,18 @@ public unsafe class GameDisplay : IDisposable
             i--;
         }
 
-        size = _cursorTexture.Width * 1.5f;
-        drawTexture(_cursorTexture,
+        size = _baseCircleSize / 2f; // _cursorTexture.Width * 1.5f;
+        _renderer.DrawTexture(_cursorTexture,
             Input.MouseX - size / 2,
             Input.MouseY - size / 2,
             size, size, new(1, 1, 1, 1),
             0);
+        
+        
+        _renderer.DrawText(new Vector2(100, 100), "Arial", FontWeight.Light, 64, new Vector4(1, 1, 1, 1), "The quick brown fox jumps over the lazy dog\n");
+        _renderer.DrawText(new Vector2(100, 200), "Arial", FontWeight.Regular, 64, new Vector4(1, 1, 1, 1), "The quick brown fox jumps over the lazy dog\n");
     }
-
-    private void drawTexture(Texture texture, float x, float y, float width, float height, Vector4 color,
-        float rotation = 0)
-
-    {
-        Matrix4 projection =
-            Matrix4.CreateOrthographicOffCenter(
-                0,
-                _windowWidth,
-                _windowHeight,
-                0,
-                -1f,
-                1f);
-
-        Matrix4 model =
-            Matrix4.CreateTranslation(-0.5f, -0.5f, 0f) *
-            Matrix4.CreateRotationZ(MathHelper.DegreesToRadians(rotation)) *
-            Matrix4.CreateTranslation(0.5f, 0.5f, 0f) *
-            Matrix4.CreateScale(width, height, 1f) *
-            Matrix4.CreateTranslation(x, y, 0f);
-
-        texture.Bind();
-
-        shader.Use();
-        shader.SetInt("ourTexture", 0);
-        shader.SetVector4("color", color);
-        shader.SetMatrix4("model", model);
-        shader.SetMatrix4("view", Matrix4.Identity);
-        shader.SetMatrix4("projection", projection);
-
-        vao.Bind();
-
-        GL.DrawElements(
-            PrimitiveType.Triangles,
-            6,
-            DrawElementsType.UnsignedInt,
-            IntPtr.Zero);
-    }
-
-    private void drawRectangle(float x, float y, float width, float height, Vector4 color,
-        float rotation = 0)
-    {
-        Matrix4 projection =
-            Matrix4.CreateOrthographicOffCenter(
-                0,
-                _windowWidth,
-                _windowHeight,
-                0,
-                -1f,
-                1f);
-
-        Matrix4 model =
-            Matrix4.CreateTranslation(-0.5f, -0.5f, 0f) *
-            Matrix4.CreateRotationZ(MathHelper.DegreesToRadians(rotation)) *
-            Matrix4.CreateTranslation(0.5f, 0.5f, 0f) *
-            Matrix4.CreateScale(width, height, 1f) *
-            Matrix4.CreateTranslation(x, y, 0f);
-
-        _whiteTexture.Bind();
-
-        shader.Use();
-        shader.SetInt("ourTexture", 0);
-        shader.SetVector4("color", color);
-        shader.SetMatrix4("model", model);
-        shader.SetMatrix4("view", Matrix4.Identity);
-        shader.SetMatrix4("projection", projection);
-
-        vao.Bind();
-
-        GL.DrawElements(
-            PrimitiveType.Triangles,
-            6,
-            DrawElementsType.UnsignedInt,
-            IntPtr.Zero);
-    }
-
+    
     public void Dispose()
     {
         //Bass.Stop();
