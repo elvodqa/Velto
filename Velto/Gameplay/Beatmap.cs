@@ -1,49 +1,22 @@
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using OpenTK.Mathematics;
 
 namespace Velto.Gameplay;
 
 public class Beatmap
 {
+    private const byte ComboSkipMask = 0b0111_0000;
     public string Filename;
     public string Folder; // path to folder containing the map
-    
-    // General
-    public string AudioFilename { get; set; }
-    public int AudioLeadIn { get; set; } // Milliseconds of silence before the audio starts playing
-    public float StackLeniency { get; set; } = 0.7f;
-    public int Mode { get; set; } // 0 = osu!, 1 = osu!taiko, 2 = osu!catch, 3 = osu!mania
-    
-    // Metadata
-    public string Title { get; set; }
-    public string Artist { get; set; }
-    public string Creator { get; set; }
-    public string Version { get; set; } // difficulty name
-    
-    // Difficulty
-    public float HPDrainRate { get; set; }
-    public float CircleSize { get; set; }
-    public float OverallDifficulty { get; set; }
-    public float ApproachRate { get; set; }
-    public float SliderMultiplier { get; set; }
-    public float SliderTickRate { get; set; }
-    
-    public string BackgroundFile { get; set; }
-    
-    public List<HitObject> HitObjects { get; set; }
 
-    const byte ComboSkipMask = 0b0111_0000;
     public Beatmap(string filePath)
     {
-        HitObjects = new();
+        HitObjects = new List<HitObject>();
         Filename = Path.GetFileName(filePath);
         Folder = Path.GetDirectoryName(filePath)!;
 
-        bool reachedHitobjects = false;
-        bool reachedEvents = false;
-        foreach (string line in File.ReadAllLines(filePath))
+        var reachedHitobjects = false;
+        var reachedEvents = false;
+        foreach (var line in File.ReadAllLines(filePath))
         {
             if (line.StartsWith("//")) continue;
             if (line.StartsWith(" ")) continue;
@@ -65,9 +38,9 @@ public class Beatmap
             if (!reachedHitobjects && !reachedEvents)
             {
                 if (!line.Contains(":")) continue;
-                string[] split = line.Split(":");
-                string first = split[0].Trim();
-                string second = split[1].Trim();
+                var split = line.Split(":");
+                var first = split[0].Trim();
+                var second = split[1].Trim();
                 switch (first)
                 {
                     case "AudioFilename":
@@ -118,30 +91,30 @@ public class Beatmap
             {
                 if (line.StartsWith("0"))
                 {
-                    string[] split = line.Split(",");
+                    var split = line.Split(",");
                     BackgroundFile = split[2];
                     BackgroundFile = BackgroundFile.Substring(1, BackgroundFile.Length - 2);
                 }
             }
             else if (reachedHitobjects)
             {
-                string[] split = line.Split(",");
+                var split = line.Split(",");
                 int x, y, time;
                 x = int.Parse(split[0]);
                 y = int.Parse(split[1]);
                 time = int.Parse(split[2]);
-                int type = int.Parse(split[3]);
-                
-                var flags = (HitObjectType)(type & 0b1000_1111); 
+                var type = int.Parse(split[3]);
+
+                var flags = (HitObjectType)(type & 0b1000_1111);
                 // keep bits 0–3 and 7 as enum flags
 
-                int comboSkip = (type & ComboSkipMask) >> 4;
+                var comboSkip = (type & ComboSkipMask) >> 4;
 
-                bool isCircle = flags.HasFlag(HitObjectType.Circle);
-                bool isSlider = flags.HasFlag(HitObjectType.Slider);
-                bool isNewCombo = flags.HasFlag(HitObjectType.NewCombo);
-                bool isSpinner = flags.HasFlag(HitObjectType.Spinner);
-                bool isHold = flags.HasFlag(HitObjectType.ManiaHold);
+                var isCircle = flags.HasFlag(HitObjectType.Circle);
+                var isSlider = flags.HasFlag(HitObjectType.Slider);
+                var isNewCombo = flags.HasFlag(HitObjectType.NewCombo);
+                var isSpinner = flags.HasFlag(HitObjectType.Spinner);
+                var isHold = flags.HasFlag(HitObjectType.ManiaHold);
 
                 //Console.WriteLine($"Flags: {flags}");
                 //Console.WriteLine($"Combo skip: {comboSkip}");
@@ -151,36 +124,37 @@ public class Beatmap
                     HitCircle hitCircle = new();
                     hitCircle.NewCombo = isNewCombo;
                     hitCircle.Time = time;
-                    hitCircle.Position = new(x, y);
+                    hitCircle.Position = new Vector2(x, y);
 
                     HitObjects.Add(hitCircle);
-                } else if (isSlider)
+                }
+                else if (isSlider)
                 {
                     Slider slider = new();
                     slider.NewCombo = isNewCombo;
                     slider.Position = new Vector2(int.Parse(split[0]), int.Parse(split[1]));
                     slider.Time = int.Parse(split[2]);
                     //slider.HitSound = int.Parse(split[4]);
-                    string[] sliderData = split[5].Split('|');
-                    CurveType defaultCurveType = sliderData[0] switch 
+                    var sliderData = split[5].Split('|');
+                    var defaultCurveType = sliderData[0] switch
                     {
                         "B" => CurveType.Bezier,
                         "C" => CurveType.Catmull,
                         "L" => CurveType.Linear,
                         "P" => CurveType.Perfect,
-                        _ => CurveType.Linear,
+                        _ => CurveType.Linear
                     };
-                    
-                    slider.CurvePoints.Add(new CurvePoint()
+
+                    slider.CurvePoints.Add(new CurvePoint
                     {
                         Position = slider.Position,
                         Type = defaultCurveType
                     });
-                    
-                    for (int i = 1; i < sliderData.Length; i++)
+
+                    for (var i = 1; i < sliderData.Length; i++)
                     {
-                        string[] point = sliderData[i].Split(':');
-                        CurvePoint curvePoint = new CurvePoint();
+                        var point = sliderData[i].Split(':');
+                        var curvePoint = new CurvePoint();
                         curvePoint.Position = new Vector2(int.Parse(point[0]), int.Parse(point[1]));
                         if (i > 1 && sliderData[i - 1] == sliderData[i])
                         {
@@ -192,15 +166,17 @@ public class Beatmap
                         {
                             curvePoint.Type = defaultCurveType;
                         }
+
                         slider.CurvePoints.Add(curvePoint);
                     }
+
                     /*if (int.Parse(split[3]) == 6)
                     {
                         curComboNumber = 1;
                         slider.ComboNumber = curComboNumber;
                         curComboNumber++;
-                    } 
-                    else 
+                    }
+                    else
                     {
                         slider.ComboNumber = curComboNumber;
                         curComboNumber++;
@@ -209,15 +185,39 @@ public class Beatmap
                 }
             }
         }
-        
+
         CalculatePrepass();
     }
+
+    // General
+    public string AudioFilename { get; set; }
+    public int AudioLeadIn { get; set; } // Milliseconds of silence before the audio starts playing
+    public float StackLeniency { get; set; } = 0.7f;
+    public int Mode { get; set; } // 0 = osu!, 1 = osu!taiko, 2 = osu!catch, 3 = osu!mania
+
+    // Metadata
+    public string Title { get; set; }
+    public string Artist { get; set; }
+    public string Creator { get; set; }
+    public string Version { get; set; } // difficulty name
+
+    // Difficulty
+    public float HPDrainRate { get; set; }
+    public float CircleSize { get; set; }
+    public float OverallDifficulty { get; set; }
+    public float ApproachRate { get; set; }
+    public float SliderMultiplier { get; set; }
+    public float SliderTickRate { get; set; }
+
+    public string BackgroundFile { get; set; }
+
+    public List<HitObject> HitObjects { get; set; }
 
     public void CalculatePrepass()
     {
         var comboCounter = 0;
         var colorCounter = 0;
-        
+
         foreach (var hitobject in HitObjects)
         {
             if (hitobject.NewCombo)
@@ -226,14 +226,15 @@ public class Beatmap
                 colorCounter %= 4;
                 comboCounter = 0;
             }
+
             comboCounter++;
             //if (comboCounter >= 9) comboCounter = 9;
-            Vector4 color = colorCounter switch
+            var color = colorCounter switch
             {
                 0 => new Vector4(1, 0, 0, 1),
                 1 => new Vector4(0, 1, 0, 1),
                 2 => new Vector4(0, 0, 1, 1),
-                3 => new Vector4(1, 1, 0, 1),
+                3 => new Vector4(1, 1, 0, 1)
             };
 
             hitobject.Color = color;
@@ -244,7 +245,7 @@ public class Beatmap
                 var segments = new List<List<CurvePoint>>();
                 var current = new List<CurvePoint>();
 
-                for (int i = 0; i < slider.CurvePoints.Count; i++)
+                for (var i = 0; i < slider.CurvePoints.Count; i++)
                 {
                     var point = slider.CurvePoints[i];
                     current.Add(point);
@@ -262,22 +263,15 @@ public class Beatmap
                 }
 
                 // Add remaining points
-                if (current.Count > 1)
-                {
-                    segments.Add(current);
-                }
+                if (current.Count > 1) segments.Add(current);
 
                 foreach (var segment in segments)
                 {
                     BezierCurve bezier =
-                        new(segment.Select(x=> new Vector2(x.Position.X, x.Position.Y)));
-                    for (float i = 0; i <= 1.0f; i += 0.05f)
-                    {
-                        slider.Points.Add(bezier.CalculatePoint(i));
-                    }
+                        new(segment.Select(x => new Vector2(x.Position.X, x.Position.Y)));
+                    for (float i = 0; i <= 1.0f; i += 0.05f) slider.Points.Add(bezier.CalculatePoint(i));
                 }
             }
         }
     }
-    
 }

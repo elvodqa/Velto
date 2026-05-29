@@ -1,17 +1,46 @@
 using System.Runtime.InteropServices;
-using BlurgText;
+using OpenTK.Graphics.OpenGL;
+using OpenTK.Mathematics;
+using SDL;
 
 namespace Velto.Graphics;
 
-using OpenTK.Graphics.OpenGL;
-using OpenTK.Mathematics;
-using Velto.Gameplay;
-using SDL;
-using static SDL.SDL3;
+using static SDL3;
 
 public unsafe class Renderer : IDisposable
 {
-    private float[] _vertices =
+    private readonly float[] fontQuadVertices =
+    {
+        1f, 0f, 0f, 1f, 0f,
+        1f, 1f, 0f, 1f, 1f,
+        0f, 0f, 0f, 0f, 0f,
+        1f, 1f, 0f, 1f, 1f,
+        0f, 1f, 0f, 0f, 1f,
+        0f, 0f, 0f, 0f, 0f
+    };
+
+    private readonly List<FontCall> _fontCalls = new();
+    private readonly int _fontInstanceVbo;
+
+    private readonly int _fontQuadVbo;
+    private readonly Shader _fontShader;
+    private readonly int _fontVao;
+
+    private readonly bool _framebufferBound = false;
+
+    private readonly uint[] _indices =
+    [
+        0, 2, 1, // first triangle
+        1, 2, 3 // second triangle
+    ];
+
+    private readonly BufferObject<uint> _quadIndexBuffer;
+    private readonly BufferObject<float> _quadVertexBuffer;
+
+    private readonly Shader _spriteShader;
+    private readonly VertexArrayObject<float, uint> _spriteVao;
+
+    private readonly float[] _vertices =
     [
         // position         // uv
         0f, 0f, 0f, 0f, 1f, // top-left
@@ -20,90 +49,25 @@ public unsafe class Renderer : IDisposable
         1f, 1f, 0f, 1f, 0f // bottom-right
     ];
 
-    private uint[] _indices =
-    [
-        0, 2, 1, // first triangle
-        1, 2, 3 // second triangle
-    ];
 
-    private readonly float[] fontQuadVertices =
-    {
-        1f, 0f, 0f, 1f, 0f,
-        1f, 1f, 0f, 1f, 1f,
-        0f, 0f, 0f, 0f, 0f,
-        1f, 1f, 0f, 1f, 1f,
-        0f, 1f, 0f, 0f, 1f,
-        0f, 0f, 0f, 0f, 0f,
-    };
+    private readonly Texture _whiteTexture;
 
-    private SDL_Window* _window;
-    private BufferObject<float> _quadVertexBuffer;
-    private BufferObject<uint> _quadIndexBuffer;
-    private VertexArrayObject<float, uint> _spriteVao;
-
-    private int _fontQuadVbo;
-    private int _fontVao;
-    private int _fontInstanceVbo;
-    private List<FontCall> _fontCalls = new();
-    private Shader _fontShader;
-
-    private Shader _spriteShader;
-
-
-    private Texture _whiteTexture;
-
-    private bool _framebufferBound = false;
-
-
-    public Vector2 WindowSizeInPixels
-    {
-        get
-        {
-            int w, h;
-            SDL_GetWindowSizeInPixels(_window, &w, &h);
-            return new Vector2(w, h);
-        }
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    struct Vertex
-    {
-        public Vector2 Position;
-        public Vector2 Texture;
-        public Vector4 Color;
-
-        public Vertex(Vector2 pos, Vector2 tex, Vector4 color)
-        {
-            Position = pos;
-            Texture = tex;
-            Color = color;
-        }
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    public struct FontCall
-    {
-        public Matrix4 Model;
-        public Vector4 Color;
-        public Vector4 UV;
-        public Vector2 GlyphSize;
-        public float DistanceRange;
-    }
+    private readonly SDL_Window* _window;
 
 
     public Renderer(SDL_Window* window)
     {
         _window = window;
-        _quadVertexBuffer = new(_vertices, BufferTarget.ArrayBuffer, BufferUsage.StaticDraw);
-        _quadIndexBuffer = new(_indices, BufferTarget.ElementArrayBuffer, BufferUsage.StaticDraw);
+        _quadVertexBuffer = new BufferObject<float>(_vertices, BufferTarget.ArrayBuffer, BufferUsage.StaticDraw);
+        _quadIndexBuffer = new BufferObject<uint>(_indices, BufferTarget.ElementArrayBuffer, BufferUsage.StaticDraw);
         _spriteVao = new VertexArrayObject<float, uint>(_quadVertexBuffer, _quadIndexBuffer);
         _spriteVao.VertexAttributePointer(0, 3, VertexAttribPointerType.Float, 5 * sizeof(float), 0);
         _spriteVao.VertexAttributePointer(1, 2, VertexAttribPointerType.Float, 5 * sizeof(float), 3 * sizeof(float));
-        _spriteShader = new("sprite");
+        _spriteShader = new Shader("sprite");
 
-        _whiteTexture = new(Resources.GetPath("Resources/Textures/white.png"));
+        _whiteTexture = new Texture(Resources.GetPath("Resources/Textures/white.png"));
 
-        _fontShader = new("text");
+        _fontShader = new Shader("text");
         _fontShader.Use();
         _fontShader.SetInt("uTexture", 0);
         _fontVao = GL.GenVertexArray();
@@ -116,7 +80,7 @@ public unsafe class Renderer : IDisposable
         GL.BindBuffer(BufferTarget.ArrayBuffer, _fontQuadVbo);
         GL.BufferData(BufferTarget.ArrayBuffer, fontQuadVertices.Length * sizeof(float), fontQuadVertices,
             BufferUsage.StaticDraw);
-        int quadStride = 5 * sizeof(float);
+        var quadStride = 5 * sizeof(float);
         GL.EnableVertexAttribArray(0);
         GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, quadStride, 0);
         GL.EnableVertexAttribArray(1);
@@ -127,14 +91,14 @@ public unsafe class Renderer : IDisposable
         GL.BufferData(BufferTarget.ArrayBuffer, 1024 * Marshal.SizeOf<FontCall>(), IntPtr.Zero,
             BufferUsage.DynamicDraw);
 
-        int vec4Size = Vector4.SizeInBytes;
-        int instanceStride = Marshal.SizeOf<FontCall>();
-        int offset = 0;
+        var vec4Size = Vector4.SizeInBytes;
+        var instanceStride = Marshal.SizeOf<FontCall>();
+        var offset = 0;
 
         // mat4 (locations 2..5)
-        for (int i = 0; i < 4; i++)
+        for (var i = 0; i < 4; i++)
         {
-            uint attrib = (uint)(2 + i);
+            var attrib = (uint)(2 + i);
             GL.EnableVertexAttribArray(attrib);
             GL.VertexAttribPointer(attrib, 4, VertexAttribPointerType.Float, false, instanceStride, offset);
             GL.VertexAttribDivisor(attrib, 1);
@@ -167,6 +131,32 @@ public unsafe class Renderer : IDisposable
         GL.BindVertexArray(0);
     }
 
+
+    public Vector2 WindowSizeInPixels
+    {
+        get
+        {
+            int w, h;
+            SDL_GetWindowSizeInPixels(_window, &w, &h);
+            return new Vector2(w, h);
+        }
+    }
+
+
+    public void Dispose()
+    {
+        GL.DeleteBuffer(_fontInstanceVbo);
+        GL.DeleteBuffer(_fontQuadVbo);
+        GL.DeleteVertexArray(_fontVao);
+
+        _quadVertexBuffer.Dispose();
+        _quadIndexBuffer.Dispose();
+        _spriteVao.Dispose();
+        _whiteTexture.Dispose();
+        _spriteShader.Dispose();
+        _fontShader.Dispose();
+    }
+
     public void Clear(Vector4 color)
     {
         if (!_framebufferBound)
@@ -175,11 +165,8 @@ public unsafe class Renderer : IDisposable
             SDL_GetWindowSizeInPixels(_window, &width, &height);
             GL.Viewport(0, 0, width, height);
         }
-        else
-        {
-            // TODO: implement framebuffers
-        }
 
+        // TODO: implement framebuffers
         GL.Enable(EnableCap.Blend);
         GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
         GL.ClearColor(color.X, color.Y, color.Z, color.W);
@@ -191,12 +178,9 @@ public unsafe class Renderer : IDisposable
 
     {
         int wWidth = 1280, wHeight = 720;
-        if (!_framebufferBound)
-        {
-            SDL_GetWindowSizeInPixels(_window, &wWidth, &wHeight);
-        }
+        if (!_framebufferBound) SDL_GetWindowSizeInPixels(_window, &wWidth, &wHeight);
 
-        Matrix4 projection =
+        var projection =
             Matrix4.CreateOrthographicOffCenter(
                 0,
                 wWidth,
@@ -205,7 +189,7 @@ public unsafe class Renderer : IDisposable
                 -1f,
                 1f);
 
-        Matrix4 model =
+        var model =
             Matrix4.CreateTranslation(-0.5f, -0.5f, 0f) *
             Matrix4.CreateRotationZ(MathHelper.DegreesToRadians(rotation)) *
             Matrix4.CreateTranslation(0.5f, 0.5f, 0f) *
@@ -234,12 +218,9 @@ public unsafe class Renderer : IDisposable
         float rotation = 0)
     {
         int wWidth = 1280, wHeight = 720;
-        if (!_framebufferBound)
-        {
-            SDL_GetWindowSizeInPixels(_window, &wWidth, &wHeight);
-        }
+        if (!_framebufferBound) SDL_GetWindowSizeInPixels(_window, &wWidth, &wHeight);
 
-        Matrix4 projection =
+        var projection =
             Matrix4.CreateOrthographicOffCenter(
                 0,
                 wWidth,
@@ -248,7 +229,7 @@ public unsafe class Renderer : IDisposable
                 -1f,
                 1f);
 
-        Matrix4 model =
+        var model =
             Matrix4.CreateTranslation(-0.5f, -0.5f, 0f) *
             Matrix4.CreateRotationZ(MathHelper.DegreesToRadians(rotation)) *
             Matrix4.CreateTranslation(0.5f, 0.5f, 0f) *
@@ -277,10 +258,10 @@ public unsafe class Renderer : IDisposable
     public void DrawText(MSDFFont font, string text, Vector2 position, float scale,
         Vector4 color)
     {
-        float x = position.X;
-        float baseline = position.Y + font.Ascender * font.EmSize * scale;
+        var x = position.X;
+        var baseline = position.Y + font.Ascender * font.EmSize * scale;
         uint prev = 0;
-        foreach (char c in text)
+        foreach (var c in text)
         {
             if (c == '\n')
             {
@@ -291,11 +272,8 @@ public unsafe class Renderer : IDisposable
             }
 
             if (!font.Glyphs.TryGetValue(c, out var glyph)) continue;
-            float kern = 0f;
-            if (prev != 0)
-            {
-                kern = font.GetKerning(prev, c) * scale;
-            }
+            var kern = 0f;
+            if (prev != 0) kern = font.GetKerning(prev, c) * scale;
 
             if (glyph.HasGeometry)
             {
@@ -308,13 +286,11 @@ public unsafe class Renderer : IDisposable
             x += glyph.XAdvance * font.EmSize * scale + kern;
             prev = c;
         }
-        int wWidth = 1280, wHeight = 720;
-        if (!_framebufferBound)
-        {
-            SDL_GetWindowSizeInPixels(_window, &wWidth, &wHeight);
-        }
 
-        Matrix4 projection =
+        int wWidth = 1280, wHeight = 720;
+        if (!_framebufferBound) SDL_GetWindowSizeInPixels(_window, &wWidth, &wHeight);
+
+        var projection =
             Matrix4.CreateOrthographicOffCenter(
                 0,
                 wWidth,
@@ -327,7 +303,7 @@ public unsafe class Renderer : IDisposable
 
     private void DrawGlyph(MSDFFont.Glyph glyph, Vector2 position, Vector2 size, Vector4 color, float distanceRange)
     {
-        Matrix4 model = Matrix4.CreateScale(size.X, size.Y, 1f) * Matrix4.CreateTranslation(position.X, position.Y, 0f);
+        var model = Matrix4.CreateScale(size.X, size.Y, 1f) * Matrix4.CreateTranslation(position.X, position.Y, 0f);
         _fontCalls.Add(new FontCall
         {
             Model = model, Color = color, UV = new Vector4(glyph.U0, glyph.V0, glyph.U1, glyph.V1), GlyphSize = size,
@@ -356,18 +332,28 @@ public unsafe class Renderer : IDisposable
         _fontCalls.Clear();
     }
 
-
-    public void Dispose()
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Vertex
     {
-        GL.DeleteBuffer(_fontInstanceVbo);
-        GL.DeleteBuffer(_fontQuadVbo);
-        GL.DeleteVertexArray(_fontVao);
+        public Vector2 Position;
+        public Vector2 Texture;
+        public Vector4 Color;
 
-        _quadVertexBuffer.Dispose();
-        _quadIndexBuffer.Dispose();
-        _spriteVao.Dispose();
-        _whiteTexture.Dispose();
-        _spriteShader.Dispose();
-        _fontShader.Dispose();
+        public Vertex(Vector2 pos, Vector2 tex, Vector4 color)
+        {
+            Position = pos;
+            Texture = tex;
+            Color = color;
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct FontCall
+    {
+        public Matrix4 Model;
+        public Vector4 Color;
+        public Vector4 UV;
+        public Vector2 GlyphSize;
+        public float DistanceRange;
     }
 }

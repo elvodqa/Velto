@@ -1,17 +1,15 @@
-using System;
+using OpenTK.Graphics.OpenGL;
 
 namespace Velto.Graphics;
 
-using OpenTK.Graphics.OpenGL;
-
 public unsafe class BufferObject<TDataType> : IDisposable where TDataType : unmanaged
 {
-    private int _handle;
-    private BufferTarget _bufferTarget;
+    private readonly BufferTarget _bufferTarget;
     private BufferUsage _bufferUsage;
+    private readonly int _handle;
 
     /// <summary>
-    /// Creates a GL buffer without allocating storage. You must call BufferData/Allocate before BufferSubData.
+    ///     Creates a GL buffer without allocating storage. You must call BufferData/Allocate before BufferSubData.
     /// </summary>
     public BufferObject(BufferTarget target)
     {
@@ -29,12 +27,17 @@ public unsafe class BufferObject<TDataType> : IDisposable where TDataType : unma
     }
 
     public BufferObject(Span<TDataType> data, BufferTarget bufferTarget, BufferUsage bufferUsage)
-    { 
+    {
         _bufferTarget = bufferTarget;
         _bufferUsage = bufferUsage;
-        
+
         _handle = GL.GenBuffer();
         BufferData(data, bufferTarget, bufferUsage);
+    }
+
+    public void Dispose()
+    {
+        GL.DeleteBuffer(_handle);
     }
 
     public void Allocate(int elementCount, BufferUsage bufferUsage)
@@ -56,10 +59,4 @@ public unsafe class BufferObject<TDataType> : IDisposable where TDataType : unma
     {
         GL.BindBuffer(_bufferTarget, _handle);
     }
-
-    public void Dispose()
-    {
-        GL.DeleteBuffer(_handle);
-    }
-    
 }

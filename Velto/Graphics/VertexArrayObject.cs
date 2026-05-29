@@ -1,15 +1,13 @@
-using System;
+using OpenTK.Graphics.OpenGL;
 
 namespace Velto.Graphics;
-
-using OpenTK.Graphics.OpenGL;
 
 public unsafe class VertexArrayObject<TVertexType, TIndexType> : IDisposable
     where TVertexType : unmanaged
     where TIndexType : unmanaged
 {
-    private int _handle;
-    
+    private readonly int _handle;
+
     public VertexArrayObject(BufferObject<TVertexType> vbo, BufferObject<TIndexType> ebo)
     {
         _handle = GL.GenVertexArray();
@@ -18,10 +16,15 @@ public unsafe class VertexArrayObject<TVertexType, TIndexType> : IDisposable
         ebo.Bind();
     }
 
+    public void Dispose()
+    {
+        GL.DeleteVertexArray(_handle);
+    }
+
     public void VertexAttributePointer(uint index, int count, VertexAttribPointerType type, uint length, int offSet)
     {
         //GL.VertexAttribPointer(index, count, type, false, (int)(vertexSize * sizeof(TVertexType)), (void*) (offSet * sizeof(TVertexType)));
-        GL.VertexAttribPointer(index, count, type, false, (int)(length), (void*) offSet);
+        GL.VertexAttribPointer(index, count, type, false, (int)length, (void*)offSet);
         GL.EnableVertexAttribArray(index);
     }
 
@@ -29,23 +32,18 @@ public unsafe class VertexArrayObject<TVertexType, TIndexType> : IDisposable
     {
         GL.BindVertexArray(_handle);
     }
-    
+
     public void Unbind()
     {
         GL.BindVertexArray(0);
-    }
-
-    public void Dispose()
-    {
-        GL.DeleteVertexArray(_handle);
     }
 }
 
 public unsafe class VertexArrayObject<TVertexType> : IDisposable
     where TVertexType : unmanaged
 {
-    private int _handle;
-    
+    private readonly int _handle;
+
     public VertexArrayObject(BufferObject<TVertexType> vbo)
     {
         _handle = GL.GenVertexArray();
@@ -53,10 +51,16 @@ public unsafe class VertexArrayObject<TVertexType> : IDisposable
         vbo.Bind();
     }
 
-    public void VertexAttributePointer(uint index, int count, VertexAttribPointerType type, uint length, int offSet, bool normalized = false)
+    public void Dispose()
+    {
+        GL.DeleteVertexArray(_handle);
+    }
+
+    public void VertexAttributePointer(uint index, int count, VertexAttribPointerType type, uint length, int offSet,
+        bool normalized = false)
     {
         //GL.VertexAttribPointer(index, count, type, false, (int)(vertexSize * sizeof(TVertexType)), (void*) (offSet * sizeof(TVertexType)));
-        GL.VertexAttribPointer(index, count, type, normalized, (int)(length), (void*) offSet);
+        GL.VertexAttribPointer(index, count, type, normalized, (int)length, (void*)offSet);
         GL.EnableVertexAttribArray(index);
     }
 
@@ -64,14 +68,9 @@ public unsafe class VertexArrayObject<TVertexType> : IDisposable
     {
         GL.BindVertexArray(_handle);
     }
-    
+
     public void Unbind()
     {
         GL.BindVertexArray(0);
-    }
-
-    public void Dispose()
-    {
-        GL.DeleteVertexArray(_handle);
     }
 }

@@ -1,9 +1,6 @@
-using OpenTK.Mathematics;
-
 namespace Velto.Gameplay;
 
-class HitCircle : HitObject
+internal class HitCircle : HitObject
 {
     public float ApproachCircleSize;
-    
 }

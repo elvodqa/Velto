@@ -25,13 +25,17 @@ public unsafe class GameBase : IDisposable
     private Logger _logger;
     private SDL_Window* _window;
     private SDL_GLContextState* _glContextState;
-    
+
+    private GCHandle _eventWatchHandle;
+    private IntPtr _eventWatchUserdata;
+    private ulong _eventWatchTickLast;
+
     private GameDisplay _gameDisplay;
     private bool _running;
 
     private Renderer _renderer;
-   
-    
+
+
     public GameBase()
     {
         SDL_Init(SDL_InitFlags.SDL_INIT_VIDEO);
@@ -55,7 +59,7 @@ public unsafe class GameBase : IDisposable
         SDL_GL_SetAttribute(SDL_GLAttr.SDL_GL_DEPTH_SIZE, 24);
         
         _window = SDL_CreateWindow("Velto"u8, 1280, 720, SDL_WindowFlags.SDL_WINDOW_OPENGL | SDL_WindowFlags.SDL_WINDOW_RESIZABLE
-            //| SDL_WindowFlags.SDL_WINDOW_HIGH_PIXEL_DENSITY
+            | SDL_WindowFlags.SDL_WINDOW_HIGH_PIXEL_DENSITY
             );
         _glContextState = SDL_GL_CreateContext(_window);
         SDL_GL_MakeCurrent(_window, _glContextState);
@@ -77,7 +81,12 @@ public unsafe class GameBase : IDisposable
 
         _running = false;
         _renderer = new(_window);
-;        _gameDisplay = new(_renderer);
+        _gameDisplay = new(_renderer);
+
+        // During a live window resize, the OS may block the main loop. An event watch lets us redraw.
+        _eventWatchHandle = GCHandle.Alloc(this);
+        _eventWatchUserdata = GCHandle.ToIntPtr(_eventWatchHandle);
+        SDL_AddEventWatch(&EventWatch, _eventWatchUserdata);
     }
 
     
@@ -134,9 +143,86 @@ public unsafe class GameBase : IDisposable
         }
         
     }
+    
+    private void RenderFromEventWatch()
+    {
+        // Ensure the correct context is current before any GL calls.
+        SDL_GL_MakeCurrent(_window, _glContextState);
+
+        var tickNow = SDL_GetPerformanceCounter();
+        double deltaTime;
+        if (_eventWatchTickLast == 0)
+        {
+            deltaTime = 0;
+        }
+        else
+        {
+            deltaTime = (tickNow - _eventWatchTickLast) * 1000 / (double)SDL_GetPerformanceFrequency();
+            if (deltaTime < 0) deltaTime = 0;
+            if (deltaTime > 250) deltaTime = 250; // avoid giant jumps during resize stalls
+        }
+
+        _eventWatchTickLast = tickNow;
+
+        Input.GetKeyboardState();
+        Input.UpdateMouse(_window);
+
+        _gameDisplay?.Update(deltaTime);
+        _gameDisplay?.Draw(deltaTime);
+
+        SDL_GL_SwapWindow(_window);
+    }
+
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
+    private static unsafe SDLBool EventWatch(IntPtr userdata, SDL_Event* ev)
+    {
+        var game = ((GCHandle)userdata).Target as GameBase;
+        if (game == null || ev == null)
+            return true;
+
+        // Use the top-level event discriminator; reading ev->window for non-window events is unsafe.
+        var type = (SDL_EventType)ev->type;
+
+        if (type == SDL_EventType.SDL_EVENT_WINDOW_EXPOSED ||
+            type == SDL_EventType.SDL_EVENT_WINDOW_HIT_TEST ||
+            type == SDL_EventType.SDL_EVENT_WINDOW_RESIZED)
+        {
+            game.RenderFromEventWatch();
+        }
+
+        // Return true so we don't accidentally swallow events before the main poll loop sees them.
+        return true;
+    }
+    
+    /*
+     @(private)
+       resizeCallback :: proc "c" (userdata: rawptr, event: ^sdl.Event) -> bool {
+           context = runtime.default_context()
+           game := cast(^Game)userdata
+       
+           if event.window.commonEvent.type == .WINDOW_EXPOSED || event.window.commonEvent.type == .WINDOW_HIT_TEST {
+               width, height: c.int
+               sdl.GetWindowSize(window, &width, &height)
+               work_game_frame(game, width, height, game.userdata)
+               sdl.GL_SwapWindow(window) 
+           }
+       
+           return false
+       }
+     
+     */
 
     public void Dispose()
     {
+        if (_eventWatchUserdata != IntPtr.Zero)
+        {
+            SDL_RemoveEventWatch(&EventWatch, _eventWatchUserdata);
+            _eventWatchUserdata = IntPtr.Zero;
+        }
+
+        if (_eventWatchHandle.IsAllocated)
+            _eventWatchHandle.Free();
+
         SDL_GL_DestroyContext(_glContextState);
         SDL_DestroyWindow(_window);
     }

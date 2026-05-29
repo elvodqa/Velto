@@ -1,0 +1,1 @@
+../third_party/msdf-atlas-gen/build/bin/msdf-atlas-gen -font arial.ttf -imageout arial.png -json arial.json -size 16

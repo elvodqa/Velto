@@ -6,32 +6,17 @@ namespace Velto.Graphics;
 
 public class MSDFFont
 {
-    public struct Glyph
-    {
-        public float X;
-        public float Y;
-        public float Width;
-        public float Height;
-        public float XOffset;
-        public float YOffset;
-        public float XAdvance;
-        public float U0;
-        public float V0;
-        public float U1;
-        public float V1;
-        public bool HasGeometry;
-    }
+    public float Ascender;
+    public int AtlasHeight;
+    public int AtlasTexture;
+    public int AtlasWidth;
+    public float Descender;
+    public float DistanceRange;
+    public float EmSize;
 
     public Dictionary<uint, Glyph> Glyphs = new();
     public Dictionary<(uint, uint), float> Kerning = new();
-    public int AtlasTexture;
-    public int AtlasWidth;
-    public int AtlasHeight;
-    public float DistanceRange;
-    public float EmSize;
     public float LineHeight;
-    public float Ascender;
-    public float Descender;
 
     public static MSDFFont Load(string basePath)
     {
@@ -53,7 +38,7 @@ public class MSDFFont
         // Restore default used by Texture to avoid surprising later loads.
         StbImage.stbi_set_flip_vertically_on_load(1);
 
-        int tex = GL.GenTexture();
+        var tex = GL.GenTexture();
         GL.BindTexture(TextureTarget.Texture2D, tex);
         GL.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba, image.Width, image.Height, 0,
             PixelFormat.Rgba, PixelType.UnsignedByte, image.Data);
@@ -68,9 +53,9 @@ public class MSDFFont
 
     private static void LoadJson(MSDFFont font, string path)
     {
-        string jsonText = File.ReadAllText(path);
-        JsonDocument doc = JsonDocument.Parse(jsonText);
-        JsonElement root = doc.RootElement;
+        var jsonText = File.ReadAllText(path);
+        var doc = JsonDocument.Parse(jsonText);
+        var root = doc.RootElement;
         var atlas = root.GetProperty("atlas");
         font.DistanceRange = atlas.GetProperty("distanceRange").GetSingle();
         font.EmSize = atlas.GetProperty("size").GetSingle();
@@ -80,7 +65,7 @@ public class MSDFFont
         font.Descender = metrics.GetProperty("descender").GetSingle();
         foreach (var glyphJson in root.GetProperty("glyphs").EnumerateArray())
         {
-            uint unicode = glyphJson.GetProperty("unicode").GetUInt32();
+            var unicode = glyphJson.GetProperty("unicode").GetUInt32();
             Glyph glyph = new();
             glyph.XAdvance = glyphJson.GetProperty("advance").GetSingle();
             if (glyphJson.TryGetProperty("atlasBounds", out var atlasBounds) &&
@@ -89,8 +74,8 @@ public class MSDFFont
                 glyph.HasGeometry = true;
                 glyph.X = atlasBounds.GetProperty("left").GetSingle();
                 glyph.Y = atlasBounds.GetProperty("bottom").GetSingle();
-                float right = atlasBounds.GetProperty("right").GetSingle();
-                float top = atlasBounds.GetProperty("top").GetSingle();
+                var right = atlasBounds.GetProperty("right").GetSingle();
+                var top = atlasBounds.GetProperty("top").GetSingle();
                 glyph.Width = right - glyph.X;
                 glyph.Height = top - glyph.Y;
                 glyph.XOffset = planeBounds.GetProperty("left").GetSingle();
@@ -105,20 +90,34 @@ public class MSDFFont
         }
 
         if (root.TryGetProperty("kerning", out var kernings))
-        {
             foreach (var k in kernings.EnumerateArray())
             {
-                uint first = k.GetProperty("unicode1").GetUInt32();
-                uint second = k.GetProperty("unicode2").GetUInt32();
-                float advance = k.GetProperty("advance").GetSingle();
+                var first = k.GetProperty("unicode1").GetUInt32();
+                var second = k.GetProperty("unicode2").GetUInt32();
+                var advance = k.GetProperty("advance").GetSingle();
                 font.Kerning[(first, second)] = advance;
             }
-        }
     }
 
     public float GetKerning(uint first, uint second)
     {
-        if (Kerning.TryGetValue((first, second), out float k)) return k;
+        if (Kerning.TryGetValue((first, second), out var k)) return k;
         return 0f;
+    }
+
+    public struct Glyph
+    {
+        public float X;
+        public float Y;
+        public float Width;
+        public float Height;
+        public float XOffset;
+        public float YOffset;
+        public float XAdvance;
+        public float U0;
+        public float V0;
+        public float U1;
+        public float V1;
+        public bool HasGeometry;
     }
 }
