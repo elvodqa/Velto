@@ -1,3 +1,5 @@
+using OpenTK.Mathematics;
+
 namespace Velto.Gameplay;
 
 public class Beatmap
@@ -149,9 +151,127 @@ public class Beatmap
                     hitCircle.Position = new(x, y);
 
                     HitObjects.Add(hitCircle);
-                } else if (isNewCombo)
+                } else if (isSlider)
                 {
+                    Slider slider = new();
+                    slider.NewCombo = isNewCombo;
+                    slider.Position = new Vector2(int.Parse(split[0]), int.Parse(split[1]));
+                    slider.Time = int.Parse(split[2]);
+                    //slider.HitSound = int.Parse(split[4]);
+                    string[] sliderData = split[5].Split('|');
+                    CurveType defaultCurveType = sliderData[0] switch 
+                    {
+                        "B" => CurveType.Bezier,
+                        "C" => CurveType.Catmull,
+                        "L" => CurveType.Linear,
+                        "P" => CurveType.Perfect,
+                        _ => CurveType.Linear,
+                    };
                     
+                    slider.CurvePoints.Add(new CurvePoint()
+                    {
+                        Position = slider.Position,
+                        Type = defaultCurveType
+                    });
+                    
+                    for (int i = 1; i < sliderData.Length; i++)
+                    {
+                        string[] point = sliderData[i].Split(':');
+                        CurvePoint curvePoint = new CurvePoint();
+                        curvePoint.Position = new Vector2(int.Parse(point[0]), int.Parse(point[1]));
+                        if (i > 1 && sliderData[i - 1] == sliderData[i])
+                        {
+                            curvePoint.Type = CurveType.Linear;
+                            // remove i-1
+                            slider.CurvePoints.RemoveAt(slider.CurvePoints.Count - 1);
+                        }
+                        else
+                        {
+                            curvePoint.Type = defaultCurveType;
+                        }
+                        slider.CurvePoints.Add(curvePoint);
+                    }
+                    /*if (int.Parse(split[3]) == 6)
+                    {
+                        curComboNumber = 1;
+                        slider.ComboNumber = curComboNumber;
+                        curComboNumber++;
+                    } 
+                    else 
+                    {
+                        slider.ComboNumber = curComboNumber;
+                        curComboNumber++;
+                    }*/
+                    HitObjects.Add(slider);
+                }
+            }
+        }
+        
+        CalculatePrepass();
+    }
+
+    public void CalculatePrepass()
+    {
+        var comboCounter = 0;
+        var colorCounter = 0;
+        
+        foreach (var hitobject in HitObjects)
+        {
+            if (hitobject.NewCombo)
+            {
+                colorCounter++;
+                colorCounter %= 4;
+                comboCounter = 0;
+            }
+            comboCounter++;
+            if (comboCounter >= 9) comboCounter = 9;
+            Vector4 color = colorCounter switch
+            {
+                0 => new Vector4(1, 0, 0, 1),
+                1 => new Vector4(0, 1, 0, 1),
+                2 => new Vector4(0, 0, 1, 1),
+                3 => new Vector4(1, 0, 1, 1),
+            };
+
+            hitobject.Color = color;
+            hitobject.ComboNumber = comboCounter;
+
+            if (hitobject is Slider slider)
+            {
+                var segments = new List<List<CurvePoint>>();
+                var current = new List<CurvePoint>();
+
+                for (int i = 0; i < slider.CurvePoints.Count; i++)
+                {
+                    var point = slider.CurvePoints[i];
+                    current.Add(point);
+
+                    // End segment when reaching a Linear point
+                    // but not if it's the very first point in the segment
+                    if (point.Type == CurveType.Linear && current.Count > 1)
+                    {
+                        segments.Add(current);
+                        current = new List<CurvePoint>();
+
+                        // carry over the last point as start of next segment
+                        current.Add(point);
+                    }
+                }
+
+                // Add remaining points
+                if (current.Count > 1)
+                {
+                    segments.Add(current);
+                }
+
+                foreach (var segment in segments)
+                {
+                    BezierCurve bezier =
+                        new(segment.Select(x=> new Vector2(x.Position.X, x.Position.Y)));
+                    for (float i = 0; i <= 1.0f; i += 0.05f)
+                    {
+                        slider.Points.Add(bezier.CalculatePoint(i));
+                    }
                 }
             }
         }

@@ -21,11 +21,13 @@ public class HitObject
     public Vector2 Position { get; set; }
     public int Time { get; set; }
     public bool NewCombo { get; set; } = false;
-    public Vector4 Color { get; set; }
-    internal bool DidSetColor = false;
-    internal int Combo;
-    internal bool DidSetCombo = false;
+    
     internal bool Failed = false;
+    
+    // prepass info
+    public Vector4 Color { get; set; }
+    internal int ComboNumber;
+    
     
     
 }
