@@ -67,6 +67,7 @@ public unsafe class GameDisplay : IDisposable
     private bool _isPaused = false;
     private IOrderedEnumerable<HitObject> _sortedObjects;
     private float _baseCircleSize;
+    private MSDFFont _msdfFont;
 
     private Renderer _renderer;
 
@@ -98,7 +99,8 @@ public unsafe class GameDisplay : IDisposable
         _sliderballTexture = new(Resources.GetPath($"Resources/Textures/{_skinName}/sliderb.png"));
         _hit0Texture =new(Resources.GetPath($"Resources/Textures/{_skinName}/hit0.png"));
         _circleTexture = new(Resources.GetPath($"Resources/Textures/circle.png"));
-       
+
+        _msdfFont = MSDFFont.Load(Resources.GetPath($"Resources/Fonts/arial/arial"));
 
         for (int i = 0; i < 10; i++)
         {
@@ -193,9 +195,6 @@ public unsafe class GameDisplay : IDisposable
         // Handle objects bkz: https://osu.ppy.sh/wiki/en/Gameplay/Judgement/osu%21 
         foreach (var hitObject in _sortedObjects)
         {
-           
-            
-            
             if (hitObject is HitCircle circle)
             {
                 if (_songCursor - 150 >= circle.Time)
@@ -547,9 +546,8 @@ public unsafe class GameDisplay : IDisposable
             size, size, new(1, 1, 1, 1),
             0);
         
+        _renderer.DrawText(_msdfFont, "The quick brown fox jumps over the lazy dog", new Vector2(0, 0), 0.5f, new Vector4(1, 1, 1, 1));
         
-        _renderer.DrawText(new Vector2(100, 100), "Arial", FontWeight.Light, 64, new Vector4(1, 1, 1, 1), "The quick brown fox jumps over the lazy dog\n");
-        _renderer.DrawText(new Vector2(100, 200), "Arial", FontWeight.Regular, 64, new Vector4(1, 1, 1, 1), "The quick brown fox jumps over the lazy dog\n");
     }
     
     public void Dispose()
