@@ -354,7 +354,7 @@ public unsafe class GameDisplay : IDisposable
         }
 
         // bg dim
-        _renderer.DrawRectangle(0, 0, _windowWidth, _windowHeight, new Vector4(0, 0, 0, 0.75f));
+        _renderer.DrawRectangle(0, 0, _windowWidth, _windowHeight, new Vector4(0, 0, 0, 0.55f));
 
         // hitobjects
         var playfieldAspect = PLAYFIELD_W / (float)PLAYFIELD_H;
@@ -386,7 +386,7 @@ public unsafe class GameDisplay : IDisposable
             playfieldTopLeft.Y,
             playfieldWidth,
             playfieldHeight,
-            new Vector4(1, 1, 1, 0.6f)
+            new Vector4(0, 0, 0, 0.3f)
         );
 
         
