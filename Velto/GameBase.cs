@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using OpenTK.Mathematics;
 using Velto.Graphics;
 
 namespace Velto;
@@ -34,6 +35,12 @@ public unsafe class GameBase : IDisposable
     private bool _running;
 
     private Renderer _renderer;
+    
+    private double _fpsTimer = 0.0;
+    private int _frameCount = 0;
+    private double _fps = 0;
+
+    private MSDFFont _debugFont;
 
 
     public GameBase()
@@ -63,7 +70,12 @@ public unsafe class GameBase : IDisposable
             );
         _glContextState = SDL_GL_CreateContext(_window);
         SDL_GL_MakeCurrent(_window, _glContextState);
-        SDL_GL_SetSwapInterval(1);
+        SDL_GL_SetSwapInterval(0);
+
+        int interval;
+        SDL_GL_GetSwapInterval(&interval);
+        _logger.Info($"Swap Interval = {interval}");
+        //SDL_GL_SetSwapInterval(0);
         
         GLLoader.LoadBindings(new BindingContext());
     
@@ -87,6 +99,8 @@ public unsafe class GameBase : IDisposable
         _eventWatchHandle = GCHandle.Alloc(this);
         _eventWatchUserdata = GCHandle.ToIntPtr(_eventWatchHandle);
         SDL_AddEventWatch(&EventWatch, _eventWatchUserdata);
+
+        _debugFont = MSDFFont.Load(Resources.GetPath("Resources/Fonts/arial/arial"));
     }
 
     
@@ -95,6 +109,7 @@ public unsafe class GameBase : IDisposable
     {
         Initialize();
         SDL_MaximizeWindow(_window);
+        SDL_HideCursor();
         
         ulong tickNow = SDL_GetPerformanceCounter();
         ulong tickLast = 0;
@@ -109,6 +124,19 @@ public unsafe class GameBase : IDisposable
             tickLast = tickNow;
             tickNow = SDL_GetPerformanceCounter();
             deltaTime = (tickNow - tickLast)*1000 / (double)SDL_GetPerformanceFrequency();
+            
+            _frameCount++;
+            _fpsTimer += deltaTime;
+            if (_fpsTimer >= 1000.0)
+            {
+                _fps = _frameCount * 1000.0 / _fpsTimer;
+
+                //SDL_SetWindowTitle(_window,
+                //    $"Velto - FPS: {fps:F1}");
+
+                _frameCount = 0;
+                _fpsTimer = 0.0;
+            }
             
             SDL_Event ev;
             while (SDL_PollEvent(&ev))
@@ -131,17 +159,22 @@ public unsafe class GameBase : IDisposable
                 }
                 Input.UpdateEvents(ev);
             }
-         
-            Input.GetKeyboardState();
-            Input.UpdateMouse(_window);
-            
-          
-            _gameDisplay.Update(deltaTime);
-            _gameDisplay.Draw(deltaTime);
+
+            Loop(deltaTime);
             
             SDL_GL_SwapWindow(_window);
         }
+    }
+
+    private void Loop(double deltaTime)
+    {
+        Input.GetKeyboardState();
+        Input.UpdateMouse(_window);
+            
+        _gameDisplay.Update(deltaTime);
+        _gameDisplay.Draw(deltaTime);
         
+        _renderer.DrawText(_debugFont, $"FPS: {_fps:F1} [{deltaTime:F2}ms]", new (5, 5), 0.6f, new Vector4(1, 1, 1, 1));
     }
     
     private void RenderFromEventWatch()
@@ -164,11 +197,7 @@ public unsafe class GameBase : IDisposable
 
         _eventWatchTickLast = tickNow;
 
-        Input.GetKeyboardState();
-        Input.UpdateMouse(_window);
-
-        _gameDisplay?.Update(deltaTime);
-        _gameDisplay?.Draw(deltaTime);
+        Loop(deltaTime);
 
         SDL_GL_SwapWindow(_window);
     }

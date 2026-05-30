@@ -61,7 +61,6 @@ public unsafe class GameDisplay : IDisposable
     {
         _renderer = renderer;
         
-
         vertexBuffer = new BufferObject<float>(vertices, BufferTarget.ArrayBuffer, BufferUsage.StaticDraw);
         indexBuffer = new BufferObject<uint>(indices, BufferTarget.ElementArrayBuffer, BufferUsage.StaticDraw);
         vao = new VertexArrayObject<float, uint>(vertexBuffer, indexBuffer);
@@ -70,8 +69,8 @@ public unsafe class GameDisplay : IDisposable
         shader = new Shader("sprite"); // pippidonclear0
 
         //_beatmap = new(Resources.GetPath("Resources/Songs/lotus/Susumu Hirasawa - SWITCHED-ON LOTUS (Starrodkirby86) [KIRBY Mix Deluxe].osu"));
-        // _beatmap = new Beatmap(Resources.GetPath("Resources/Songs/Wakeshima Kanon/ASCA - Nisemono no Koi ni Sayounara with Wakeshima Kanon (timemon) [Kyou's Extra].osu"));
-        _beatmap = new(Resources.GetPath("Resources/Songs/Centipede/Knife Party - Centipede (Sugoi-_-Desu) [This isn't a map, just a simple visualisation].osu"));
+         _beatmap = new Beatmap(Resources.GetPath("Resources/Songs/Wakeshima Kanon/ASCA - Nisemono no Koi ni Sayounara with Wakeshima Kanon (timemon) [Kyou's Extra].osu"));
+        //_beatmap = new(Resources.GetPath("Resources/Songs/Centipede/Knife Party - Centipede (Sugoi-_-Desu) [This isn't a map, just a simple visualisation].osu"));
         //_beatmap = new(Resources.GetPath("Resources/Songs/exit/Camellia - Exit This Earth's Atomosphere (Camellia's ''PLANETARY200STEP'' Remix) (ProfessionalBox) [Primordial Nucleosynthesis].osu"));
 
         _backgroundTexture = new Texture(Path.Combine(_beatmap.Folder, _beatmap.BackgroundFile));
@@ -291,17 +290,32 @@ public unsafe class GameDisplay : IDisposable
         {
             if (hitObject is HitCircle circle)
             {
-                if (_songCursor - 150 >= circle.Time)
+                if (hitObject.HitResult == HitResult.None)
                 {
-                    circle.HitResult = HitResult.Miss;
-                    circle.Failed = true;
-                }
-
-                if (Vector2.Distance(circle.Position, new Vector2(Input.MouseX, Input.MouseY)) <= _baseCircleSize / 2)
-                    if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_Z) ||
-                        Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_X))
+                    if (_songCursor - 150 >= circle.Time)
                     {
+                        circle.HitResult = HitResult.Miss;
+                        circle.Failed = true;
                     }
+
+                    var mouse = new Vector2(Input.MouseX, Input.MouseY);
+                    // convert screen → playfield
+                    mouse.X = (mouse.X - playfieldTopLeft.X) / scale;
+                    mouse.Y = (mouse.Y - playfieldTopLeft.Y) / scale;
+                    var radiusPlayfield = osuRadius;
+                    if (Vector2.Distance(circle.Position, mouse) <= radiusPlayfield)
+                        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_Z) ||
+                            Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_X))
+                        {
+                            circle.Color = new Vector4(1, 1, 1, 1);
+                            circle.HitResult = HitResult.Ok;
+                        }
+                }
+                else
+                {
+                    
+                }
+               
             }
 
             if (hitObject is Slider slider)
