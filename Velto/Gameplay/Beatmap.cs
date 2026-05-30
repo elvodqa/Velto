@@ -1,8 +1,11 @@
 using OpenTK.Mathematics;
+using Velto.Graphics;
+using SDL;
+using static SDL.SDL3;
 
 namespace Velto.Gameplay;
 
-public class Beatmap
+public unsafe class Beatmap
 {
     private const byte ComboSkipMask = 0b0111_0000;
     public string Filename;
@@ -213,7 +216,7 @@ public class Beatmap
 
     public List<HitObject> HitObjects { get; set; }
 
-    public void CalculatePrepass()
+    public void CalculatePrepass(SDL_Window* window)
     {
         var comboCounter = 0;
         var colorCounter = 0;
@@ -282,7 +285,7 @@ public class Beatmap
                 {
                     BezierCurve bezier =
                         new(segment.Select(x => new Vector2(x.Position.X, x.Position.Y)));
-                    for (float i = 0; i <= 1.0f; i += 0.05f) slider.Points.Add(bezier.CalculatePoint(i));
+                    for (float i = 0; i <= 1.0f; i += 0.01f) slider.Points.Add(bezier.CalculatePoint(i));
                 }
             }
         }

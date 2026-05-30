@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
 using SDL;
+using Velto.Gameplay;
 
 namespace Velto.Graphics;
 
@@ -26,7 +27,8 @@ public unsafe class Renderer : IDisposable
     private readonly Shader _fontShader;
     private readonly int _fontVao;
 
-    private readonly bool _framebufferBound = false;
+    private Framebuffer? _framebuffer;
+    private Stack<Framebuffer> _framebufferStack = new();
 
     private readonly uint[] _indices =
     [
@@ -39,6 +41,8 @@ public unsafe class Renderer : IDisposable
 
     private readonly Shader _spriteShader;
     private readonly VertexArrayObject<float, uint> _spriteVao;
+
+    private Shader _sliderShader;
 
     private readonly float[] _vertices =
     [
@@ -53,6 +57,11 @@ public unsafe class Renderer : IDisposable
     private readonly Texture _whiteTexture;
 
     private readonly SDL_Window* _window;
+
+    public SDL_Window* Window
+    {
+        get => _window;
+    }
 
 
     public Renderer(SDL_Window* window)
@@ -129,6 +138,8 @@ public unsafe class Renderer : IDisposable
         GL.VertexAttribDivisor(9, 1);
 
         GL.BindVertexArray(0);
+        
+        _sliderShader = new Shader("slider");
     }
 
 
@@ -142,28 +153,58 @@ public unsafe class Renderer : IDisposable
         }
     }
 
-
-    public void Dispose()
+    public void BindFramebuffer(Framebuffer framebuffer)
     {
-        GL.DeleteBuffer(_fontInstanceVbo);
-        GL.DeleteBuffer(_fontQuadVbo);
-        GL.DeleteVertexArray(_fontVao);
+        ArgumentNullException.ThrowIfNull(framebuffer);
 
-        _quadVertexBuffer.Dispose();
-        _quadIndexBuffer.Dispose();
-        _spriteVao.Dispose();
-        _whiteTexture.Dispose();
-        _spriteShader.Dispose();
-        _fontShader.Dispose();
+        _framebufferStack.Push(framebuffer);
+        SetFramebuffer(framebuffer);
+    }
+
+    public void UnbindFramebuffer(Framebuffer? framebuffer)
+    {
+        if (_framebuffer != framebuffer) return;
+
+        _framebufferStack.Pop();
+
+        SetFramebuffer(_framebufferStack.TryPeek(out var lastFramebuffer) ? lastFramebuffer : null);
+    }
+
+    private void SetFramebuffer(Framebuffer? framebuffer = null)
+    {
+        _framebuffer = framebuffer;
+
+        if (_framebuffer == null)
+        {
+            GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+
+            int width, height;
+            SDL_GetWindowSizeInPixels(_window, &width, &height);
+            GL.Viewport(0, 0, width, height);
+        }
+        else
+        {
+            _framebuffer.Bind();
+            GL.Viewport(0, 0, _framebuffer.Width, _framebuffer.Height);
+        }
+    }
+
+    public void FixFramebuffer()
+    {
+        SetFramebuffer(_framebuffer);
     }
 
     public void Clear(Vector4 color)
     {
-        if (!_framebufferBound)
+        if (_framebuffer == null)
         {
             int width, height;
             SDL_GetWindowSizeInPixels(_window, &width, &height);
             GL.Viewport(0, 0, width, height);
+        }
+        else
+        {
+            GL.Viewport(0, 0, _framebuffer.Width, _framebuffer.Height);
         }
 
         // TODO: implement framebuffers
@@ -173,12 +214,118 @@ public unsafe class Renderer : IDisposable
         GL.Clear(ClearBufferMask.ColorBufferBit /*| ClearBufferMask.DepthBufferBit*/);
     }
 
+    public void DrawSlider(Slider slider, float x, float y, float scale, float osuRadius, float fadein, float fadeout)
+    {
+        var framebuffer = slider.SliderFramebuffer;
+        if (framebuffer == null)
+            return;
+
+        // Render into the offscreen texture in its own local coordinate system.
+        BindFramebuffer(framebuffer);
+
+        GL.Disable(EnableCap.DepthTest);
+        GL.Enable(EnableCap.Blend);
+        GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+        GL.ClearColor(0, 0, 0, 0);
+        GL.Clear(ClearBufferMask.ColorBufferBit);
+
+        var projection =
+            Matrix4.CreateOrthographicOffCenter(
+                0,
+                framebuffer.Width,
+                framebuffer.Height,
+                0,
+                -1f,
+                1f);
+
+        // Slider mesh vertices are in osu-playfield coordinates; shift them so CacheOffset becomes (0,0) in the FBO.
+        var model = Matrix4.CreateTranslation(-slider.CacheOffset.X, -slider.CacheOffset.Y, 0f);
+
+        _sliderShader.Use();
+
+        _sliderShader.SetMatrix4("uProjection", projection);
+        _sliderShader.SetMatrix4("uView", Matrix4.Identity);
+        _sliderShader.SetMatrix4("uModel", model);
+
+        _sliderShader.SetVector4("uColor", slider.Color);
+
+        // Approximate end-cap size in normalized slider length units.
+        float totalLen = 0f;
+        for (int i = 1; i < slider.Points.Count; i++)
+            totalLen += Vector2.Distance(slider.Points[i - 1], slider.Points[i]);
+        float cap = totalLen > 0.001f ? (osuRadius / totalLen) : 0f;
+
+        _sliderShader.SetFloat("uCap", cap);
+        _sliderShader.SetFloat("uFadeIn", fadein);
+        _sliderShader.SetFloat("uFadeOut", fadeout);
+
+        slider.Vao.Bind();
+        GL.DrawElements(PrimitiveType.Triangles, slider.IndexCount, DrawElementsType.UnsignedInt, 0);
+
+        UnbindFramebuffer(framebuffer);
+
+        // Draw cached texture to screen. (x,y) is expected to be the top-left screen position.
+        DrawTexture(framebuffer.Texture,
+            x, y, framebuffer.Width * scale, framebuffer.Height * scale, new Vector4(1, 1, 1, 1));
+    }
+
+    public void DrawTexture(int texture, float x, float y, float width, float height, Vector4 color,
+        float rotation = 0)
+    {
+        int wWidth = 1280, wHeight = 720;
+        if (_framebuffer == null) SDL_GetWindowSizeInPixels(_window, &wWidth, &wHeight);
+        else
+        {
+            wWidth = _framebuffer.Width;
+            wHeight = _framebuffer.Height;
+        }
+
+        var projection =
+            Matrix4.CreateOrthographicOffCenter(
+                0,
+                wWidth,
+                wHeight,
+                0,
+                -1f,
+                1f);
+
+        var model =
+            Matrix4.CreateTranslation(-0.5f, -0.5f, 0f) *
+            Matrix4.CreateRotationZ(MathHelper.DegreesToRadians(rotation)) *
+            Matrix4.CreateTranslation(0.5f, 0.5f, 0f) *
+            Matrix4.CreateScale(width, height, 1f) *
+            Matrix4.CreateTranslation(x, y, 0f);
+
+        GL.ActiveTexture(TextureUnit.Texture0);
+        GL.BindTexture(TextureTarget.Texture2D, texture);
+
+        _spriteShader.Use();
+        _spriteShader.SetInt("ourTexture", 0);
+        _spriteShader.SetVector4("color", color);
+        _spriteShader.SetMatrix4("model", model);
+        _spriteShader.SetMatrix4("view", Matrix4.Identity);
+        _spriteShader.SetMatrix4("projection", projection);
+
+        _spriteVao.Bind();
+
+        GL.DrawElements(
+            PrimitiveType.Triangles,
+            6,
+            DrawElementsType.UnsignedInt,
+            IntPtr.Zero);
+    }
+    
     public void DrawTexture(Texture texture, float x, float y, float width, float height, Vector4 color,
         float rotation = 0)
 
     {
         int wWidth = 1280, wHeight = 720;
-        if (!_framebufferBound) SDL_GetWindowSizeInPixels(_window, &wWidth, &wHeight);
+        if (_framebuffer == null) SDL_GetWindowSizeInPixels(_window, &wWidth, &wHeight);
+        else
+        {
+            wWidth = _framebuffer.Width;
+            wHeight = _framebuffer.Height;
+        }
 
         var projection =
             Matrix4.CreateOrthographicOffCenter(
@@ -217,41 +364,7 @@ public unsafe class Renderer : IDisposable
     public void DrawRectangle(float x, float y, float width, float height, Vector4 color,
         float rotation = 0)
     {
-        int wWidth = 1280, wHeight = 720;
-        if (!_framebufferBound) SDL_GetWindowSizeInPixels(_window, &wWidth, &wHeight);
-
-        var projection =
-            Matrix4.CreateOrthographicOffCenter(
-                0,
-                wWidth,
-                wHeight,
-                0,
-                -1f,
-                1f);
-
-        var model =
-            Matrix4.CreateTranslation(-0.5f, -0.5f, 0f) *
-            Matrix4.CreateRotationZ(MathHelper.DegreesToRadians(rotation)) *
-            Matrix4.CreateTranslation(0.5f, 0.5f, 0f) *
-            Matrix4.CreateScale(width, height, 1f) *
-            Matrix4.CreateTranslation(x, y, 0f);
-
-        _whiteTexture.Bind();
-
-        _spriteShader.Use();
-        _spriteShader.SetInt("ourTexture", 0);
-        _spriteShader.SetVector4("color", color);
-        _spriteShader.SetMatrix4("model", model);
-        _spriteShader.SetMatrix4("view", Matrix4.Identity);
-        _spriteShader.SetMatrix4("projection", projection);
-
-        _spriteVao.Bind();
-
-        GL.DrawElements(
-            PrimitiveType.Triangles,
-            6,
-            DrawElementsType.UnsignedInt,
-            IntPtr.Zero);
+        DrawTexture(_whiteTexture, x, y, width, height, color, rotation);
     }
 
     // font stuff 
@@ -288,8 +401,13 @@ public unsafe class Renderer : IDisposable
         }
 
         int wWidth = 1280, wHeight = 720;
-        if (!_framebufferBound) SDL_GetWindowSizeInPixels(_window, &wWidth, &wHeight);
-
+        if (_framebuffer == null) SDL_GetWindowSizeInPixels(_window, &wWidth, &wHeight);
+        else
+        {
+            wWidth = _framebuffer.Width;
+            wHeight = _framebuffer.Height;
+        }
+        
         var projection =
             Matrix4.CreateOrthographicOffCenter(
                 0,
@@ -355,5 +473,20 @@ public unsafe class Renderer : IDisposable
         public Vector4 UV;
         public Vector2 GlyphSize;
         public float DistanceRange;
+    }
+    
+    public void Dispose()
+    {
+        GL.DeleteBuffer(_fontInstanceVbo);
+        GL.DeleteBuffer(_fontQuadVbo);
+        GL.DeleteVertexArray(_fontVao);
+
+        _quadVertexBuffer.Dispose();
+        _quadIndexBuffer.Dispose();
+        _spriteVao.Dispose();
+        _whiteTexture.Dispose();
+        _spriteShader.Dispose();
+        _fontShader.Dispose();
+        _sliderShader.Dispose();
     }
 }

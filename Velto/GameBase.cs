@@ -48,7 +48,7 @@ public unsafe class GameBase : IDisposable
         
         SDL_GL_SetAttribute(SDL_GLAttr.SDL_GL_CONTEXT_MAJOR_VERSION, 4);
         SDL_GL_SetAttribute(SDL_GLAttr.SDL_GL_CONTEXT_MINOR_VERSION, 1);
-        SDL_GL_SetAttribute(
+        SDL_GL_SetAttribute(    
             SDL_GLAttr.SDL_GL_CONTEXT_FLAGS,
             SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG |
             SDL_GL_CONTEXT_DEBUG_FLAG);

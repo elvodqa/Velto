@@ -42,12 +42,19 @@ public unsafe class Framebuffer : IDisposable
         GL.BindTexture(TextureTarget.Texture2D, Texture);
         GL.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba, _width, _height, 0,
             PixelFormat.Rgba, PixelType.UnsignedByte, null);
-        GL.TexParameteri(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)FilterMode.Linear);
-        GL.TexParameteri(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)FilterMode.Linear);
+
+        // Must use OpenGL enums here (NOT Velto.Graphics.FilterMode). Otherwise the texture stays incomplete and samples black.
+        GL.TexParameteri(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+        GL.TexParameteri(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+        GL.TexParameteri(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
+        GL.TexParameteri(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
+
         GL.BindTexture(TextureTarget.Texture2D, 0);
 
         GL.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0,
             TextureTarget.Texture2D, Texture, 0);
+
+        GL.DrawBuffer(DrawBufferMode.ColorAttachment0);
 
         var res = GL.CheckFramebufferStatus(FramebufferTarget.Framebuffer);
         if (res != FramebufferStatus.FramebufferComplete)
@@ -57,6 +64,8 @@ public unsafe class Framebuffer : IDisposable
 
         //_renderer.FixFramebuffer();
         GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+        
+        _renderer.FixFramebuffer();
     }
     
     

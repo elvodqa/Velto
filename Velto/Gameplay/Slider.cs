@@ -26,4 +26,11 @@ public class Slider : HitObject
 
     public List<Vector2> Points = new();
     public int SlideRepeatCount;
+    public Framebuffer SliderFramebuffer;
+    public Vector2 CacheOffset;
+    public (float[] vbo, uint[] ibo) VboData, IboData;
+    public BufferObject<float> Vbo;
+    public BufferObject<uint> Ebo;
+    public VertexArrayObject<float, uint> Vao;
+    public int IndexCount;
 }
