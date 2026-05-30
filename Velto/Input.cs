@@ -1,118 +1,116 @@
-using System.Runtime.InteropServices;
+using SDL3;
 
 namespace Velto;
 
-using SDL;
-using static SDL.SDL3;
-
-public unsafe class Input
+public static class Input
 {
-    private static int _numOfKeys;
+    private static bool[] _currentKeyboard = [];
+    private static bool[] _previousKeyboard = [];
 
-    private static SDL_MouseButtonFlags _currentMouse;
-    private static SDL_MouseButtonFlags _previousMouse;
-    
-    private static byte[] _currentKeyboard = new byte[(int)SDL_Scancode.SDL_SCANCODE_COUNT];
-    private static byte[] _previousKeyboard = new byte[(int)SDL_Scancode.SDL_SCANCODE_COUNT];
+    private static SDL.MouseButtonFlags _currentMouse;
+    private static SDL.MouseButtonFlags _previousMouse;
 
     public static float MouseX { get; private set; }
     public static float MouseY { get; private set; }
+
     public static float DeltaX { get; private set; }
     public static float DeltaY { get; private set; }
+
     public static float WheelX { get; private set; }
     public static float WheelY { get; private set; }
-    
-    public static byte[] GetKeyboardState()
+
+    public static void UpdateKeyboard()
     {
-        fixed (int* keys = &_numOfKeys)
+        var state = SDL.GetKeyboardState(out int keyCount);
+
+        if (_currentKeyboard.Length != keyCount)
         {
-            // _previousKeyState = _currentKeyState;
-            // _currentKeyState =  SDL_GetKeyboardState(keys);
-            Array.Copy(_currentKeyboard, _previousKeyboard, _numOfKeys);
-            Marshal.Copy((nint)SDL_GetKeyboardState(keys), _currentKeyboard, 0, _numOfKeys);
-            return _currentKeyboard;
+            _currentKeyboard = new bool[keyCount];
+            _previousKeyboard = new bool[keyCount];
+        }
+
+        Array.Copy(_currentKeyboard, _previousKeyboard, keyCount);
+
+        for (int i = 0; i < keyCount; i++)
+        {
+            _currentKeyboard[i] = state[i];
         }
     }
 
-    public static void FixScrollback()
+    public static void UpdateMouse(nint window)
     {
-        WheelX = 0;
-        WheelY = 0;
-    }
-
-    public static void UpdateEvents(SDL_Event ev)
-    {
-        switch (ev.type)
-        {
-            case (uint)SDL_EventType.SDL_EVENT_MOUSE_WHEEL:
-                WheelX = ev.wheel.x;
-                WheelY = ev.wheel.y;
-                break;
-        }
-    }
-
-    public static void UpdateMouse(SDL_Window* window)
-    {
-        // store previous state
         _previousMouse = _currentMouse;
 
-        float x, y;
-        _currentMouse = SDL_GetMouseState(&x, &y);
+        _currentMouse = SDL.GetMouseState(out float x, out float y);
 
-        //float scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
-        //if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) scale = 2;
-        float scale = SDL_GetWindowDisplayScale(window);
+        float scale = SDL.GetWindowDisplayScale(window);
 
-        // position
         float prevX = MouseX;
         float prevY = MouseY;
 
         MouseX = x * scale;
         MouseY = y * scale;
 
-        // delta
         DeltaX = MouseX - prevX;
         DeltaY = MouseY - prevY;
     }
-    
-    // private static SDL_MouseButtonFlags ButtonMask(SDL_MouseButtonFlags button)
-    // {
-    //     return (SDL_MouseButtonFlags)(1 << ((int)button - 1));
-    // }
 
-    public static bool IsKeyDown(SDL_Scancode scancode)
+    public static void UpdateEvent(SDL.Event e)
     {
-        return _currentKeyboard[(int)scancode] != 0;
+        switch ((SDL.EventType)e.Type)
+        {
+            case SDL.EventType.MouseWheel:
+                WheelX = e.Wheel.X;
+                WheelY = e.Wheel.Y;
+                break;
+        }
     }
 
-    public static bool IsKeyJustPressed(SDL_Scancode scancode)
+    public static void EndFrame()
     {
-        return _currentKeyboard[(int)scancode] != 0 && _previousKeyboard[(int)scancode] == 0;
+        WheelX = 0;
+        WheelY = 0;
     }
-    
-    public static bool IsKeyboardJustReleased(SDL_Scancode scancode)
-    {
-        return _currentKeyboard[(int)scancode] == 0 && _previousKeyboard[(int)scancode] != 0;
-    }
-    
-    public static bool IsMouseDown(SDLButton button)
-    {
-        return (_currentMouse & SDL_BUTTON(button)) != 0;
-    }
-    
-    public static bool IsMouseJustPressed(SDLButton button)
-    {
-        var mask = SDL_BUTTON(button);
 
-        return (_currentMouse & mask) != 0 &&
-               (_previousMouse & mask) == 0;
-    }
-    
-    public static bool IsMouseJustReleased(SDLButton button)
+    public static bool IsKeyDown(SDL.Scancode key)
     {
-        var mask = SDL_BUTTON(button);
+        return _currentKeyboard[(int)key];
+    }
 
-        return (_currentMouse & mask) == 0 &&
-               (_previousMouse & mask) != 0;
+    public static bool IsKeyJustPressed(SDL.Scancode key)
+    {
+        int index = (int)key;
+
+        return _currentKeyboard[index] &&
+               !_previousKeyboard[index];
+    }
+
+    public static bool IsKeyJustReleased(SDL.Scancode key)
+    {
+        int index = (int)key;
+
+        return !_currentKeyboard[index] &&
+                _previousKeyboard[index];
+    }
+
+    public static bool IsMouseDown(SDL.MouseButtonFlags button)
+    {
+        return (_currentMouse & button) != 0;
+    }
+
+    public static bool IsMouseJustPressed(SDL.MouseButtonFlags button)
+    {
+        //var mask = SDL.ButtonMask(button);
+
+        return (_currentMouse & button) != 0 &&
+               (_previousMouse & button) == 0;
+    }
+
+    public static bool IsMouseJustReleased(SDL.MouseButtonFlags button)
+    {
+        //var mask = SDL.ButtonMask(button);
+
+        return (_currentMouse & button) == 0 &&
+               (_previousMouse & button) != 0;
     }
 }

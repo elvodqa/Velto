@@ -9,23 +9,23 @@ using OpenTK;
 using OpenTK.Core.Utility;
 using OpenTK.Graphics;
 using System;
-using SDL;
-using static SDL.SDL3;
+using SDL3;
+
 using OpenTK.Graphics.OpenGL;
 
 public class BindingContext : IBindingsContext
 {
     public IntPtr GetProcAddress(string procName)
     {
-        return SDL_GL_GetProcAddress(procName);
+        return SDL.GLGetProcAddress(procName);
     }
 }
 
 public unsafe class GameBase : IDisposable
 {
     private Logger _logger;
-    private SDL_Window* _window;
-    private SDL_GLContextState* _glContextState;
+    private IntPtr _window;
+    private IntPtr _glContextState;
 
     private GCHandle _eventWatchHandle;
     private IntPtr _eventWatchUserdata;
@@ -41,11 +41,12 @@ public unsafe class GameBase : IDisposable
     private double _fps = 0;
 
     private MSDFFont _debugFont;
+    private SDL.EventFilter _eventFilter;
 
 
     public GameBase()
     {
-        SDL_Init(SDL_InitFlags.SDL_INIT_VIDEO);
+        SDL.Init(SDL.InitFlags.Video);
         _logger = new Logger();
     }
 
@@ -53,27 +54,21 @@ public unsafe class GameBase : IDisposable
     public void Initialize()
     {
         
-        SDL_GL_SetAttribute(SDL_GLAttr.SDL_GL_CONTEXT_MAJOR_VERSION, 4);
-        SDL_GL_SetAttribute(SDL_GLAttr.SDL_GL_CONTEXT_MINOR_VERSION, 1);
-        SDL_GL_SetAttribute(    
-            SDL_GLAttr.SDL_GL_CONTEXT_FLAGS,
-            SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG |
-            SDL_GL_CONTEXT_DEBUG_FLAG);
-        SDL_GL_SetAttribute(
-            SDL_GLAttr.SDL_GL_CONTEXT_PROFILE_MASK,
-            SDL_GL_CONTEXT_PROFILE_CORE);
-        SDL_GL_SetAttribute(SDL_GLAttr.SDL_GL_DOUBLEBUFFER, 1);
-        SDL_GL_SetAttribute(SDL_GLAttr.SDL_GL_DEPTH_SIZE, 24);
+        SDL.GLSetAttribute(SDL.GLAttr.ContextMajorVersion, 4);
+        SDL.GLSetAttribute(SDL.GLAttr.ContextMinorVersion, 1);
+        SDL.GLSetAttribute(SDL.GLAttr.ContextFlags, (int)(SDL.GLContextFlag.ForwardCompatible | SDL.GLContextFlag.Debug));
+        SDL.GLSetAttribute(SDL.GLAttr.ContextProfileMask, (int)SDL.GLProfile.Core);
+        SDL.GLSetAttribute(SDL.GLAttr.DoubleBuffer, 1);
+        SDL.GLSetAttribute(SDL.GLAttr.DepthSize, 24);
         
-        _window = SDL_CreateWindow("Velto"u8, 1280, 720, SDL_WindowFlags.SDL_WINDOW_OPENGL | SDL_WindowFlags.SDL_WINDOW_RESIZABLE
-            | SDL_WindowFlags.SDL_WINDOW_HIGH_PIXEL_DENSITY
+        _window = SDL.CreateWindow("Velto", 1280, 720, SDL.WindowFlags.OpenGL | SDL.WindowFlags.Resizable
+            | SDL.WindowFlags.HighPixelDensity
             );
-        _glContextState = SDL_GL_CreateContext(_window);
-        SDL_GL_MakeCurrent(_window, _glContextState);
-        SDL_GL_SetSwapInterval(0);
-
-        int interval;
-        SDL_GL_GetSwapInterval(&interval);
+        _glContextState = SDL.GLCreateContext(_window);
+        SDL.GLMakeCurrent(_window, _glContextState);
+        SDL.GLSetSwapInterval(0);
+        
+        SDL.GLGetSwapInterval(out int interval);
         _logger.Info($"Swap Interval = {interval}");
         //SDL_GL_SetSwapInterval(0);
         
@@ -85,7 +80,7 @@ public unsafe class GameBase : IDisposable
         GL.Enable(EnableCap.DebugOutput);
         GL.Enable(EnableCap.DebugOutputSynchronous);
         
-        _logger.Info($"BasePath: {SDL_GetBasePath()}");
+        _logger.Info($"BasePath: {SDL.GetBasePath()}");
         _logger.Info($"Vendor:   {GL.GetString(StringName.Vendor)}");
         _logger.Info($"Renderer: {GL.GetString(StringName.Renderer)}");
         _logger.Info($"Version:  {GL.GetString(StringName.Version)}");
@@ -98,32 +93,30 @@ public unsafe class GameBase : IDisposable
         // During a live window resize, the OS may block the main loop. An event watch lets us redraw.
         _eventWatchHandle = GCHandle.Alloc(this);
         _eventWatchUserdata = GCHandle.ToIntPtr(_eventWatchHandle);
-        SDL_AddEventWatch(&EventWatch, _eventWatchUserdata);
+        _eventFilter = Filter;
+        SDL.AddEventWatch(_eventFilter, _eventWatchUserdata);
 
         _debugFont = MSDFFont.Load(Resources.GetPath("Resources/Fonts/arial/arial"));
     }
-
     
-
     public void Run()
     {
         Initialize();
-        SDL_MaximizeWindow(_window);
-        SDL_HideCursor();
+        SDL.MaximizeWindow(_window);
+        SDL.HideCursor();
         
-        ulong tickNow = SDL_GetPerformanceCounter();
+        ulong tickNow = SDL.GetPerformanceCounter();
         ulong tickLast = 0;
         double deltaTime = 0;
         _running = true;
-        Input.GetKeyboardState();
+        Input.UpdateKeyboard();
         Input.UpdateMouse(_window);
         while (_running)
         {
-            Input.FixScrollback();
-            SDL_PumpEvents();
+            SDL.PumpEvents();
             tickLast = tickNow;
-            tickNow = SDL_GetPerformanceCounter();
-            deltaTime = (tickNow - tickLast)*1000 / (double)SDL_GetPerformanceFrequency();
+            tickNow = SDL.GetPerformanceCounter();
+            deltaTime = (tickNow - tickLast)*1000 / (double)SDL.GetPerformanceFrequency();
             
             _frameCount++;
             _fpsTimer += deltaTime;
@@ -137,52 +130,54 @@ public unsafe class GameBase : IDisposable
                 _frameCount = 0;
                 _fpsTimer = 0.0;
             }
+
             
-            SDL_Event ev;
-            while (SDL_PollEvent(&ev))
+            while (SDL.PollEvent(out SDL.Event ev))
             {
-                switch (ev.type)
+                switch ((SDL.EventType)ev.Type)
                 {
-                    case (uint)SDL_EventType.SDL_EVENT_QUIT:
+                    case SDL.EventType.Quit:
                         _running = false;
                         break;
-                    case (uint)SDL_EventType.SDL_EVENT_WINDOW_RESIZED:
-                        _logger.Info($"Window Resized: {ev.window.data1} x {ev.window.data2}");
+                    case SDL.EventType.WindowResized:
+                        _logger.Info($"Window Resized: {ev.Window.Data1} x {ev.Window.Data2}");
                         break;
-                    case (uint)SDL_EventType.SDL_EVENT_KEY_DOWN:
-                        if (ev.key.key == SDL_Keycode.SDLK_F1)
+                    case SDL.EventType.KeyDown:
+                        if (ev.Key.Key == SDL.Keycode.F1)
                         {
                             _gameDisplay.Dispose();
                             _gameDisplay = new(_renderer);
                         }
                         break;
                 }
-                Input.UpdateEvents(ev);
+                Input.UpdateEvent(ev);
             }
 
             Loop(deltaTime);
             
-            SDL_GL_SwapWindow(_window);
+            SDL.GLSwapWindow(_window);
         }
     }
 
     private void Loop(double deltaTime)
     {
-        Input.GetKeyboardState();
+        Input.UpdateKeyboard();
         Input.UpdateMouse(_window);
             
         _gameDisplay.Update(deltaTime);
         _gameDisplay.Draw(deltaTime);
         
         _renderer.DrawText(_debugFont, $"FPS: {_fps:F1} [{deltaTime:F2}ms]", new (5, 5), 0.6f, new Vector4(1, 1, 1, 1));
+        
+        Input.EndFrame();
     }
     
     private void RenderFromEventWatch()
     {
         // Ensure the correct context is current before any GL calls.
-        SDL_GL_MakeCurrent(_window, _glContextState);
+        SDL.GLMakeCurrent(_window, _glContextState);
 
-        var tickNow = SDL_GetPerformanceCounter();
+        var tickNow = SDL.GetPerformanceCounter();
         double deltaTime;
         if (_eventWatchTickLast == 0)
         {
@@ -190,7 +185,7 @@ public unsafe class GameBase : IDisposable
         }
         else
         {
-            deltaTime = (tickNow - _eventWatchTickLast) * 1000 / (double)SDL_GetPerformanceFrequency();
+            deltaTime = (tickNow - _eventWatchTickLast) * 1000 / (double)SDL.GetPerformanceFrequency();
             if (deltaTime < 0) deltaTime = 0;
             if (deltaTime > 250) deltaTime = 250; // avoid giant jumps during resize stalls
         }
@@ -199,22 +194,22 @@ public unsafe class GameBase : IDisposable
 
         Loop(deltaTime);
 
-        SDL_GL_SwapWindow(_window);
+        SDL.GLSwapWindow(_window);
     }
 
-    [UnmanagedCallersOnly(CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
-    private static unsafe SDLBool EventWatch(IntPtr userdata, SDL_Event* ev)
+    //[UnmanagedCallersOnly(CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
+    private bool Filter(IntPtr userdata, ref SDL.Event ev)
     {
         var game = ((GCHandle)userdata).Target as GameBase;
-        if (game == null || ev == null)
+        if (game == null)
             return true;
 
         // Use the top-level event discriminator; reading ev->window for non-window events is unsafe.
-        var type = (SDL_EventType)ev->type;
+        var type = (SDL.EventType)ev.Type;
 
-        if (type == SDL_EventType.SDL_EVENT_WINDOW_EXPOSED ||
-            type == SDL_EventType.SDL_EVENT_WINDOW_HIT_TEST ||
-            type == SDL_EventType.SDL_EVENT_WINDOW_RESIZED)
+        if (type == SDL.EventType.WindowExposed ||
+            type == SDL.EventType.WindowHitTest ||
+            type == SDL.EventType.WindowResized)
         {
             game.RenderFromEventWatch();
         }
@@ -245,15 +240,15 @@ public unsafe class GameBase : IDisposable
     {
         if (_eventWatchUserdata != IntPtr.Zero)
         {
-            SDL_RemoveEventWatch(&EventWatch, _eventWatchUserdata);
+            SDL.RemoveEventWatch(Filter, _eventWatchUserdata);
             _eventWatchUserdata = IntPtr.Zero;
         }
 
         if (_eventWatchHandle.IsAllocated)
             _eventWatchHandle.Free();
 
-        SDL_GL_DestroyContext(_glContextState);
-        SDL_DestroyWindow(_window);
+        SDL.GLDestroyContext(_glContextState);
+        SDL.DestroyWindow(_window);
     }
     
     private static void DebugCallback(DebugSource source, DebugType type, uint id, DebugSeverity severity, int length, IntPtr message, IntPtr userParam)

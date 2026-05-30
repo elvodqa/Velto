@@ -2,7 +2,7 @@ using System.Drawing;
 using ManagedBass;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
-using SDL;
+using SDL3;
 using Velto.Gameplay;
 
 namespace Velto.Graphics;
@@ -164,7 +164,7 @@ public unsafe class GameDisplay : IDisposable
             .OrderByDescending(h => Math.Abs(h.Time - _songCursor));
 
         RectangleF hitbox = new(0, _windowHeight - 40, _windowWidth, 40);
-        if (Input.IsMouseDown(SDLButton.SDL_BUTTON_LEFT))
+        if (Input.IsMouseDown(SDL.MouseButtonFlags.Left))
             // Console.WriteLine(hitbox);
             // Console.WriteLine($"{Input.MouseX} {Input.MouseY}");
             if (hitbox.Contains(Input.MouseX, Input.MouseY))
@@ -174,7 +174,7 @@ public unsafe class GameDisplay : IDisposable
                 Bass.ChannelSetPosition(_musicChannel, Bass.ChannelSeconds2Bytes(_musicChannel, songPointer / 1000));
             }
         
-        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_ESCAPE))
+        if (Input.IsKeyJustPressed(SDL.Scancode.Escape))
         {
             if (_isMenuOpen)
             {
@@ -222,7 +222,7 @@ public unsafe class GameDisplay : IDisposable
             
         }
         
-        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_SPACE) && !_isMenuOpen)
+        if (Input.IsKeyJustPressed(SDL.Scancode.Space) && !_isMenuOpen)
         {
             if (_isPaused)
                 Bass.ChannelPlay(_musicChannel);
@@ -232,13 +232,13 @@ public unsafe class GameDisplay : IDisposable
             _isPaused = !_isPaused;
         }
 
-        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_LEFT))
+        if (Input.IsKeyJustPressed(SDL.Scancode.Left))
         {
             _songCursor -= 1000;
             Bass.ChannelSetPosition(_musicChannel, Bass.ChannelSeconds2Bytes(_musicChannel, _songCursor / 1000));
         }
 
-        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_RIGHT))
+        if (Input.IsKeyJustPressed(SDL.Scancode.Right))
         {
             _songCursor += 1000;
             Bass.ChannelSetPosition(_musicChannel, Bass.ChannelSeconds2Bytes(_musicChannel, _songCursor / 1000));
@@ -260,7 +260,7 @@ public unsafe class GameDisplay : IDisposable
                 if (collision.Contains(Input.MouseX, Input.MouseY))
                 {
                     box.IsHovered = true;
-                    if (Input.IsMouseJustPressed(SDLButton.SDL_BUTTON_LEFT))
+                    if (Input.IsMouseJustPressed(SDL.MouseButtonFlags.Left))
                     {
                         _beatmap = box.Beatmap;
                         
@@ -304,8 +304,8 @@ public unsafe class GameDisplay : IDisposable
                     mouse.Y = (mouse.Y - playfieldTopLeft.Y) / scale;
                     var radiusPlayfield = osuRadius;
                     if (Vector2.Distance(circle.Position, mouse) <= radiusPlayfield)
-                        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_Z) ||
-                            Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_X))
+                        if (Input.IsKeyJustPressed(SDL.Scancode.Z) ||
+                            Input.IsKeyJustPressed(SDL.Scancode.X))
                         {
                             circle.Color = new Vector4(1, 1, 1, 1);
                             circle.HitResult = HitResult.Ok;

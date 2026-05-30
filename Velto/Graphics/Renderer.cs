@@ -1,12 +1,11 @@
 using System.Runtime.InteropServices;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
-using SDL;
+using SDL3;
 using Velto.Gameplay;
 
 namespace Velto.Graphics;
 
-using static SDL3;
 
 public unsafe class Renderer : IDisposable
 {
@@ -56,15 +55,15 @@ public unsafe class Renderer : IDisposable
 
     private readonly Texture _whiteTexture;
 
-    private readonly SDL_Window* _window;
+    private readonly IntPtr _window;
 
-    public SDL_Window* Window
+    public IntPtr Window
     {
         get => _window;
     }
 
 
-    public Renderer(SDL_Window* window)
+    public Renderer(IntPtr window)
     {
         _window = window;
         _quadVertexBuffer = new BufferObject<float>(_vertices, BufferTarget.ArrayBuffer, BufferUsage.StaticDraw);
@@ -147,8 +146,7 @@ public unsafe class Renderer : IDisposable
     {
         get
         {
-            int w, h;
-            SDL_GetWindowSizeInPixels(_window, &w, &h);
+            SDL.GetWindowSizeInPixels(_window, out var w, out var h);
             return new Vector2(w, h);
         }
     }
@@ -177,9 +175,8 @@ public unsafe class Renderer : IDisposable
         if (_framebuffer == null)
         {
             GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
-
-            int width, height;
-            SDL_GetWindowSizeInPixels(_window, &width, &height);
+            
+            SDL.GetWindowSizeInPixels(_window, out var width, out var height);
             GL.Viewport(0, 0, width, height);
         }
         else
@@ -198,8 +195,8 @@ public unsafe class Renderer : IDisposable
     {
         if (_framebuffer == null)
         {
-            int width, height;
-            SDL_GetWindowSizeInPixels(_window, &width, &height);
+            
+            SDL.GetWindowSizeInPixels(_window, out var width, out var height);
             GL.Viewport(0, 0, width, height);
         }
         else
@@ -273,7 +270,12 @@ public unsafe class Renderer : IDisposable
         float rotation = 0)
     {
         int wWidth = 1280, wHeight = 720;
-        if (_framebuffer == null) SDL_GetWindowSizeInPixels(_window, &wWidth, &wHeight);
+        if (_framebuffer == null)
+        {
+            SDL.GetWindowSizeInPixels(_window, out var _wWidth, out var _wHeight);
+            wWidth = _wWidth;
+            wHeight = _wHeight;
+        }
         else
         {
             wWidth = _framebuffer.Width;
@@ -320,7 +322,12 @@ public unsafe class Renderer : IDisposable
 
     {
         int wWidth = 1280, wHeight = 720;
-        if (_framebuffer == null) SDL_GetWindowSizeInPixels(_window, &wWidth, &wHeight);
+        if (_framebuffer == null)
+        {
+            SDL.GetWindowSizeInPixels(_window, out var _wWidth, out var _wHeight);
+            wWidth = _wWidth;
+            wHeight = _wHeight;
+        }
         else
         {
             wWidth = _framebuffer.Width;
@@ -401,7 +408,12 @@ public unsafe class Renderer : IDisposable
         }
 
         int wWidth = 1280, wHeight = 720;
-        if (_framebuffer == null) SDL_GetWindowSizeInPixels(_window, &wWidth, &wHeight);
+        if (_framebuffer == null)
+        {
+            SDL.GetWindowSizeInPixels(_window, out var _wWidth, out var _wHeight);
+            wWidth = _wWidth;
+            wHeight = _wHeight;
+        }
         else
         {
             wWidth = _framebuffer.Width;

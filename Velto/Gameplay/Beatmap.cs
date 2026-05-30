@@ -1,7 +1,6 @@
 using OpenTK.Mathematics;
 using Velto.Graphics;
-using SDL;
-using static SDL.SDL3;
+using SDL3;
 
 namespace Velto.Gameplay;
 
@@ -216,7 +215,7 @@ public unsafe class Beatmap
 
     public List<HitObject> HitObjects { get; set; }
 
-    public void CalculatePrepass(SDL_Window* window)
+    public void CalculatePrepass(IntPtr window)
     {
         var comboCounter = 0;
         var colorCounter = 0;

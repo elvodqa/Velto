@@ -12,7 +12,8 @@
       <PackageReference Include="OpenTK" Version="5.0.0-pre.16" />
       <PackageReference Include="OpenTK.Mathematics" Version="5.0.0-pre.16" />
       <PackageReference Include="ppy.ManagedBass" Version="2022.1216.0" />
-      <PackageReference Include="ppy.SDL3-CS" Version="2026.520.0" />
+      <PackageReference Include="SDL3-CS" Version="3.5.0-preview.20260213-150035" />
+      <PackageReference Include="SDL3-CS.Native" Version="3.5.0-preview.20260205-174353" />
       <PackageReference Include="SDL3-CS.Native.Shadercross" Version="3.0.0" />
       <PackageReference Include="StbImageSharp" Version="2.30.15" />
     </ItemGroup>
