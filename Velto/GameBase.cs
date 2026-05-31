@@ -82,6 +82,7 @@ public unsafe class GameBase : IDisposable
         GCHandle handle = GCHandle.Alloc(_logger);
         IntPtr ptr = GCHandle.ToIntPtr(handle);
         //GL.DebugMessageCallback(DebugCallback, IntPtr.Zero);
+        
         GL.Enable(EnableCap.DebugOutput);
         GL.Enable(EnableCap.DebugOutputSynchronous);
         
@@ -90,7 +91,15 @@ public unsafe class GameBase : IDisposable
         _logger.Info($"Renderer: {GL.GetString(StringName.Renderer)}");
         _logger.Info($"Version:  {GL.GetString(StringName.Version)}");
         _logger.Info($"GLSL:     {GL.GetString(StringName.ShadingLanguageVersion)}");
+        
+        GL.GetInteger(GetPName.NumExtensions, out var numOfExtensions);
 
+        for (int i = 0; i < numOfExtensions; i++)
+        {
+            var extension = GL.GetStringi(StringName.Extensions, (uint)i);
+            //_logger.Info($"\t{extension}");
+        }
+        
         _running = false;
         _renderer = new(_window);
         _gameDisplay = new(_renderer);
@@ -109,7 +118,7 @@ public unsafe class GameBase : IDisposable
     {
         Initialize();
         SDL_MaximizeWindow(_window);
-        SDL_HideCursor();
+        //SDL_HideCursor();
         
         ulong tickNow = SDL_GetPerformanceCounter();
         ulong tickLast = 0;

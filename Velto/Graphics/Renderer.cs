@@ -85,7 +85,7 @@ public unsafe class Renderer : IDisposable
         _spriteVao.VertexAttributePointer(1, 2, VertexAttribPointerType.Float, 5 * sizeof(float), 3 * sizeof(float));
         _spriteShader = new Shader("sprite");
     
-        //GL.PixelStorei(PixelStoreParameter.UnpackAlignment , 1);
+        GL.PixelStorei(PixelStoreParameter.UnpackAlignment , 1);
         
         _whiteTexture = new Texture(Resources.GetPath("Resources/Textures/white.png"));
 

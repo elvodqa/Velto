@@ -347,7 +347,7 @@ public unsafe class Beatmap
                 {
                     BezierCurve bezier =
                         new(segment.Select(x => new Vector2(x.Position.X, x.Position.Y)));
-                    for (float i = 0; i <= 1.0f; i += 0.05f) slider.Points.Add(bezier.CalculatePoint(i));
+                    for (float i = 0; i <= 1.0f; i += 0.01f) slider.Points.Add(bezier.CalculatePoint(i));
                 }
                 
                 var timingPoint = TimingPoints[0];
@@ -360,17 +360,16 @@ public unsafe class Beatmap
                 }
                 
                 // Calculate length
-                
                 var length = slider.Length;
                 var sliderMultiplier = SliderMultiplier;
                 var beatLength = timingPoint.BeatLength;
                 double sv = 1;
                 if (timingPoint.Uninherited == 0)
                 {
-                    sv = 100/timingPoint.BeatLength;
+                    sv = 100f / timingPoint.BeatLength;
                 }
 
-                slider.Duration = length / (sliderMultiplier * 100 * sv) * beatLength;
+                slider.Duration = length / (sliderMultiplier * 500 * sv) * beatLength;
                 slider.Duration *= slider.SlideRepeatCount * 10;
                 Console.WriteLine(slider.Duration);
             }

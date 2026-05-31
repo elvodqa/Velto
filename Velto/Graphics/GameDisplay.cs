@@ -2,8 +2,9 @@ using System.Drawing;
 using ManagedBass;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
-using SDL;
 using Velto.Gameplay;
+using SDL;
+using static SDL.SDL3;
 
 namespace Velto.Graphics;
 
@@ -46,7 +47,7 @@ public unsafe class GameDisplay : IDisposable
     private int _windowWidth, _windowHeight;
     private readonly BufferObject<uint> indexBuffer;
 
-    private Vector2 lastPosition = Vector2.Zero;
+    private Vector2 lastCursorPosition = Vector2.Zero;
     private Shader shader;
 
     private readonly Queue<TrailInfo> trails = new();
@@ -56,6 +57,8 @@ public unsafe class GameDisplay : IDisposable
     private List<BeatmapBox> _beatmapBoxes = new();
     private SliderPool _sliderPool;
     private int _hitSound;
+
+    private Player _player;
 
     public GameDisplay(Renderer renderer)
     {
@@ -107,6 +110,8 @@ public unsafe class GameDisplay : IDisposable
         _beatmap.CalculatePrepass(_renderer.Window);
 
         _sliderPool = new SliderPool(_renderer);
+
+        _player = new Player(_beatmap);
     }
 
     float playfieldWidth, playfieldHeight;
@@ -168,11 +173,7 @@ public unsafe class GameDisplay : IDisposable
         
         double cursor = _songCursor;
 
-      
-
-       
-
-
+        
         RectangleF hitbox = new(0, _windowHeight - 40, _windowWidth, 40);
         if (Input.IsMouseDown(SDLButton.SDL_BUTTON_LEFT))
             // Console.WriteLine(hitbox);
@@ -258,6 +259,12 @@ public unsafe class GameDisplay : IDisposable
             _songCursor += 1000;
             Bass.ChannelSetPosition(_musicChannel, Bass.ChannelSeconds2Bytes(_musicChannel, _songCursor / 1000));
         }
+        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_A))
+        {
+            _player.Autoplay = !_player.Autoplay;
+            if (_player.Autoplay) SDL_ShowCursor();
+            else SDL_HideCursor();
+        }
 
         if (Math.Abs(Input.WheelY) > 0.01f)
         {
@@ -289,6 +296,13 @@ public unsafe class GameDisplay : IDisposable
                         _startingTimer = WAITINGTIME + _beatmap.AudioLeadIn;
 
                         _beatmap.CalculatePrepass(_renderer.Window);
+                        _player = new Player(_beatmap);
+
+                        foreach (var obj in _beatmap.HitObjects)
+                        {
+                            obj.HitTime = 0;
+                            obj.HitResult = HitResult.None;
+                        }
 
                         _isPaused = false;
                         _isMenuOpen = false;
@@ -350,6 +364,19 @@ public unsafe class GameDisplay : IDisposable
 
         // Slider points are in osu! playfield coordinates, so cache/build using osu-radius (unscaled).
         _sliderPool.Update(_songCursor, osuRadius);
+        
+        _player.Update(delta, _songCursor);
+        
+        if (lastCursorPosition != Vector2.Zero && Vector2.Distance(_player.Cursor, lastCursorPosition) > 5)
+            trails.Enqueue(new TrailInfo
+            {
+                Position = lastCursorPosition,
+                Life = 50
+            });
+
+        if (trails.Count > 48*2)
+            trails.Dequeue();
+        
     }
     
     float GetSliderVelocityMultiplier(double time)
@@ -366,23 +393,6 @@ public unsafe class GameDisplay : IDisposable
 
     public void Draw(double delta)
     {
-        
-        
-        //Bass.ChannelSetAttribute(_musicChannel, ChannelAttribute.Volume, 0.02f);
-        Bass.ChannelGetAttribute(_musicChannel, ChannelAttribute.Volume, out var volume);
-
-        var mousePos = new Vector2(Input.MouseX, Input.MouseY);
-
-        if (lastPosition != Vector2.Zero && Vector2.Distance(mousePos, lastPosition) > 5)
-            trails.Enqueue(new TrailInfo
-            {
-                Position = lastPosition,
-                Life = 50
-            });
-
-        if (trails.Count > 48*2)
-            trails.Dequeue();
-
         _renderer.Clear(new Vector4(0, 0, 0, 1));
 
         // bg
@@ -419,7 +429,7 @@ public unsafe class GameDisplay : IDisposable
 
 
         var scale = playfieldWidth / PLAYFIELD_W;
-
+        
         foreach (var hitObject in _sortedObjects)
         {
             var posX = playfieldTopLeft.X + hitObject.Position.X * scale;
@@ -440,7 +450,7 @@ public unsafe class GameDisplay : IDisposable
                     Math.Clamp(
                         Util.MapRange((float)_songCursor, hitObject.Time, hitObject.Time + _beatmap.Posttime, 1, 0),
                         0, 1);
-                drawSize = (float)(objectCircleSize + objectCircleSize * (1 - fadeout) * 0.1);
+                drawSize = (float)(objectCircleSize + objectCircleSize * (1 - fadeout) * 0.2);
                 approachCircleSize =
                     Math.Max(
                         Util.MapRange((float)_songCursor, hitObject.Time - _beatmap.Preempt, hitObject.Time + 0,
@@ -526,6 +536,10 @@ public unsafe class GameDisplay : IDisposable
                 //var sliderLife = slider.Length / (_beatmap.SliderMultiplier * 100 * _beatmap.Slid);
                 if (!(hitObject.Time + _startingTimer - (int)_songCursor > - slider.Duration) ||
                     !(hitObject.Time + _startingTimer - (int)_songCursor < _beatmap.Preempt)) continue;
+
+                slider.Sliding =
+                    _songCursor >= slider.Time &&
+                    _songCursor <= slider.Time + slider.Duration;
                 
                 var sliderFadein =
                     Math.Clamp(
@@ -542,7 +556,7 @@ public unsafe class GameDisplay : IDisposable
                     var scaledX = playfieldTopLeft.X + point.X * scale;
                     var scaledY = playfieldTopLeft.Y + point.Y * scale;
                     
-                    var _drawSize = drawSize * 0.92f;
+                    var _drawSize = objectCircleSize * 0.92f;
                     _renderer.DrawTexture(_circleTexture,
                         scaledX - _drawSize / 2,
                         scaledY - _drawSize / 2,
@@ -554,7 +568,7 @@ public unsafe class GameDisplay : IDisposable
                 {
                     var scaledX = playfieldTopLeft.X + point.X * scale;
                     var scaledY = playfieldTopLeft.Y + point.Y * scale;
-                    var _drawSize = drawSize * 0.8f;
+                    var _drawSize = objectCircleSize * 0.8f;
                     
                     _renderer.DrawTexture(_circleTexture,
                         scaledX - _drawSize / 2,
@@ -564,6 +578,32 @@ public unsafe class GameDisplay : IDisposable
                         hitObject.Color with { W = Math.Min(sliderFadein, sliderFadeout) });
                 }
                 GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+
+                if (slider.Sliding)
+                {
+                    float progress =
+                        ((float)_songCursor - (float)slider.Time) /
+                        (float)slider.Duration;
+
+                    progress = Math.Clamp(progress, 0f, 1f);
+
+                    int index = (int)(progress * (slider.Points.Count - 1));
+                    var position = slider.Points[index];
+                    
+                    var scaledX = playfieldTopLeft.X + position.X * scale;
+                    var scaledY = playfieldTopLeft.Y + position.Y * scale;
+                    var _drawSize = objectCircleSize * 1f;
+                    
+                    _renderer.DrawTexture(_sliderballTexture,
+                        scaledX - _drawSize / 2,
+                        scaledY - _drawSize / 2,
+                        _drawSize,
+                        _drawSize,
+                        hitObject.Color with { W = 1 });
+                
+                }
+
+                
 
                 //_renderer.DrawSlider(slider, posX, posY, 1, _baseCircleSize, fadein, fadeout);
 
@@ -668,7 +708,7 @@ public unsafe class GameDisplay : IDisposable
         }
         
         
-        // cursor
+        // Game cursor
         // Update trail lifetimes first so the draw loop can use a stable count (prevents 1-frame alpha spikes).
         var trailCount = trails.Count;
         for (var t = 0; t < trailCount; t++)
@@ -682,7 +722,17 @@ public unsafe class GameDisplay : IDisposable
         var trailSnapshot = trails.ToArray();
 
         var size = _baseCircleSize / 2f;
-        lastPosition = mousePos;
+        
+        
+        var _posX = playfieldTopLeft.X + _player.Cursor.X * scale;
+        var _posY = playfieldTopLeft.Y + _player.Cursor.Y * scale;
+        if (!_player.Autoplay)
+        {
+            _posX = Input.MouseX;
+            _posY = Input.MouseY;
+        }
+
+        lastCursorPosition = new(_posX, _posY);
 
         if (trailSnapshot.Length > 0)
         {
@@ -700,11 +750,12 @@ public unsafe class GameDisplay : IDisposable
                 i--;
             }
         }
+
         
         size = _baseCircleSize / 2f; // _cursorTexture.Width * 1.5f;
         _renderer.DrawTexture(_cursorTexture,
-            Input.MouseX - size / 2,
-            Input.MouseY - size / 2,
+            _posX - size / 2,
+            _posY - size / 2,
             size, size, new Vector4(1, 1, 1, 1));
     }
     
