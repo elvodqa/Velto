@@ -40,4 +40,47 @@ public class Slider : HitObject
     public BufferObject<uint> Ebo;
     public VertexArrayObject<float, uint> Vao;
     public int IndexCount;
+
+    // Duration for a single traversal of the path (i.e., one "span"), in milliseconds.
+    public double SpanDuration;
+
+    public Vector2 GetPositionAt(double songCursor)
+    {
+        if (Points.Count == 0)
+            return Position;
+
+        if (Duration <= 0)
+            return Points[^1];
+
+        var localTime = songCursor - Time;
+
+        if (localTime <= 0)
+            return Points[0];
+
+        if (localTime >= Duration)
+            return (Math.Max(1, SlideRepeatCount) % 2 == 0) ? Points[0] : Points[^1];
+
+        var spans = Math.Max(1, SlideRepeatCount);
+        var spanDuration = Duration / spans;
+        if (spanDuration <= 0)
+            return Points[0];
+
+        var spanIndex = (int)Math.Floor(localTime / spanDuration);
+        spanIndex = Math.Clamp(spanIndex, 0, spans - 1);
+
+        var t = (localTime - spanIndex * spanDuration) / spanDuration;
+        t = Math.Clamp(t, 0.0, 1.0);
+
+        // odd spans traverse backwards (ping-pong)
+        if ((spanIndex & 1) == 1)
+            t = 1.0 - t;
+
+        var idxF = t * (Points.Count - 1);
+        var idx0 = (int)Math.Floor(idxF);
+        idx0 = Math.Clamp(idx0, 0, Points.Count - 1);
+        var idx1 = Math.Min(idx0 + 1, Points.Count - 1);
+
+        var frac = (float)(idxF - idx0);
+        return Vector2.Lerp(Points[idx0], Points[idx1], frac);
+    }
 }

@@ -71,15 +71,7 @@ public class Player
             songCursor >= activeSlider.Time &&
             songCursor <= activeSlider.Time + activeSlider.Duration)
         {
-            float progress =
-                (float)((songCursor - activeSlider.Time) / activeSlider.Duration);
-
-            progress = Math.Clamp(progress, 0f, 1f);
-                
-            int index = (int)(progress * (activeSlider.Points.Count - 1));
-            var position = activeSlider.Points[index];
-
-            Cursor = position;
+            Cursor = activeSlider.GetPositionAt(songCursor);
             return;
         }
 
@@ -99,16 +91,8 @@ public class Player
 
         if (previous is Slider previousSlider)
         {
-            float progress =
-                (float)((songCursor - previousSlider.Time) / previousSlider.Duration);
-
-            progress = Math.Clamp(progress, 0f, 1f);
-                
-            int index = (int)(progress * (previousSlider.Points.Count - 1));
-            var position = previousSlider.Points[index];
-
-            startPos = position;
             startTime = previousSlider.Time + previousSlider.Duration;
+            startPos = previousSlider.GetPositionAt(startTime);
         }
         else
         {

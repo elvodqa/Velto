@@ -281,10 +281,8 @@ public unsafe class Beatmap
     {
         var comboCounter = 0;
         var colorCounter = 0;
-        var sortedTimingPoints = TimingPoints.OrderBy(t => t.Time);
+        var sortedTimingPoints = TimingPoints.OrderBy(t => t.Time).ToList();
 
-        double sliderVelocity = 1f;
-        
         foreach (var hitobject in HitObjects)
         {
             float preempt;
@@ -322,6 +320,9 @@ public unsafe class Beatmap
 
             if (hitobject is Slider slider)
             {
+                slider.Points.Clear();
+
+                // --- Build a sampled path for rendering/following ---
                 var segments = new List<List<CurvePoint>>();
                 var current = new List<CurvePoint>();
 
@@ -330,65 +331,72 @@ public unsafe class Beatmap
                     var point = slider.CurvePoints[i];
                     current.Add(point);
 
-                    // End segment when reaching a Linear point
-                    // but not if it's the very first point in the segment
+                    // End segment when reaching a Linear point, but not at segment start.
                     if (point.Type == CurveType.Linear && current.Count > 1)
                     {
                         segments.Add(current);
-                        current = new List<CurvePoint>();
-
-                        // carry over the last point as start of next segment
-                        current.Add(point);
-                    }
-                }
-                
-                // Add remaining points
-                if (current.Count > 1) segments.Add(current);
-
-                var timingPoint = TimingPoints[0];
-                TimingPoint lastGlobal = TimingPoints[0];
-                foreach (var point in sortedTimingPoints)
-                {
-                    if (point.Time <= slider.Time)
-                    {
-                        if (point.Uninherited==0)
-                        {
-                            timingPoint = point;
-                        }
-                        else
-                        {
-                            lastGlobal = point;
-                        }
+                        current = new List<CurvePoint> { point };
                     }
                 }
 
-                double pixelPerMs = SliderMultiplier * lastGlobal.BeatLength /
-                                    (float)(1 - (timingPoint.BeatLength / 100)) / (double)1000;
-                ulong sum = 0;
+                if (current.Count > 1)
+                    segments.Add(current);
+
+                const float sampleSpacingPx = 4f; // render/sample density (lower = smoother)
+
                 foreach (var segment in segments)
                 {
-                    BezierCurve bezier =
-                        new(segment.Select(x => new Vector2(x.Position.X, x.Position.Y)));
-                    float dist = bezier.CalculateLength(0.001f);
-                    int count = (int)(dist / pixelPerMs) ;
-                    sum += (ulong)count;
-                    for (int i = 0; i < count; i++) slider.Points.Add(bezier.CalculatePoint((float)i/count));
+                    var bezier = new BezierCurve(segment.Select(x => new Vector2(x.Position.X, x.Position.Y)));
+                    var dist = bezier.CalculateLength(0.001f);
+
+                    var count = Math.Max(2, (int)Math.Ceiling(dist / sampleSpacingPx));
+                    for (int i = 0; i < count; i++)
+                    {
+                        var t = count <= 1 ? 0f : i / (float)(count - 1);
+                        var p = bezier.CalculatePoint(t);
+
+                        if (slider.Points.Count == 0 || (p - slider.Points[^1]).LengthSquared > 0.001f)
+                            slider.Points.Add(p);
+                    }
                 }
-                
-        
-                
-                // Calculate length
 
+                // --- Timing (osu! rules): duration = length * msPerBeat / (SliderMultiplier*100*SV) ---
+                TimingPoint? baseTiming = null; // red line (uninherited = 1)
+                TimingPoint? svTiming = null;   // green line (uninherited = 0)
 
-                //sliderVelocity *= (100.0f / timingPoint.BeatLength);
-            
-                slider.Duration = sum ;
-                slider.Duration *= slider.SlideRepeatCount;
-                
-                Console.Write($"{slider.Duration}  ");
-                // slider.Duration = 200;
+                foreach (var tp in sortedTimingPoints)
+                {
+                    if (tp.Time > slider.Time)
+                        break;
+
+                    if (tp.Uninherited == 1)
+                        baseTiming = tp;
+                    else
+                        svTiming = tp;
+                }
+
+                // Fallbacks in case maps are weird / missing expected points.
+                var baseTp = baseTiming ?? sortedTimingPoints.FirstOrDefault(t => t.Uninherited == 1);
+                if (baseTp.Time == 0 && baseTp.BeatLength == 0 && sortedTimingPoints.Count > 0)
+                    baseTp = sortedTimingPoints[0];
+
+                var msPerBeat = baseTp.BeatLength;
+                if (msPerBeat <= 0)
+                    msPerBeat = 500; // sane default
+
+                var svMultiplier = 1.0;
+                if (svTiming.HasValue && svTiming.Value.BeatLength < 0)
+                    svMultiplier = -100.0 / svTiming.Value.BeatLength;
+
+                var pxPerBeat = SliderMultiplier * 100.0 * svMultiplier;
+                if (pxPerBeat <= 0)
+                    pxPerBeat = 1;
+
+                var spans = Math.Max(1, slider.SlideRepeatCount);
+                slider.SpanDuration = slider.Length * msPerBeat / pxPerBeat;
+                slider.Duration = slider.SpanDuration * spans;
             }
         }
-        Console.WriteLine();
+
     }
 }
