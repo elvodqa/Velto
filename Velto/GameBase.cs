@@ -175,6 +175,8 @@ public unsafe class GameBase : IDisposable
         }
     }
 
+   
+
     private void Loop(double deltaTime)
     {
         _renderer.BeginFrame();

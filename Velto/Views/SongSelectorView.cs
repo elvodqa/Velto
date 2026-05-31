@@ -81,19 +81,16 @@ public class SongSelectorView : View
         _currentWidth = _maxWidth * eased;
         _cursor += Input.WheelY * 20;
 
-        var scrollAllowance = 0f;
-        if (_beatmapBoxes.Count > 0)
-        {
-            var last = _beatmapBoxes.OrderByDescending(t => t.Position.Y).First();
-            scrollAllowance = last.Position.X + last.Size.Y;
-        }
+        float itemHeight = 150f;
+        float gap = 2f;
+        float totalContentHeight = _beatmapBoxes.Count * itemHeight + Math.Max(0, _beatmapBoxes.Count - 1) * gap;
+        float maxScroll = Math.Max(0, totalContentHeight - Height);
         
-        _cursor = Math.Clamp(_cursor, -scrollAllowance, 0);
+        _cursor = Math.Clamp(_cursor, -maxScroll, 0);
     
         if (_state == PanelState.Open)
         {
             var height = 150;
-            var gap = 2;
             var i = 0;
 
             foreach (var box in _beatmapBoxes)

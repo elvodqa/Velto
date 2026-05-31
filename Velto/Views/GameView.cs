@@ -27,7 +27,11 @@ public unsafe class GameView : View
     private readonly Texture _hit0Texture;
     private readonly Texture _hitcircleOverlayTexture;
     private readonly Texture _hitcircleTexture;
+
+    private readonly Texture _sliderStartCircleTexture;
+    
     private readonly Texture _reverseArrowTexture;
+    private readonly Texture _sliderFollowCircleTexture;
     private bool _isPaused;
     private readonly MSDFFont _msdfFont;
     private int _musicChannel;
@@ -93,6 +97,8 @@ public unsafe class GameView : View
         _hit0Texture = new Texture(Resources.GetPath($"Resources/Textures/{_skinName}/hit0.png"));
         _circleTexture = new Texture(Resources.GetPath("Resources/Textures/circle.png"));
         _reverseArrowTexture = new Texture(Resources.GetPath($"Resources/Textures/{_skinName}/reversearrow.png"));
+        _sliderFollowCircleTexture = new Texture(Resources.GetPath($"Resources/Textures/{_skinName}/sliderfollowcircle.png"));
+        _sliderStartCircleTexture = new Texture(Resources.GetPath($"Resources/Textures/{_skinName}/sliderstartcircle.png"));
         _msdfFont = MSDFFont.Load(Resources.GetPath("Resources/Fonts/arial/arial"));
 
         for (var i = 0; i < 10; i++)
@@ -509,7 +515,7 @@ public unsafe class GameView : View
                     Math.Clamp(Util.MapRange((float)_songCursor, hitObject.Time, (float)(hitObject.Time + slider.Duration), 1, 0),
                         0, 1);
                 
-                GL.BlendFunc(BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha);
+                //GL.BlendFunc(BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha);
                 foreach (var point in slider.Points)
                 {
                     var scaledX = playfieldTopLeft.X + point.X * scale;
@@ -553,6 +559,16 @@ public unsafe class GameView : View
                         _drawSize,
                         _drawSize,
                         hitObject.Color with { W = 1 });
+
+
+                    _drawSize = objectCircleSize * 2;
+                    _renderer.DrawTexture(_sliderFollowCircleTexture,
+                        scaledX - _drawSize /2,
+                        scaledY - _drawSize /2,
+                        _drawSize,
+                        _drawSize,
+                        new Vector4(1, 1, 1, 1) with { W = 1});
+                    
                 }
 
                 if (slider.SlideRepeatCount > 1)
@@ -587,17 +603,17 @@ public unsafe class GameView : View
                     approachCircleSize,
                     approachCircleSize, hitObject.Color with { W = Math.Min(fadein, fadeout) });
 
-                _renderer.DrawTexture(_hitcircleTexture,
+                _renderer.DrawTexture(_sliderStartCircleTexture,
                     posX - drawSize / 2,
                     posY - drawSize / 2,
                     drawSize,
                     drawSize, hitObject.Color with { W = Math.Min(fadein, fadeout) });
-
-                _renderer.DrawTexture(_hitcircleOverlayTexture,
-                    posX - drawSize / 2,
-                    posY - drawSize / 2,
-                    drawSize,
-                    drawSize, new Vector4(1, 1, 1, 1) with { W = Math.Min(fadein, fadeout) });
+                //
+                // _renderer.DrawTexture(_hitcircleOverlayTexture,
+                //     posX - drawSize / 2,
+                //     posY - drawSize / 2,
+                //     drawSize,
+                //     drawSize, new Vector4(1, 1, 1, 1) with { W = Math.Min(fadein, fadeout) });
 
                 var num = hitObject.ComboNumber.ToString();
 
