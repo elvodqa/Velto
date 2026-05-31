@@ -3,6 +3,7 @@ using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
 using SDL;
 using Velto.Gameplay;
+using Buffer = System.Buffer;
 
 namespace Velto.Graphics;
 
@@ -42,6 +43,10 @@ public unsafe class Renderer : IDisposable
     private readonly Shader _spriteShader;
     private readonly VertexArrayObject<float, uint> _spriteVao;
 
+    private Shader _lineShader;
+    private VertexArrayObject<float> _lineVao;
+    private BufferObject<float> _lineVbo;
+
     private Shader _sliderShader;
 
     private readonly float[] _vertices =
@@ -52,11 +57,17 @@ public unsafe class Renderer : IDisposable
         0f, 1f, 0f, 0f, 0f, // bottom-left
         1f, 1f, 0f, 1f, 0f // bottom-right
     ];
+    
+    float[] lineVertices = {
+        -0.5f, 0.0f,  // start point
+        0.5f, 0.0f   // end point
+    };
 
 
     private readonly Texture _whiteTexture;
 
     private readonly SDL_Window* _window;
+    public uint DrawCallCount = 0;
 
     public SDL_Window* Window
     {
@@ -73,7 +84,9 @@ public unsafe class Renderer : IDisposable
         _spriteVao.VertexAttributePointer(0, 3, VertexAttribPointerType.Float, 5 * sizeof(float), 0);
         _spriteVao.VertexAttributePointer(1, 2, VertexAttribPointerType.Float, 5 * sizeof(float), 3 * sizeof(float));
         _spriteShader = new Shader("sprite");
-
+    
+        //GL.PixelStorei(PixelStoreParameter.UnpackAlignment , 1);
+        
         _whiteTexture = new Texture(Resources.GetPath("Resources/Textures/white.png"));
 
         _fontShader = new Shader("text");
@@ -140,8 +153,20 @@ public unsafe class Renderer : IDisposable
         GL.BindVertexArray(0);
         
         _sliderShader = new Shader("slider");
+
+        _lineShader = new("line");
+
+        _lineVbo = new(lineVertices, BufferTarget.ArrayBuffer, BufferUsage.StaticDraw);
+        _lineVao = new(_lineVbo);
+        _lineVao.VertexAttributePointer(0, 2, VertexAttribPointerType.Float, sizeof(float)*2, 0);
     }
 
+    public void Line()
+    {
+        _lineShader.Use();
+        _lineVao.Bind();
+        GL.DrawArrays(PrimitiveType.Lines, 0, 2);
+    }
 
     public Vector2 WindowSizeInPixels
     {
@@ -153,6 +178,11 @@ public unsafe class Renderer : IDisposable
         }
     }
 
+    public void BeginFrame()
+    {
+        DrawCallCount = 0;
+    }
+    
     public void BindFramebuffer(Framebuffer framebuffer)
     {
         ArgumentNullException.ThrowIfNull(framebuffer);
@@ -210,12 +240,16 @@ public unsafe class Renderer : IDisposable
         // TODO: implement framebuffers
         GL.Enable(EnableCap.Blend);
         GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+       
         GL.ClearColor(color.X, color.Y, color.Z, color.W);
         GL.Clear(ClearBufferMask.ColorBufferBit /*| ClearBufferMask.DepthBufferBit*/);
+        //GL.LineWidth(50);
+        //GL.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Line);
     }
 
     public void DrawSlider(Slider slider, float x, float y, float scale, float osuRadius, float fadein, float fadeout)
     {
+        DrawCallCount++;
         var framebuffer = slider.SliderFramebuffer;
         if (framebuffer == null)
             return;
@@ -272,6 +306,7 @@ public unsafe class Renderer : IDisposable
     public void DrawTexture(int texture, float x, float y, float width, float height, Vector4 color,
         float rotation = 0)
     {
+        DrawCallCount++;
         int wWidth = 1280, wHeight = 720;
         if (_framebuffer == null) SDL_GetWindowSizeInPixels(_window, &wWidth, &wHeight);
         else
@@ -319,6 +354,7 @@ public unsafe class Renderer : IDisposable
         float rotation = 0)
 
     {
+        DrawCallCount++;
         int wWidth = 1280, wHeight = 720;
         if (_framebuffer == null) SDL_GetWindowSizeInPixels(_window, &wWidth, &wHeight);
         else
@@ -359,6 +395,7 @@ public unsafe class Renderer : IDisposable
             6,
             DrawElementsType.UnsignedInt,
             IntPtr.Zero);
+        
     }
 
     public void DrawRectangle(float x, float y, float width, float height, Vector4 color,
@@ -431,6 +468,7 @@ public unsafe class Renderer : IDisposable
 
     private void Flush(Matrix4 projection, int texture)
     {
+        DrawCallCount++;
         if (_fontCalls.Count == 0) return;
         // GL.UseProgram(shader);
         // int projLoc = GL.GetUniformLocation(shader, "uProjection");

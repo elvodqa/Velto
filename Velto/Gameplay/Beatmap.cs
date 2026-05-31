@@ -5,6 +5,17 @@ using static SDL.SDL3;
 
 namespace Velto.Gameplay;
 
+public struct TimingPoint
+{
+    public double Time;
+    public double BeatLength;
+    public int Meter;
+    public int SampleSet;
+    public int SampleIndex;
+    public int Volume;
+    public int Uninherited; // (0 or 1): Whether or not the timing point is uninherited.
+}
+
 public unsafe class Beatmap
 {
     private const byte ComboSkipMask = 0b0111_0000;
@@ -13,21 +24,30 @@ public unsafe class Beatmap
 
     public Beatmap(string filePath)
     {
-        HitObjects = new List<HitObject>();
+        HitObjects = new();
+        TimingPoints = new();
         Filename = Path.GetFileName(filePath);
         Folder = Path.GetDirectoryName(filePath)!;
 
+        var reachedGeneral = true;
+        var reachedTimingPoints = false;
         var reachedHitobjects = false;
         var reachedEvents = false;
         foreach (var line in File.ReadAllLines(filePath))
         {
             if (line.StartsWith("//")) continue;
             if (line.StartsWith(" ")) continue;
+            if (line.StartsWith("\n")) continue;
+            if (string.IsNullOrWhiteSpace(line))
+                continue;
             if (line == "\n") continue;
+            
             if (line.StartsWith("[HitObjects]"))
             {
                 reachedHitobjects = true;
                 reachedEvents = false;
+                reachedTimingPoints = false;
+                reachedGeneral = false;
                 continue;
             }
 
@@ -35,10 +55,20 @@ public unsafe class Beatmap
             {
                 reachedEvents = true;
                 reachedHitobjects = false;
+                reachedTimingPoints = false;
+                reachedGeneral = false;
                 continue;
             }
-
-            if (!reachedHitobjects && !reachedEvents)
+            if (line.StartsWith("[TimingPoints]"))
+            {
+                reachedEvents = false;
+                reachedHitobjects = false;
+                reachedTimingPoints = true;
+                reachedGeneral = false;
+                continue;
+            }
+            
+            if (reachedGeneral)
             {
                 if (!line.Contains(":")) continue;
                 var split = line.Split(":");
@@ -99,6 +129,26 @@ public unsafe class Beatmap
                     BackgroundFile = BackgroundFile.Substring(1, BackgroundFile.Length - 2);
                 }
             }
+            else if (reachedTimingPoints)
+            {
+                var split = line.Split(",");
+                
+                if (split.Length < 7)
+                {
+                    // colors are here
+                    //Console.WriteLine($"Invalid timing point: {line}");
+                    continue;
+                }
+                TimingPoint timingPoint = new();
+                timingPoint.Time = double.Parse(split[0]);
+                timingPoint.BeatLength = double.Parse(split[1]);
+                timingPoint.Meter = int.Parse(split[2]);
+                timingPoint.SampleSet = int.Parse(split[3]);
+                timingPoint.SampleIndex = int.Parse(split[4]);
+                timingPoint.Volume = int.Parse(split[5]);
+                timingPoint.Uninherited = int.Parse(split[6]);
+                TimingPoints.Add(timingPoint);
+            }
             else if (reachedHitobjects)
             {
                 var split = line.Split(",");
@@ -137,6 +187,7 @@ public unsafe class Beatmap
                     slider.NewCombo = isNewCombo;
                     slider.Position = new Vector2(int.Parse(split[0]), int.Parse(split[1]));
                     slider.Time = int.Parse(split[2]);
+                    
                     //slider.HitSound = int.Parse(split[4]);
                     var sliderData = split[5].Split('|');
                     var defaultCurveType = sliderData[0] switch
@@ -172,7 +223,10 @@ public unsafe class Beatmap
 
                         slider.CurvePoints.Add(curvePoint);
                     }
-
+                    
+                    slider.SlideRepeatCount = int.Parse(split[6]);
+                    slider.Length = double.Parse(split[7]);
+                    
                     /*if (int.Parse(split[3]) == 6)
                     {
                         curComboNumber = 1;
@@ -214,27 +268,35 @@ public unsafe class Beatmap
 
     public string BackgroundFile { get; set; }
 
+    public List<TimingPoint> TimingPoints { get; set; }
     public List<HitObject> HitObjects { get; set; }
+    
 
+    public float Preempt;
+    public float Posttime;
+    
+    
+    
     public void CalculatePrepass(SDL_Window* window)
     {
         var comboCounter = 0;
         var colorCounter = 0;
-
+        var sortedTimingPoints = TimingPoints.OrderBy(t => t.Time);
+        
         foreach (var hitobject in HitObjects)
         {
             float preempt;
             if (ApproachRate < 5)
-                preempt = 1200 + 600 * (5 - ApproachRate) / 5;
+                preempt = 1200 + 120 * (5 - ApproachRate);
+            else if (ApproachRate == 5)
+                preempt = 1200;
             else
-                preempt = 1200 - 750 * (ApproachRate - 5) / 5;
-
-            float pretime = 500;
+                preempt = 1200 - 150 * (ApproachRate - 5);
+            
             float posttime = 150;
 
-            hitobject.Preempt = preempt;
-            hitobject.Pretime = pretime;
-            hitobject.Posttime = posttime;
+            Preempt = preempt;
+            Posttime = posttime;
             
             if (hitobject.NewCombo)
             {
@@ -277,7 +339,7 @@ public unsafe class Beatmap
                         current.Add(point);
                     }
                 }
-
+                
                 // Add remaining points
                 if (current.Count > 1) segments.Add(current);
 
@@ -285,8 +347,32 @@ public unsafe class Beatmap
                 {
                     BezierCurve bezier =
                         new(segment.Select(x => new Vector2(x.Position.X, x.Position.Y)));
-                    for (float i = 0; i <= 1.0f; i += 0.01f) slider.Points.Add(bezier.CalculatePoint(i));
+                    for (float i = 0; i <= 1.0f; i += 0.05f) slider.Points.Add(bezier.CalculatePoint(i));
                 }
+                
+                var timingPoint = TimingPoints[0];
+                foreach (var point in sortedTimingPoints)
+                {
+                    if (point.Time < slider.Time)
+                    {
+                        timingPoint = point;
+                    }
+                }
+                
+                // Calculate length
+                
+                var length = slider.Length;
+                var sliderMultiplier = SliderMultiplier;
+                var beatLength = timingPoint.BeatLength;
+                double sv = 1;
+                if (timingPoint.Uninherited == 0)
+                {
+                    sv = 100/timingPoint.BeatLength;
+                }
+
+                slider.Duration = length / (sliderMultiplier * 100 * sv) * beatLength;
+                slider.Duration *= slider.SlideRepeatCount * 10;
+                Console.WriteLine(slider.Duration);
             }
         }
     }

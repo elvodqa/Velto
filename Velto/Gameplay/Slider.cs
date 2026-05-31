@@ -23,6 +23,7 @@ public class Slider : HitObject
     public int EdgeSets;
     public int EdgeSounds;
     public double Length;
+    public double Duration = 0;
 
     public List<Vector2> Points = new();
     public int SlideRepeatCount;

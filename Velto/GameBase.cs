@@ -168,13 +168,14 @@ public unsafe class GameBase : IDisposable
 
     private void Loop(double deltaTime)
     {
+        _renderer.BeginFrame();
         Input.GetKeyboardState();
         Input.UpdateMouse(_window);
             
         _gameDisplay.Update(deltaTime);
         _gameDisplay.Draw(deltaTime);
-        
-        _renderer.DrawText(_debugFont, $"FPS: {_fps:F1} [{deltaTime:F2}ms]", new (5, 5), 0.6f, new Vector4(1, 1, 1, 1));
+        //_renderer.Line();
+        _renderer.DrawText(_debugFont, $"FPS: {_fps.ToString("0000.0")} [{deltaTime.ToString("00.00")}ms] | DrawCallCount: {_renderer.DrawCallCount:000000}", new (5, 5), 0.6f, new Vector4(1, 1, 1, 1));
     }
     
     private void RenderFromEventWatch()
@@ -223,24 +224,6 @@ public unsafe class GameBase : IDisposable
         return true;
     }
     
-    /*
-     @(private)
-       resizeCallback :: proc "c" (userdata: rawptr, event: ^sdl.Event) -> bool {
-           context = runtime.default_context()
-           game := cast(^Game)userdata
-       
-           if event.window.commonEvent.type == .WINDOW_EXPOSED || event.window.commonEvent.type == .WINDOW_HIT_TEST {
-               width, height: c.int
-               sdl.GetWindowSize(window, &width, &height)
-               work_game_frame(game, width, height, game.userdata)
-               sdl.GL_SwapWindow(window) 
-           }
-       
-           return false
-       }
-     
-     */
-
     public void Dispose()
     {
         if (_eventWatchUserdata != IntPtr.Zero)

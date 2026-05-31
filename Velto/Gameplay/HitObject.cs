@@ -31,15 +31,12 @@ public abstract class HitObject
     public int ComboNumber;
     public bool Failed = false;
     public HitResult HitResult = HitResult.None;
+    public double HitTime = -1;
     public Vector2 Position { get; set; }
     public int Time { get; set; }
     public bool NewCombo { get; set; } = false;
     public Vector4 Color { get; set; }
     
-    public float Preempt { get; set; }
-    public float Pretime { get; set; }
-    public float Posttime { get; set; }
-
     // public abstract void Draw(double dt, Renderer renderer, Vector2 playfieldTopLeft, float scale, double songCursor, 
     //     double startingTimer, float baseCircleSize, Texture approachCircleTexture,
     //     Texture hitcircleTexture, Texture hitcircleOverlayTexture, Dictionary<int, Texture> numberTextures);
