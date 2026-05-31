@@ -2,6 +2,7 @@ using OpenTK.Mathematics;
 
 
 using OpenTK.Mathematics;
+using SDL;
 
 namespace Velto.Gameplay;
 
@@ -27,7 +28,6 @@ public class Player
             Cursor = new Vector2(Input.MouseX, Input.MouseY);
             return;
         }
-        
         
         var objects = _beatmap.HitObjects;
 

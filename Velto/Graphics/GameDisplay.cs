@@ -130,17 +130,18 @@ public unsafe class GameDisplay : IDisposable
         // hitobjects
         var playfieldAspect = PLAYFIELD_W / (float)PLAYFIELD_H;
         var windowAspect = _windowWidth / (float)_windowHeight;
-
+        float playfieldScale = 0.76f;
+        
         if (windowAspect > playfieldAspect)
         {
             // window is wider → height is limiting (letterbox left/right)
-            playfieldHeight = _windowHeight * 0.82f;
+            playfieldHeight = _windowHeight * playfieldScale;
             playfieldWidth = playfieldHeight * playfieldAspect;
         }
         else
         {
             // window is taller → width is limiting (letterbox top/bottom)
-            playfieldWidth = _windowWidth * 0.82f;
+            playfieldWidth = _windowWidth * playfieldScale;
             playfieldHeight = playfieldWidth / playfieldAspect;
         }
 
