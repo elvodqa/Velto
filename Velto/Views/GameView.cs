@@ -515,7 +515,7 @@ public unsafe class GameView : View
                     Math.Clamp(Util.MapRange((float)_songCursor, hitObject.Time, (float)(hitObject.Time + slider.Duration), 1, 0),
                         0, 1);
                 
-                //GL.BlendFunc(BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha);
+                GL.BlendFunc(BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha);
                 foreach (var point in slider.Points)
                 {
                     var scaledX = playfieldTopLeft.X + point.X * scale;
