@@ -589,13 +589,15 @@ public unsafe class GameDisplay : IDisposable
 
                 if (slider.Sliding)
                 {
-                    float progress =
-                        ((float)_songCursor - (float)slider.Time) /
-                        (float)slider.Duration;
-
-                    progress = Math.Clamp(progress, 0f, 1f);
-
-                    int index = (int)(progress * (slider.Points.Count - 1));
+                    // float progress =
+                    //     ((float)_songCursor - (float)slider.Time) /
+                    //     (float)slider.Duration;
+                    //
+                    // progress = Math.Clamp(progress, 0f, 1f);
+                    //
+                    // int index = (int)(progress * (slider.Points.Count - 1));
+                    int index = (int)_songCursor - hitObject.Time;
+                    index = Math.Clamp(index, 0, slider.Points.Count - 1);
                     var position = slider.Points[index];
                     
                     var scaledX = playfieldTopLeft.X + position.X * scale;

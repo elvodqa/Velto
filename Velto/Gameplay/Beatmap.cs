@@ -345,42 +345,50 @@ public unsafe class Beatmap
                 // Add remaining points
                 if (current.Count > 1) segments.Add(current);
 
+                var timingPoint = TimingPoints[0];
+                TimingPoint lastGlobal = TimingPoints[0];
+                foreach (var point in sortedTimingPoints)
+                {
+                    if (point.Time <= slider.Time)
+                    {
+                        if (point.Uninherited==0)
+                        {
+                            timingPoint = point;
+                        }
+                        else
+                        {
+                            lastGlobal = point;
+                        }
+                    }
+                }
+
+                double pixelPerMs = SliderMultiplier * lastGlobal.BeatLength /
+                                    (float)(1 - (timingPoint.BeatLength / 100)) / (double)1000;
+                ulong sum = 0;
                 foreach (var segment in segments)
                 {
                     BezierCurve bezier =
                         new(segment.Select(x => new Vector2(x.Position.X, x.Position.Y)));
-                    for (float i = 0; i <= 1.0f; i += 0.01f) slider.Points.Add(bezier.CalculatePoint(i));
+                    float dist = bezier.CalculateLength(0.001f);
+                    int count = (int)(dist / pixelPerMs) ;
+                    sum += (ulong)count;
+                    for (int i = 0; i < count; i++) slider.Points.Add(bezier.CalculatePoint((float)i/count));
                 }
                 
-                var timingPoint = TimingPoints[0];
-                foreach (var point in sortedTimingPoints)
-                {
-                    if (point.Time < slider.Time)
-                    {
-                        timingPoint = point;
-                    }
-                }
+        
                 
                 // Calculate length
-                
-                var length = slider.Length;
-                var sliderMultiplier = SliderMultiplier;
-                var beatLength = timingPoint.BeatLength;
-                
-                
-                if (timingPoint.Uninherited == 1)
-                {
-                    //sliderVelocity = 1.0f;
-                }
-                else
-                {
-                    //sliderVelocity *= (100.0f / timingPoint.BeatLength);
-                }
-                
-                slider.Duration = length / (sliderMultiplier * 100f * sliderVelocity) * beatLength;
+
+
+                //sliderVelocity *= (100.0f / timingPoint.BeatLength);
+            
+                slider.Duration = sum ;
                 slider.Duration *= slider.SlideRepeatCount;
-                Console.WriteLine(slider.Duration);
+                
+                Console.Write($"{slider.Duration}  ");
+                // slider.Duration = 200;
             }
         }
+        Console.WriteLine();
     }
 }

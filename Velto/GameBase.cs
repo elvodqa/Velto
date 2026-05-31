@@ -70,12 +70,12 @@ public unsafe class GameBase : IDisposable
             );
         _glContextState = SDL_GL_CreateContext(_window);
         SDL_GL_MakeCurrent(_window, _glContextState);
-        SDL_GL_SetSwapInterval(0);
+        // SDL_GL_SetSwapInterval(0);
 
         int interval;
         SDL_GL_GetSwapInterval(&interval);
         _logger.Info($"Swap Interval = {interval}");
-        //SDL_GL_SetSwapInterval(0);
+        SDL_GL_SetSwapInterval(1);
         
         GLLoader.LoadBindings(new BindingContext());
     
