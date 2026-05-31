@@ -1,6 +1,6 @@
 using System.IO;
 
-namespace Velto;
+namespace Velto.Core;
 
 using SDL;
 using static SDL.SDL3;

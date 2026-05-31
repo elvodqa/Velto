@@ -1,4 +1,4 @@
-namespace Velto;
+namespace Velto.Core;
 
 public class Util
 {

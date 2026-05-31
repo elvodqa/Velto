@@ -2,6 +2,7 @@ using System.Drawing;
 using ManagedBass;
 using OpenTK.Mathematics;
 using SDL;
+using Velto.Core;
 using Velto.Gameplay;
 using Velto.Graphics;
 
@@ -35,28 +36,15 @@ public class SongSelectorView : View
     private float _cursor = 0;
     private List<BeatmapBox> _beatmapBoxes = new();
     private GameView _gameView;
+    private float _totalContentHeight;
+    
     
     public SongSelectorView(Renderer renderer, GameView gameview)
     {
         _gameView = gameview;
         _renderer = renderer;
         _font = MSDFFont.Load(Resources.GetPath("Resources/Fonts/arial/arial"));
-        
-        var songDirs = Directory.GetDirectories(Resources.GetPath("Resources/Songs"));
-        foreach (var dir in songDirs)
-        {
-            var files = Directory.GetFiles(dir);
-            foreach (var file in files)
-            {
-                if (Path.GetExtension(file) == ".osu")
-                {
-                    var box = new BeatmapBox();
-                    box.Beatmap = new Beatmap(file);
-                    box.Texture = new Texture(Path.Combine( box.Beatmap.Folder,  box.Beatmap.BackgroundFile));
-                    _beatmapBoxes.Add(box);
-                }
-            }
-        }
+        LoadBeatmaps();
     }
    
     public override void Update(double delta)
@@ -79,12 +67,13 @@ public class SongSelectorView : View
             : EasingFunctions.InCubic(_progress);
         
         _currentWidth = _maxWidth * eased;
-        _cursor += Input.WheelY * 20;
+        
+        if (_state == PanelState.Open) _cursor += Input.WheelY * 20;
 
         float itemHeight = 150f;
         float gap = 2f;
-        float totalContentHeight = _beatmapBoxes.Count * itemHeight + Math.Max(0, _beatmapBoxes.Count - 1) * gap;
-        float maxScroll = Math.Max(0, totalContentHeight - Height);
+        _totalContentHeight = _beatmapBoxes.Count * itemHeight + Math.Max(0, _beatmapBoxes.Count - 1) * gap;
+        float maxScroll = Math.Max(0, _totalContentHeight - Height);
         
         _cursor = Math.Clamp(_cursor, -maxScroll, 0);
     
@@ -95,11 +84,9 @@ public class SongSelectorView : View
 
             foreach (var box in _beatmapBoxes)
             {
-                
                 box.Position = new Vector2(Width-_currentWidth, i * (height + gap) + _cursor);
                 box.Size = new Vector2(_currentWidth, height);
                 i++;
-         
                 
                 box.IsHovered = false;
                 RectangleF collision = new(box.Position.X, box.Position.Y, box.Size.X, box.Size.Y);
@@ -114,7 +101,16 @@ public class SongSelectorView : View
                 }
             }
         }
-       
+
+        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_F5))
+        {
+            foreach (var box in _beatmapBoxes)
+            {
+                box.Texture.Dispose();
+            }
+            _beatmapBoxes.Clear();
+            LoadBeatmaps();
+        }
     }
 
     public override void Draw(double delta)
@@ -139,14 +135,24 @@ public class SongSelectorView : View
 
             _renderer.DrawRectangle(box.Position.X, box.Position.Y, box.Size.X, box.Size.Y, color);
             _renderer.DrawTexture(box.Texture, box.Position.X, box.Position.Y, 230, 150, new Vector4(1, 1, 1, 1));
-            _renderer.DrawText(_font, $"{box.Beatmap.Artist} - {box.Beatmap.Title}",
+            _renderer.DrawText(_font, box.Beatmap.ToString(),
                 new Vector2(box.Position.X + 25 + 230, box.Position.Y + 25),
                 0.5f, new Vector4(1, 1, 1, 1));
-            _renderer.DrawText(_font, $"By: {box.Beatmap.Creator} | Difficulty: {box.Beatmap.Version}",
+            _renderer.DrawText(_font, $"By: {box.Beatmap.Creator}",
                 new Vector2(box.Position.X + 25 + 230, box.Position.Y + 65),
                 0.5f, new Vector4(1, 1, 1, 1));
         }
         _renderer.FlushText(_font);
+        
+        // draw thumb (https://thorlaksson.com/2025/scrollbars-from-scratch/)
+        var l_c = _totalContentHeight;
+        var l_v = Height;
+        var d = -_cursor;
+
+        var l_t = l_v * (l_v / l_c); // length of thumb
+        var d_t = d * (l_v / l_c); // distance of thumb
+
+        _renderer.DrawRectangle(Width - 30, d_t, 30, l_t, new Vector4(1, 1, 1, 1));
     }
     
      
@@ -166,5 +172,24 @@ public class SongSelectorView : View
             Open();
         else 
             Close();
+    }
+
+    private void LoadBeatmaps()
+    {
+        var songDirs = Directory.GetDirectories(Resources.GetPath("Resources/Songs"));
+        foreach (var dir in songDirs)
+        {
+            var files = Directory.GetFiles(dir);
+            foreach (var file in files)
+            {
+                if (Path.GetExtension(file) == ".osu")
+                {
+                    var box = new BeatmapBox();
+                    box.Beatmap = new Beatmap(file);
+                    box.Texture = new Texture(Path.Combine( box.Beatmap.Folder,  box.Beatmap.BackgroundFile));
+                    _beatmapBoxes.Add(box);
+                }
+            }
+        }
     }
 }

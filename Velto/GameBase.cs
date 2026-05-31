@@ -1,11 +1,5 @@
-using System.Runtime.InteropServices;
-using OpenTK.Mathematics;
-using Velto.Graphics;
-using Velto.Views;
-
 namespace Velto;
 
-using Velto.Logging;
 using OpenTK;
 using OpenTK.Core.Utility;
 using OpenTK.Graphics;
@@ -13,6 +7,12 @@ using System;
 using SDL;
 using static SDL.SDL3;
 using OpenTK.Graphics.OpenGL;
+using System.Runtime.InteropServices;
+using OpenTK.Mathematics;
+using Velto.Core;
+using Velto.Graphics;
+using Velto.Views;
+
 
 public class BindingContext : IBindingsContext
 {
@@ -24,7 +24,6 @@ public class BindingContext : IBindingsContext
 
 public unsafe class GameBase : IDisposable
 {
-    private Logger _logger;
     private SDL_Window* _window;
     private SDL_GLContextState* _glContextState;
 
@@ -47,7 +46,6 @@ public unsafe class GameBase : IDisposable
     public GameBase()
     {
         SDL_Init(SDL_InitFlags.SDL_INIT_VIDEO);
-        _logger = new Logger();
     }
 
 
@@ -74,31 +72,26 @@ public unsafe class GameBase : IDisposable
 
         int interval;
         SDL_GL_GetSwapInterval(&interval);
-        _logger.Info($"Swap Interval = {interval}");
+        Logger.Instance.Info($"Swap Interval = {interval}");
         SDL_GL_SetSwapInterval(1);
         
         GLLoader.LoadBindings(new BindingContext());
-    
-        GCHandle handle = GCHandle.Alloc(_logger);
-        IntPtr ptr = GCHandle.ToIntPtr(handle);
-        //GL.DebugMessageCallback(DebugCallback, IntPtr.Zero);
         
-        GL.Enable(EnableCap.DebugOutput);
-        GL.Enable(EnableCap.DebugOutputSynchronous);
-        
-        _logger.Info($"BasePath: {SDL_GetBasePath()}");
-        _logger.Info($"Vendor:   {GL.GetString(StringName.Vendor)}");
-        _logger.Info($"Renderer: {GL.GetString(StringName.Renderer)}");
-        _logger.Info($"Version:  {GL.GetString(StringName.Version)}");
-        _logger.Info($"GLSL:     {GL.GetString(StringName.ShadingLanguageVersion)}");
+        Logger.Instance.Info($"BasePath: {SDL_GetBasePath()}");
+        Logger.Instance.Info($"Vendor:   {GL.GetString(StringName.Vendor)}");
+        Logger.Instance.Info($"Renderer: {GL.GetString(StringName.Renderer)}");
+        Logger.Instance.Info($"Version:  {GL.GetString(StringName.Version)}");
+        Logger.Instance.Info($"GLSL:     {GL.GetString(StringName.ShadingLanguageVersion)}");
         
         GL.GetInteger(GetPName.NumExtensions, out var numOfExtensions);
 
+        string extensions = "";
         for (int i = 0; i < numOfExtensions; i++)
         {
             var extension = GL.GetStringi(StringName.Extensions, (uint)i);
-            //_logger.Info($"\t{extension}");
+            extensions += $"{extension} | ";
         }
+        Logger.Instance.Info($"{extensions}");
         
         _running = false;
         _renderer = new(_window);
@@ -111,9 +104,7 @@ public unsafe class GameBase : IDisposable
 
         _debugFont = MSDFFont.Load(Resources.GetPath("Resources/Fonts/arial/arial"));
     }
-
     
-
     public void Run()
     {
         Initialize();
@@ -156,7 +147,7 @@ public unsafe class GameBase : IDisposable
                         _running = false;
                         break;
                     case (uint)SDL_EventType.SDL_EVENT_WINDOW_RESIZED:
-                        _logger.Info($"Window Resized: {ev.window.data1} x {ev.window.data2}");
+                        Logger.Instance.Info($"Window Resized: {ev.window.data1} x {ev.window.data2}");
                         break;
                     case (uint)SDL_EventType.SDL_EVENT_KEY_DOWN:
                         if (ev.key.key == SDL_Keycode.SDLK_F1)
@@ -253,33 +244,5 @@ public unsafe class GameBase : IDisposable
 
         SDL_GL_DestroyContext(_glContextState);
         SDL_DestroyWindow(_window);
-    }
-    
-    private static void DebugCallback(DebugSource source, DebugType type, uint id, DebugSeverity severity, int length, IntPtr message, IntPtr userParam)
-    {
-        string msg = System.Runtime.InteropServices.Marshal
-            .PtrToStringAnsi(message, length);
-
-        string formatted =
-            $"[{severity}] {type} ({source}) #{id}: {msg}";
-        Console.WriteLine(formatted);
-        /*switch (severity)
-        {
-            case DebugSeverity.DebugSeverityHigh:
-                _logger.Error(formatted);
-                break;
-
-            case DebugSeverity.DebugSeverityMedium:
-                _logger.Warn(formatted);
-                break;
-
-            case DebugSeverity.DebugSeverityLow:
-                _logger.Info(formatted);
-                break;
-
-            default:
-                _logger.Debug(formatted);
-                break;
-        }*/
     }
 }

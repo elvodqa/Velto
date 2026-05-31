@@ -4,6 +4,7 @@ using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
 using Velto.Gameplay;
 using SDL;
+using Velto.Core;
 using Velto.Graphics;
 using static SDL.SDL3;
 
@@ -27,6 +28,7 @@ public unsafe class GameView : View
     private readonly Texture _hit0Texture;
     private readonly Texture _hitcircleOverlayTexture;
     private readonly Texture _hitcircleTexture;
+    private readonly Texture _modAutoplayTexture;
 
     private readonly Texture _sliderStartCircleTexture;
     
@@ -66,6 +68,7 @@ public unsafe class GameView : View
     private Player _player;
     private SettingsView _settingsView;
     private SongSelectorView _songSelectorView;
+    private InputOverlayView _inputOverlayView;
 
     public GameView(Renderer renderer)
     {
@@ -99,6 +102,7 @@ public unsafe class GameView : View
         _reverseArrowTexture = new Texture(Resources.GetPath($"Resources/Textures/{_skinName}/reversearrow.png"));
         _sliderFollowCircleTexture = new Texture(Resources.GetPath($"Resources/Textures/{_skinName}/sliderfollowcircle.png"));
         _sliderStartCircleTexture = new Texture(Resources.GetPath($"Resources/Textures/{_skinName}/sliderstartcircle.png"));
+        _modAutoplayTexture = new Texture(Resources.GetPath($"Resources/Textures/{_skinName}/selection-mod-autoplay.png"));
         _msdfFont = MSDFFont.Load(Resources.GetPath("Resources/Fonts/arial/arial"));
 
         for (var i = 0; i < 10; i++)
@@ -124,6 +128,8 @@ public unsafe class GameView : View
 
         _settingsView = new(_renderer);
         _songSelectorView = new(_renderer, this);
+        _inputOverlayView = new(_renderer, this, _msdfFont);
+        _inputOverlayView.SetPlayer(_player);
     }
 
     float playfieldWidth, playfieldHeight;
@@ -137,6 +143,8 @@ public unsafe class GameView : View
         _songSelectorView.Width = Width;
         _songSelectorView.Height = Height;
         _songSelectorView.Update(delta);
+        _inputOverlayView.Width = Width;
+        _inputOverlayView.Height = Height;
 
         var scale = playfieldWidth / PLAYFIELD_W;
         var osuRadius = 54.4f - 4.48f * _beatmap.CircleSize;
@@ -265,7 +273,9 @@ public unsafe class GameView : View
             _songSelectorView.Toggle();
         }
 
-        
+        // Update player just before doing judgement
+        _player.Update(delta, _songCursor);
+        _inputOverlayView.Update(delta);
         // Handle objects bkz: https://osu.ppy.sh/wiki/en/Gameplay/Judgement/osu%21 
         foreach (var hitObject in _beatmap.HitObjects)
         {
@@ -312,11 +322,9 @@ public unsafe class GameView : View
             }
         }
 
-
+    
         // Slider points are in osu! playfield coordinates, so cache/build using osu-radius (unscaled).
         _sliderPool.Update(_songCursor, osuRadius);
-        
-        _player.Update(delta, _songCursor);
         
         if (lastCursorPosition != Vector2.Zero && Vector2.Distance(_player.Cursor, lastCursorPosition) > 5)
             trails.Enqueue(new TrailInfo
@@ -392,7 +400,7 @@ public unsafe class GameView : View
             new Vector4(0, 0, 0, 0.3f)
         );
 
-
+        
         var scale = playfieldWidth / PLAYFIELD_W;
         
         foreach (var hitObject in _sortedObjects)
@@ -669,10 +677,15 @@ public unsafe class GameView : View
         _renderer.DrawRectangle(0, Height - 20, songPointer, 20, yellow);
         var cursorSize = new Vector2(30, 60);
         _renderer.DrawRectangle(songPointer - cursorSize.X/ 2, Height-cursorSize.Y, cursorSize.X, cursorSize.Y, new Vector4(1, 1, 1, 1));
-        
+
+        if (_player.Autoplay)
+        {
+            _renderer.DrawTexture(_modAutoplayTexture, Width - 200, 50, 150, 150, new Vector4(1, 1, 1, 1));
+        }
+       
 
         // TODO: input overlay
-
+        _inputOverlayView.Draw(delta);
         
         // Game cursor
         // Update trail lifetimes first so the draw loop can use a stable count (prevents 1-frame alpha spikes).
@@ -744,6 +757,8 @@ public unsafe class GameView : View
 
         _beatmap.CalculatePrepass(_renderer.Window);
         _player = new Player(_beatmap);
+        _inputOverlayView.SetPlayer(_player);
+        _inputOverlayView.Reset();
         
         ResetObjectsAfter(0);
         
@@ -753,6 +768,7 @@ public unsafe class GameView : View
         _backgroundTexture.Dispose();
         _backgroundTexture = new Texture(Path.Combine(_beatmap.Folder, _beatmap.BackgroundFile));
         Bass.ChannelPlay(_musicChannel);
+        Logger.Instance.Info($"Beatmap set to {beatmap}");
     }
     
     public TimingPoint GetCurrentTimingPoint(double time)

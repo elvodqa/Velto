@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
 using SDL;
+using Velto.Core;
 using Velto.Gameplay;
 using Buffer = System.Buffer;
 

@@ -399,4 +399,9 @@ public unsafe class Beatmap
         }
 
     }
+
+    public override string ToString()
+    {
+        return $"{Artist} - {Title} [{Version}]";
+    }
 }

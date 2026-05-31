@@ -1,4 +1,4 @@
-namespace Velto;
+namespace Velto.Core;
 
 using System;
 
@@ -118,5 +118,43 @@ public static class EasingFunctions
 	{
 		if (t < 0.5) return InBounce(t * 2) / 2;
 		return 1 - InBounce((1 - t) * 2) / 2;
+	}
+	
+	public static float EaseOutBounce(float t)
+	{
+		const float n1 = 7.5625f;
+		const float d1 = 2.75f;
+
+		if (t < 1f / d1)
+		{
+			return n1 * t * t;
+		}
+		else if (t < 2f / d1)
+		{
+			t -= 1.5f / d1;
+			return n1 * t * t + 0.75f;
+		}
+		else if (t < 2.5f / d1)
+		{
+			t -= 2.25f / d1;
+			return n1 * t * t + 0.9375f;
+		}
+		else
+		{
+			t -= 2.625f / d1;
+			return n1 * t * t + 0.984375f;
+		}
+	}
+
+	public static float Bounce01To0(float t)
+	{
+		t = Math.Clamp(t, 0f, 1f);
+
+		if (t < 0.5f)
+		{
+			return EaseOutBounce(t * 2f);
+		}
+
+		return EaseOutBounce((1f - t) * 2f);
 	}
 }
