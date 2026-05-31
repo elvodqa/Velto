@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using OpenTK.Mathematics;
 using Velto.Graphics;
+using Velto.Views;
 
 namespace Velto;
 
@@ -31,7 +32,7 @@ public unsafe class GameBase : IDisposable
     private IntPtr _eventWatchUserdata;
     private ulong _eventWatchTickLast;
 
-    private GameDisplay _gameDisplay;
+    private GameView _gameDisplay;
     private bool _running;
 
     private Renderer _renderer;
@@ -52,7 +53,6 @@ public unsafe class GameBase : IDisposable
 
     public void Initialize()
     {
-        
         SDL_GL_SetAttribute(SDL_GLAttr.SDL_GL_CONTEXT_MAJOR_VERSION, 4);
         SDL_GL_SetAttribute(SDL_GLAttr.SDL_GL_CONTEXT_MINOR_VERSION, 1);
         SDL_GL_SetAttribute(    
@@ -178,6 +178,10 @@ public unsafe class GameBase : IDisposable
     private void Loop(double deltaTime)
     {
         _renderer.BeginFrame();
+
+        _gameDisplay.Width = (int)_renderer.WindowSizeInPixels.X;
+        _gameDisplay.Height = (int)_renderer.WindowSizeInPixels.Y;
+        
         Input.GetKeyboardState();
         Input.UpdateMouse(_window);
             
@@ -185,6 +189,7 @@ public unsafe class GameBase : IDisposable
         _gameDisplay.Draw(deltaTime);
         //_renderer.Line();
         _renderer.DrawText(_debugFont, $"FPS: {_fps.ToString("0000.0")} [{deltaTime.ToString("00.00")}ms] | DrawCallCount: {_renderer.DrawCallCount:000000}", new (5, 5), 0.6f, new Vector4(1, 1, 1, 1));
+        _renderer.FlushText(_debugFont);
     }
     
     private void RenderFromEventWatch()

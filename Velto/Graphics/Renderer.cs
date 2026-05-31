@@ -110,7 +110,7 @@ public unsafe class Renderer : IDisposable
 
         // instance buffer
         GL.BindBuffer(BufferTarget.ArrayBuffer, _fontInstanceVbo);
-        GL.BufferData(BufferTarget.ArrayBuffer, 1024 * Marshal.SizeOf<FontCall>(), IntPtr.Zero,
+        GL.BufferData(BufferTarget.ArrayBuffer, 1024*4 * Marshal.SizeOf<FontCall>(), IntPtr.Zero,
             BufferUsage.DynamicDraw);
 
         var vec4Size = Vector4.SizeInBytes;
@@ -222,6 +222,23 @@ public unsafe class Renderer : IDisposable
     public void FixFramebuffer()
     {
         SetFramebuffer(_framebuffer);
+    }
+
+    public void SetScissor(int x, int y, int width, int height)
+    {
+        int vpW, vpH;
+        if (_framebuffer == null)
+        {
+            SDL_GetWindowSizeInPixels(_window, &vpW, &vpH);
+        }
+        else
+        {
+            vpW = _framebuffer.Width;
+            vpH = _framebuffer.Height;
+        }
+
+        GL.Enable(EnableCap.ScissorTest);
+        GL.Scissor(x, vpH - y - height, Math.Max(0, width), Math.Max(0, height));
     }
 
     public void Clear(Vector4 color)
@@ -453,7 +470,6 @@ public unsafe class Renderer : IDisposable
                 0,
                 -1f,
                 1f);
-        Flush(projection, font.AtlasTexture);
     }
 
     private void DrawGlyph(MSDFFont.Glyph glyph, Vector2 position, Vector2 size, Vector4 color, float distanceRange)
@@ -466,8 +482,25 @@ public unsafe class Renderer : IDisposable
         });
     }
 
-    private void Flush(Matrix4 projection, int texture)
+    public void FlushText(MSDFFont font)
     {
+        int wWidth = 1280, wHeight = 720;
+        if (_framebuffer == null) SDL_GetWindowSizeInPixels(_window, &wWidth, &wHeight);
+        else
+        {
+            wWidth = _framebuffer.Width;
+            wHeight = _framebuffer.Height;
+        }
+
+        var projection =
+            Matrix4.CreateOrthographicOffCenter(
+                0,
+                wWidth,
+                wHeight,
+                0,
+                -1f,
+                1f);
+        
         DrawCallCount++;
         if (_fontCalls.Count == 0) return;
         // GL.UseProgram(shader);
@@ -477,7 +510,7 @@ public unsafe class Renderer : IDisposable
         _fontShader.SetMatrix4("uProjection", projection);
 
         GL.ActiveTexture(TextureUnit.Texture0);
-        GL.BindTexture(TextureTarget.Texture2D, texture);
+        GL.BindTexture(TextureTarget.Texture2D, font.AtlasTexture);
         GL.BindVertexArray(_fontVao);
         GL.BindBuffer(BufferTarget.ArrayBuffer, _fontInstanceVbo);
         GL.BufferSubData(BufferTarget.ArrayBuffer, IntPtr.Zero, _fontCalls.Count * Marshal.SizeOf<FontCall>(),
@@ -502,7 +535,7 @@ public unsafe class Renderer : IDisposable
             Color = color;
         }
     }
-
+    
     [StructLayout(LayoutKind.Sequential)]
     public struct FontCall
     {

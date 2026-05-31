@@ -4,11 +4,12 @@ using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
 using Velto.Gameplay;
 using SDL;
+using Velto.Graphics;
 using static SDL.SDL3;
 
-namespace Velto.Graphics;
+namespace Velto.Views;
 
-public unsafe class GameDisplay : IDisposable
+public unsafe class GameView : View
 {
     private const int PLAYFIELD_W = 512;
     private const int PLAYFIELD_H = 384;
@@ -26,6 +27,7 @@ public unsafe class GameDisplay : IDisposable
     private readonly Texture _hit0Texture;
     private readonly Texture _hitcircleOverlayTexture;
     private readonly Texture _hitcircleTexture;
+    private readonly Texture _reverseArrowTexture;
     private bool _isPaused;
     private readonly MSDFFont _msdfFont;
     private int _musicChannel;
@@ -43,8 +45,7 @@ public unsafe class GameDisplay : IDisposable
     private double _startingTimer;
     private readonly Texture _whiteTexture;
     private bool _isMenuOpen = false;
-
-    private int _windowWidth, _windowHeight;
+    
     private readonly BufferObject<uint> indexBuffer;
 
     private Vector2 lastCursorPosition = Vector2.Zero;
@@ -54,13 +55,15 @@ public unsafe class GameDisplay : IDisposable
     private readonly VertexArrayObject<float, uint> vao;
     private readonly BufferObject<float> vertexBuffer;
 
-    private List<BeatmapBox> _beatmapBoxes = new();
+    
     private SliderPool _sliderPool;
     private int _hitSound;
 
     private Player _player;
+    private SettingsView _settingsView;
+    private SongSelectorView _songSelectorView;
 
-    public GameDisplay(Renderer renderer)
+    public GameView(Renderer renderer)
     {
         _renderer = renderer;
 
@@ -89,7 +92,7 @@ public unsafe class GameDisplay : IDisposable
         _sliderballTexture = new Texture(Resources.GetPath($"Resources/Textures/{_skinName}/sliderb.png"));
         _hit0Texture = new Texture(Resources.GetPath($"Resources/Textures/{_skinName}/hit0.png"));
         _circleTexture = new Texture(Resources.GetPath("Resources/Textures/circle.png"));
-
+        _reverseArrowTexture = new Texture(Resources.GetPath($"Resources/Textures/{_skinName}/reversearrow.png"));
         _msdfFont = MSDFFont.Load(Resources.GetPath("Resources/Fonts/arial/arial"));
 
         for (var i = 0; i < 10; i++)
@@ -112,16 +115,22 @@ public unsafe class GameDisplay : IDisposable
         _sliderPool = new SliderPool(_renderer);
 
         _player = new Player(_beatmap);
+
+        _settingsView = new(_renderer);
+        _songSelectorView = new(_renderer, this);
     }
 
     float playfieldWidth, playfieldHeight;
     private Vector2 playfieldTopLeft;
 
-    public void Update(double delta)
+    public override void Update(double delta)
     {
-        var windowSizes = _renderer.WindowSizeInPixels;
-        _windowWidth = (int)windowSizes.X;
-        _windowHeight = (int)windowSizes.Y;
+        _settingsView.Width = Width;
+        _settingsView.Height = Height;
+        _settingsView.Update(delta);
+        _songSelectorView.Width = Width;
+        _songSelectorView.Height = Height;
+        _songSelectorView.Update(delta);
 
         var scale = playfieldWidth / PLAYFIELD_W;
         var osuRadius = 54.4f - 4.48f * _beatmap.CircleSize;
@@ -129,25 +138,26 @@ public unsafe class GameDisplay : IDisposable
 
         // hitobjects
         var playfieldAspect = PLAYFIELD_W / (float)PLAYFIELD_H;
-        var windowAspect = _windowWidth / (float)_windowHeight;
+        var windowAspect = Width / (float)Height;
         float playfieldScale = 0.76f;
         
         if (windowAspect > playfieldAspect)
         {
             // window is wider → height is limiting (letterbox left/right)
-            playfieldHeight = _windowHeight * playfieldScale;
+            playfieldHeight = Height * playfieldScale;
             playfieldWidth = playfieldHeight * playfieldAspect;
+            
         }
         else
         {
             // window is taller → width is limiting (letterbox top/bottom)
-            playfieldWidth = _windowWidth * playfieldScale;
+            playfieldWidth = Width * playfieldScale;
             playfieldHeight = playfieldWidth / playfieldAspect;
         }
 
         playfieldTopLeft = new(
-            (_windowWidth - playfieldWidth) / 2f,
-            (_windowHeight - playfieldHeight) / 2f
+            (Width - playfieldWidth) / 2f,
+            (Height - playfieldHeight) / 2f
         );
 
 
@@ -175,74 +185,22 @@ public unsafe class GameDisplay : IDisposable
         double cursor = _songCursor;
 
         
-        RectangleF hitbox = new(0, _windowHeight - 40, _windowWidth, 40);
+        RectangleF hitbox = new(0, Height - 40, Width, 40);
         if (Input.IsMouseDown(SDLButton.SDL_BUTTON_LEFT))
             // Console.WriteLine(hitbox);
             // Console.WriteLine($"{Input.MouseX} {Input.MouseY}");
             if (hitbox.Contains(Input.MouseX, Input.MouseY))
             {
                 // Console.WriteLine("Mouse inside");
-                var songPointer = Util.MapRange(Input.MouseX, 0, _windowWidth, 0, (float)_songLength);
+                var songPointer = Util.MapRange(Input.MouseX, 0, Width, 0, (float)_songLength);
                 Bass.ChannelSetPosition(_musicChannel, Bass.ChannelSeconds2Bytes(_musicChannel, songPointer / 1000));
                 
-                foreach (var objects in _beatmap.HitObjects)
-                {
-                    objects.HitTime = 0;
-                    objects.HitResult = HitResult.None;
-                    objects.Failed = false;
-                    
-                }
+                ResetObjectsAfter(_songCursor);
                 _sortedObjects = _beatmap.HitObjects
                     .OrderByDescending(h => Math.Abs(h.Time - _songCursor));
                 
             }
-
-        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_ESCAPE))
-        {
-            if (_isMenuOpen)
-            {
-                Bass.ChannelPlay(_musicChannel);
-                _isMenuOpen = false;
-                _isPaused = false;
-                _beatmapBoxes.Clear();
-            }
-            else
-            {
-                if (_isPaused)
-                    Bass.ChannelPlay(_musicChannel);
-                else
-                    Bass.ChannelPause(_musicChannel);
-                Bass.ChannelPause(_musicChannel);
-                _isPaused = true;
-                _isMenuOpen = true;
-
-                var height = 150;
-                var gap = 2;
-                var i = 0;
-
-                var songDirs = Directory.GetDirectories(Resources.GetPath("Resources/Songs"));
-                foreach (var dir in songDirs)
-                {
-                    var files = Directory.GetFiles(dir);
-                    foreach (var file in files)
-                    {
-                        if (Path.GetExtension(file) == ".osu")
-                        {
-                            var box = new BeatmapBox();
-                            box.Beatmap = new Beatmap(file);
-
-                            box.Position = new Vector2(0, i * (height + gap));
-                            box.Size = new Vector2(_windowWidth / 2f, height);
-
-                            _beatmapBoxes.Add(box);
-
-                            i++;
-                        }
-                    }
-                }
-            }
-        }
-
+        
         if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_SPACE) && !_isMenuOpen)
         {
             if (_isPaused)
@@ -257,12 +215,22 @@ public unsafe class GameDisplay : IDisposable
         {
             _songCursor -= 1000;
             Bass.ChannelSetPosition(_musicChannel, Bass.ChannelSeconds2Bytes(_musicChannel, _songCursor / 1000));
+            
+            ResetObjectsAfter(_songCursor);
+
+            // _sortedObjects = _beatmap.HitObjects
+            //     .OrderByDescending(h => Math.Abs(h.Time - _songCursor));
         }
 
         if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_RIGHT))
         {
             _songCursor += 1000;
             Bass.ChannelSetPosition(_musicChannel, Bass.ChannelSeconds2Bytes(_musicChannel, _songCursor / 1000));
+            
+            ResetObjectsAfter(_songCursor);
+
+            // _sortedObjects = _beatmap.HitObjects
+            //     .OrderByDescending(h => Math.Abs(h.Time - _songCursor));
         }
         if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_A))
         {
@@ -271,59 +239,27 @@ public unsafe class GameDisplay : IDisposable
             else SDL_HideCursor();
         }
 
-        if (Math.Abs(Input.WheelY) > 0.01f)
+        if (Input.IsKeyDown(SDL_Scancode.SDL_SCANCODE_LCTRL))
         {
-            _musicVolume += Input.WheelY * 0.01f;
-            _musicVolume = Math.Clamp(_musicVolume, 0, 1);
-            Bass.ChannelSetAttribute(_musicChannel, ChannelAttribute.Volume, _musicVolume);
-        }
-
-        if (_isMenuOpen)
-        {
-            foreach (var box in _beatmapBoxes)
+            if (Math.Abs(Input.WheelY) > 0.01f)
             {
-                box.IsHovered = false;
-                RectangleF collision = new(box.Position.X, box.Position.Y, box.Size.X, box.Size.Y);
-                if (collision.Contains(Input.MouseX, Input.MouseY))
-                {
-                    box.IsHovered = true;
-                    if (Input.IsMouseJustPressed(SDLButton.SDL_BUTTON_LEFT))
-                    {
-                        _beatmap = box.Beatmap;
+                _musicVolume += Input.WheelY * 0.01f;
+                _musicVolume = Math.Clamp(_musicVolume, 0, 1);
+                Bass.ChannelSetAttribute(_musicChannel, ChannelAttribute.Volume, _musicVolume);
+            }
 
-                        Bass.StreamFree(_musicChannel);
-                        _musicChannel = Bass.CreateStream(Path.Combine(_beatmap.Folder, _beatmap.AudioFilename));
-                        Bass.ChannelSetAttribute(_musicChannel, ChannelAttribute.Volume, _musicVolume);
-
-                        _songLength = 1000 *
-                                      Bass.ChannelBytes2Seconds(_musicChannel, Bass.ChannelGetLength(_musicChannel));
-
-                        _startingTimer = WAITINGTIME + _beatmap.AudioLeadIn;
-
-                        _beatmap.CalculatePrepass(_renderer.Window);
-                        _player = new Player(_beatmap);
-
-                        foreach (var objects in _beatmap.HitObjects)
-                        {
-                            objects.HitTime = 0;
-                            objects.HitResult = HitResult.None;
-                            objects.Failed = false;
-                    
-                        }
-                        _sortedObjects = _beatmap.HitObjects
-                            .OrderByDescending(h => Math.Abs(h.Time - _songCursor));
-
-                        _isPaused = false;
-                        _isMenuOpen = false;
-
-                        _backgroundTexture.Dispose();
-                        _backgroundTexture = new Texture(Path.Combine(_beatmap.Folder, _beatmap.BackgroundFile));
-                        Bass.ChannelPlay(_musicChannel);
-                    }
-                }
+            if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_O))
+            {
+                _settingsView.Toggle();
             }
         }
+            
+        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_TAB))
+        {
+            _songSelectorView.Toggle();
+        }
 
+        
         // Handle objects bkz: https://osu.ppy.sh/wiki/en/Gameplay/Judgement/osu%21 
         foreach (var hitObject in _beatmap.HitObjects)
         {
@@ -388,6 +324,19 @@ public unsafe class GameDisplay : IDisposable
         
     }
     
+    void ResetObjectsAfter(double cursorMs)
+    {
+        foreach (var obj in _beatmap.HitObjects)
+        {
+            if (obj.Time >= cursorMs)
+            {
+                obj.HitTime = 0;
+                obj.HitResult = HitResult.None;
+                obj.Failed = false;
+            }
+        }
+    }
+    
     float GetSliderVelocityMultiplier(double time)
     {
         var tp = _beatmap.TimingPoints
@@ -400,31 +349,32 @@ public unsafe class GameDisplay : IDisposable
         return (float)(-100.0 / tp.BeatLength);
     }
 
-    public void Draw(double delta)
+    public override void Draw(double delta)
     {
         _renderer.Clear(new Vector4(0, 0, 0, 1));
+        _renderer.SetScissor(0, 0, (int)Width, (int)Height);
 
         // bg
-        if (_windowWidth * ((float)_backgroundTexture.Height / _backgroundTexture.Width) > _windowHeight)
+        if (Width * ((float)_backgroundTexture.Height / _backgroundTexture.Width) > Height)
         {
             // sağ sol bar
-            var padding = _windowWidth -
-                          _windowHeight * (_backgroundTexture.Width / (float)_backgroundTexture.Height);
+            var padding = Width -
+                          Height * (_backgroundTexture.Width / (float)_backgroundTexture.Height);
             _renderer.DrawTexture(_backgroundTexture, padding / 2, 0,
-                _windowHeight * ((float)_backgroundTexture.Width / _backgroundTexture.Height), _windowHeight,
+                Height * ((float)_backgroundTexture.Width / _backgroundTexture.Height), Height,
                 new Vector4(1, 1, 1, 1));
         }
         else
         {
             // üst alt bar
-            var padding = _windowHeight - _windowWidth * (_backgroundTexture.Height /
+            var padding = Height - Width * (_backgroundTexture.Height /
                                                           (float)_backgroundTexture.Width);
-            _renderer.DrawTexture(_backgroundTexture, 0, padding / 2, _windowWidth,
-                _windowWidth * ((float)_backgroundTexture.Height / _backgroundTexture.Width), new Vector4(1, 1, 1, 1));
+            _renderer.DrawTexture(_backgroundTexture, 0, padding / 2, Width,
+                Width * ((float)_backgroundTexture.Height / _backgroundTexture.Width), new Vector4(1, 1, 1, 1));
         }
 
         // bg dim
-        _renderer.DrawRectangle(0, 0, _windowWidth, _windowHeight, new Vector4(0, 0, 0, 0.55f));
+        _renderer.DrawRectangle(0, 0, Width, Height, new Vector4(0, 0, 0, 0.55f));
 
 
         // draw playfield
@@ -584,7 +534,8 @@ public unsafe class GameDisplay : IDisposable
                         scaledY - _drawSize / 2,
                         _drawSize,
                         _drawSize,
-                        hitObject.Color with { W = Math.Min(sliderFadein, sliderFadeout) });
+                        // hitObject.Color with { W = Math.Min(sliderFadein, sliderFadeout) });
+                        new Vector4(0.1f,0.1f, 0.1f, 1) with { W = Math.Min(sliderFadein, sliderFadeout) });
                 }
                 GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 
@@ -602,6 +553,28 @@ public unsafe class GameDisplay : IDisposable
                         _drawSize,
                         _drawSize,
                         hitObject.Color with { W = 1 });
+                }
+
+                if (slider.SlideRepeatCount > 1)
+                {
+                    var position = slider.Points.Last();
+                    var scaledX = playfieldTopLeft.X + position.X * scale;
+                    var scaledY = playfieldTopLeft.Y + position.Y * scale;
+                    var _drawSize = objectCircleSize * 1f;
+    
+                    var prevPos = slider.Points[slider.Points.Count - 2];
+
+                    Vector2 direction = position - prevPos;
+                    var rotation = Math.Atan2(direction.Y, direction.X) * MathHelper.RadToDeg - 180f;
+                    
+                    _renderer.DrawTexture(_reverseArrowTexture,
+                        scaledX - _drawSize / 2,
+                        scaledY - _drawSize / 2,
+                        _drawSize,
+                        _drawSize,
+                        new Vector4(1, 1, 1, 1) with { W = 1 },
+                        (float)rotation
+                    );
                 }
 
                 
@@ -669,45 +642,21 @@ public unsafe class GameDisplay : IDisposable
         var yellow = new Vector4(242 / 255f, 191 / 255f, 36 / 255f, 1);
 
         // volume control
-        _renderer.DrawRectangle(0, (float)_windowHeight / 2 - 150, 40, 300, new Vector4(0.1f, 0.1f, 0.1f, 1));
+        _renderer.DrawRectangle(0, (float)Height / 2 - 150, 40, 300, new Vector4(0.1f, 0.1f, 0.1f, 1));
 
         var length = Util.MapRange(_musicVolume, 0, 1, 0, 300);
-        _renderer.DrawRectangle(10, (float)_windowHeight / 2 - 150, 20, length, yellow);
+        _renderer.DrawRectangle(10, (float)Height / 2 - 150, 20, length, yellow);
         
         
         // timeline
-        var songPointer = Util.MapRange((float)_songCursor, 0, (float)_songLength, 0, _windowWidth);
-        _renderer.DrawRectangle(0, _windowHeight - 20, songPointer, 20, yellow);
+        var songPointer = Util.MapRange((float)_songCursor, 0, (float)_songLength, 0, Width);
+        _renderer.DrawRectangle(0, Height - 20, songPointer, 20, yellow);
         var cursorSize = new Vector2(30, 60);
-        _renderer.DrawRectangle(songPointer - cursorSize.X/ 2, _windowHeight-cursorSize.Y, cursorSize.X, cursorSize.Y, new Vector4(1, 1, 1, 1));
+        _renderer.DrawRectangle(songPointer - cursorSize.X/ 2, Height-cursorSize.Y, cursorSize.X, cursorSize.Y, new Vector4(1, 1, 1, 1));
         
 
         // TODO: input overlay
 
-        
-
-        // menu
-        if (_isMenuOpen)
-        {
-            _renderer.DrawRectangle(0, 0, _windowWidth / 2f, _windowHeight, new Vector4(0.1f, 0.1f, 0.1f, 0.8f));
-            foreach (var box in _beatmapBoxes)
-            {
-                var color = new Vector4(0.3f, 0.3f, 0.3f, 0.5f);
-                if (box.IsHovered)
-                {
-                    color = new Vector4(0.6f, 0.6f, 0.6f, 0.5f);
-                }
-
-                _renderer.DrawRectangle(box.Position.X, box.Position.Y, box.Size.X, box.Size.Y, color);
-                _renderer.DrawText(_msdfFont, $"{box.Beatmap.Artist} - {box.Beatmap.Title}",
-                    new Vector2(box.Position.X + 25, box.Position.Y + 25),
-                    0.5f, new Vector4(1, 1, 1, 1));
-                _renderer.DrawText(_msdfFont, $"By: {box.Beatmap.Creator} | Difficulty: {box.Beatmap.Version}",
-                    new Vector2(box.Position.X + 25, box.Position.Y + 65),
-                    0.5f, new Vector4(1, 1, 1, 1));
-            }
-        }
-        
         
         // Game cursor
         // Update trail lifetimes first so the draw loop can use a stable count (prevents 1-frame alpha spikes).
@@ -758,6 +707,36 @@ public unsafe class GameDisplay : IDisposable
             _posX - size / 2,
             _posY - size / 2,
             size, size, new Vector4(1, 1, 1, 1));
+        
+        _songSelectorView.Draw(delta);
+        _settingsView.Draw(delta);
+        _renderer.SetScissor(0, 0, (int)Width, (int)Height);
+    }
+
+    public void SetBeatmap(Beatmap beatmap)
+    {
+        _beatmap = beatmap;
+
+        Bass.StreamFree(_musicChannel);
+        _musicChannel = Bass.CreateStream(Path.Combine(_beatmap.Folder, _beatmap.AudioFilename));
+        Bass.ChannelSetAttribute(_musicChannel, ChannelAttribute.Volume, _musicVolume);
+
+        _songLength = 1000 *
+                      Bass.ChannelBytes2Seconds(_musicChannel, Bass.ChannelGetLength(_musicChannel));
+
+        _startingTimer = WAITINGTIME + _beatmap.AudioLeadIn;
+
+        _beatmap.CalculatePrepass(_renderer.Window);
+        _player = new Player(_beatmap);
+        
+        ResetObjectsAfter(0);
+        
+        _sortedObjects = _beatmap.HitObjects
+            .OrderByDescending(h => Math.Abs(h.Time - _songCursor));
+
+        _backgroundTexture.Dispose();
+        _backgroundTexture = new Texture(Path.Combine(_beatmap.Folder, _beatmap.BackgroundFile));
+        Bass.ChannelPlay(_musicChannel);
     }
     
     public TimingPoint GetCurrentTimingPoint(double time)
