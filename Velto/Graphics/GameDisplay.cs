@@ -492,7 +492,7 @@ public unsafe class GameDisplay : IDisposable
                             Util.MapRange((float)_songCursor, hitObject.Time - hitObject.Pretime, hitObject.Time + 0,
                                 drawSize * 4, drawSize), drawSize);
 
-                    foreach (var point in slider.Points)
+                    /*foreach (var point in slider.Points)
                     {
                         var scaledX = playfieldTopLeft.X + point.X * scale;
                         var scaledY = playfieldTopLeft.Y + point.Y * scale;
@@ -503,7 +503,10 @@ public unsafe class GameDisplay : IDisposable
                             drawSize,
                             drawSize,
                             hitObject.Color with { W = Math.Min(fadein, fadeout) });
-                    }
+                        
+                    }*/
+                    
+                    _renderer.DrawSlider(slider, posX, posY, 1, _baseCircleSize, fadein, fadeout);
 
                     _renderer.DrawTexture(_approachCircleTexture,
                         posX - approachCircleSize / 2,
