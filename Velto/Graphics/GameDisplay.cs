@@ -183,12 +183,16 @@ public unsafe class GameDisplay : IDisposable
                 // Console.WriteLine("Mouse inside");
                 var songPointer = Util.MapRange(Input.MouseX, 0, _windowWidth, 0, (float)_songLength);
                 Bass.ChannelSetPosition(_musicChannel, Bass.ChannelSeconds2Bytes(_musicChannel, songPointer / 1000));
-
+                
                 foreach (var objects in _beatmap.HitObjects)
                 {
                     objects.HitTime = 0;
                     objects.HitResult = HitResult.None;
+                    objects.Failed = false;
+                    
                 }
+                _sortedObjects = _beatmap.HitObjects
+                    .OrderByDescending(h => Math.Abs(h.Time - _songCursor));
                 
             }
 
@@ -298,11 +302,15 @@ public unsafe class GameDisplay : IDisposable
                         _beatmap.CalculatePrepass(_renderer.Window);
                         _player = new Player(_beatmap);
 
-                        foreach (var obj in _beatmap.HitObjects)
+                        foreach (var objects in _beatmap.HitObjects)
                         {
-                            obj.HitTime = 0;
-                            obj.HitResult = HitResult.None;
+                            objects.HitTime = 0;
+                            objects.HitResult = HitResult.None;
+                            objects.Failed = false;
+                    
                         }
+                        _sortedObjects = _beatmap.HitObjects
+                            .OrderByDescending(h => Math.Abs(h.Time - _songCursor));
 
                         _isPaused = false;
                         _isMenuOpen = false;
@@ -338,7 +346,7 @@ public unsafe class GameDisplay : IDisposable
                             Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_X))
                         {
                             //Bass.ChannelPlay(Bass.SampleGetChannel(_hitSound));
-                            circle.Color = Vector4.Zero;
+                            //circle.Color = Vector4.Zero;
                             circle.HitResult = HitResult.Ok;
                             circle.HitTime = _songCursor;
                         }

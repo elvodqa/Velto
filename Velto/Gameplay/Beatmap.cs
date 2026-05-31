@@ -282,6 +282,8 @@ public unsafe class Beatmap
         var comboCounter = 0;
         var colorCounter = 0;
         var sortedTimingPoints = TimingPoints.OrderBy(t => t.Time);
+
+        double sliderVelocity = 1f;
         
         foreach (var hitobject in HitObjects)
         {
@@ -360,17 +362,23 @@ public unsafe class Beatmap
                 }
                 
                 // Calculate length
+                
                 var length = slider.Length;
                 var sliderMultiplier = SliderMultiplier;
                 var beatLength = timingPoint.BeatLength;
-                double sv = 1;
-                if (timingPoint.Uninherited == 0)
+                
+                
+                if (timingPoint.Uninherited == 1)
                 {
-                    sv = 100f / timingPoint.BeatLength;
+                    //sliderVelocity = 1.0f;
                 }
-
-                slider.Duration = length / (sliderMultiplier * 500 * sv) * beatLength;
-                slider.Duration *= slider.SlideRepeatCount * 10;
+                else
+                {
+                    //sliderVelocity *= (100.0f / timingPoint.BeatLength);
+                }
+                
+                slider.Duration = length / (sliderMultiplier * 100f * sliderVelocity) * beatLength;
+                slider.Duration *= slider.SlideRepeatCount;
                 Console.WriteLine(slider.Duration);
             }
         }
