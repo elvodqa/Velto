@@ -249,7 +249,7 @@ public unsafe class GameView : View
         }
 
         // Update player just before doing judgement
-        _player.Update(delta, _songCursor);
+        _player.Update(delta, _songCursor, playfieldTopLeft, scale);
         _inputOverlayView.Update(delta);
         // Handle objects bkz: https://osu.ppy.sh/wiki/en/Gameplay/Judgement/osu%21 
         foreach (var hitObject in _beatmap.HitObjects)
@@ -260,16 +260,20 @@ public unsafe class GameView : View
                 {
                     if (_songCursor - 150 >= circle.Time)
                     {
-                        circle.HitResult = HitResult.Miss;
-                        circle.Failed = true;
+                        hitObject.HitResult = HitResult.Miss;
+                        hitObject.Failed = true;
+                        AddResultParticle(hitObject.Position, hitObject.HitResult, hitObject.Time, 150, 400);
+                        
                     }
 
-                    var mouse = new Vector2(Input.MouseX, Input.MouseY);
-                    // convert screen → playfield
-                    mouse.X = (mouse.X - playfieldTopLeft.X) / scale;
-                    mouse.Y = (mouse.Y - playfieldTopLeft.Y) / scale;
+                    // var mouse = new Vector2(Input.MouseX, Input.MouseY);
+                    // // convert screen → playfield
+                    // mouse.X = (mouse.X - playfieldTopLeft.X) / scale;
+                    // mouse.Y = (mouse.Y - playfieldTopLeft.Y) / scale;
+                    var playerCursor = _player.Cursor;
                     var radiusPlayfield = osuRadius;
-                    if (Vector2.Distance(circle.Position, mouse) <= radiusPlayfield)
+                    var circlePosition = playfieldTopLeft + circle.Position * scale;
+                    if (Vector2.Distance(circlePosition, playerCursor) <= radiusPlayfield)
                         if (_player.ActionPrimaryPressed || _player.ActionSecondaryPressed)
                         {
                             // bkz: https://osu.ppy.sh/wiki/en/Gameplay/Judgement/osu%21
@@ -352,17 +356,6 @@ public unsafe class GameView : View
         }
     }
     
-    float GetSliderVelocityMultiplier(double time)
-    {
-        var tp = _beatmap.TimingPoints
-            .Where(t => t.Time <= time)
-            .LastOrDefault();
-
-        if (tp.Uninherited == 1)
-            return 1f;
-
-        return (float)(-100.0 / tp.BeatLength);
-    }
 
     public override void Draw(double delta)
     {
@@ -699,10 +692,9 @@ public unsafe class GameView : View
             float fadeout = Math.Clamp(Util.MapRange(t,
                 (float)(particle.Begin + particle.Appear),
                 (float)(particle.Begin + particle.Duration), 1, 0), 0, 1);
-
+        
             float alpha = fadein * fadeout;
-            var drawSize = (float)(objectCircleSize + objectCircleSize * (1 - fadeout) * 0.2);
-
+            
             var texture = particle.Result switch
             {
                 HitResult.None => Skin.Hit0,
@@ -712,14 +704,19 @@ public unsafe class GameView : View
                 HitResult.Miss => Skin.Hit0,
                 _ => throw new ArgumentOutOfRangeException()
             };
+
             
-            _renderer.DrawTexture(texture,
-                posX - drawSize / 2,
-                posY - drawSize / 2,
-                drawSize,
-                drawSize, new Vector4(1, 1, 1, 1) with { W = alpha });
+            var drawSize = (float)(objectCircleSize + objectCircleSize * (1 - fadeout) * 0.2);
+            var w = drawSize;
+            var h = texture.Height * (w/texture.Width);
+            
+            _renderer.DrawCenteredTexture(texture,
+                new Vector2(posX, posY),
+                w,
+                h, new Vector4(1, 1, 1, 1) with { W = alpha });
         }
        
+        _renderer.DrawText(_msdfFont, $"{_player.Cursor.X.ToString("0000")}x{_player.Cursor.Y.ToString("0000")}", new Vector2(10, 600), 1, new Vector4(1, 1, 1, 1));
         
         var yellow = new Vector4(242 / 255f, 191 / 255f, 36 / 255f, 1);
 
@@ -758,15 +755,17 @@ public unsafe class GameView : View
         var size = _baseCircleSize / 2f;
         
         
-        var _posX = playfieldTopLeft.X + _player.Cursor.X * scale;
-        var _posY = playfieldTopLeft.Y + _player.Cursor.Y * scale;
-        if (!_player.Autoplay)
-        {
-            _posX = Input.MouseX;
-            _posY = Input.MouseY;
-        }
+        // var _posX = playfieldTopLeft.X + _player.Cursor.X * scale;
+        // var _posY = playfieldTopLeft.Y + _player.Cursor.Y * scale;
+        // _posX = _player.Cursor.X;
+        // _posY = _player.Cursor.Y;
+        // if (!_player.Autoplay)
+        // {
+        //     _posX = Input.MouseX;
+        //     _posY = Input.MouseY;
+        // }
 
-        lastCursorPosition = new(_posX, _posY);
+        lastCursorPosition = new(_player.Cursor.X, _player.Cursor.Y);
 
         if (trailSnapshot.Length > 0)
         {
@@ -788,8 +787,8 @@ public unsafe class GameView : View
         
         size = _baseCircleSize / 2f; // _cursorTexture.Width * 1.5f;
         _renderer.DrawTexture(Skin.Cursor,
-            _posX - size / 2,
-            _posY - size / 2,
+            _player.Cursor.X - size / 2,
+            _player.Cursor.Y - size / 2,
             size, size, new Vector4(1, 1, 1, 1));
         
         _songSelectorView.Draw(delta);

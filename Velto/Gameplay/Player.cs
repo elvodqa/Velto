@@ -7,7 +7,23 @@ namespace Velto.Gameplay;
 
 public class Player
 {
-    public Vector2 Cursor { get; private set; }
+    public Vector2 Cursor
+    {
+        get
+        {
+            if (Autoplay)
+            {
+                // var _posX = playfieldTopLeft.X + _player.Cursor.X * scale;
+                // var _posY = playfieldTopLeft.Y + _player.Cursor.Y * scale;
+                return _playfieldOffset + _cursor * _scale;
+            }
+            else
+            {
+                return new Vector2(Input.MouseX, Input.MouseY);
+            }
+        }
+    }
+
     public bool Autoplay { get; set; } = true;
 
     private readonly Beatmap _beatmap;
@@ -19,17 +35,22 @@ public class Player
     public bool ActionSecondaryDown = false;
 
     private bool _primaryLastPressed = false;
+    private Vector2 _cursor = new Vector2();
+    private Vector2 _playfieldOffset = new();
+    private float _scale = 0;
 
     public Player(Beatmap beatmap)
     {
         _beatmap = beatmap;
 
         if (_beatmap.HitObjects.Count > 0)
-            Cursor = _beatmap.HitObjects[0].Position;
+            _cursor = _beatmap.HitObjects[0].Position;
     }
 
-    public void Update(double deltaTime, double songCursor)
+    public void Update(double deltaTime, double songCursor, Vector2 playfieldOffset, float scale)
     {
+        _playfieldOffset = playfieldOffset;
+        _scale = scale;
         ActionPrimaryDown = false;
         ActionPrimaryPressed = false;
         ActionSecondaryPressed = false;
@@ -37,7 +58,7 @@ public class Player
 
         if (!Autoplay)
         {
-            Cursor = new Vector2(Input.MouseX, Input.MouseY);
+            _cursor = new Vector2(Input.MouseX, Input.MouseY);
 
             if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_Z)) ActionPrimaryPressed = true;
             if (Input.IsKeyDown(SDL_Scancode.SDL_SCANCODE_Z)) ActionPrimaryDown = true;
@@ -75,7 +96,7 @@ public class Player
 
             if (currentIndex == -1)
             {
-                Cursor = objects[^1].Position;
+                _cursor = objects[^1].Position;
                 return;
             }
 
@@ -88,7 +109,7 @@ public class Player
                 songCursor >= activeSlider.Time &&
                 songCursor <= activeSlider.Time + activeSlider.Duration)
             {
-                Cursor = activeSlider.GetPositionAt(songCursor);
+                _cursor = activeSlider.GetPositionAt(songCursor);
 
                 ActionPrimaryDown = true;
 
@@ -109,7 +130,7 @@ public class Player
 
             if (Math.Abs(songCursor - current.Time) <= hitWindow)
             {
-                Cursor = current.Position;
+                _cursor = current.Position;
 
                 if (_lastAutoplayHitIndex != currentIndex)
                 {
@@ -125,7 +146,7 @@ public class Player
             // ---------------------------------------------------------
             if (currentIndex == 0)
             {
-                Cursor = current.Position;
+                _cursor = current.Position;
                 return;
             }
 
@@ -152,7 +173,7 @@ public class Player
 
             if (duration <= 0)
             {
-                Cursor = endPos;
+                _cursor = endPos;
                 return;
             }
 
@@ -161,7 +182,9 @@ public class Player
 
             t = t * t * (3f - 2f * t);
 
-            Cursor = Vector2.Lerp(startPos, endPos, t);
+            // startPos = playfieldOffset + startPos * scale;
+            // endPos = playfieldOffset + endPos * scale;
+            _cursor = Vector2.Lerp(startPos, endPos, t);
         }
     }
 
