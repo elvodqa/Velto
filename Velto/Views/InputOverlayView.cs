@@ -1,3 +1,4 @@
+using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
 using Velto.Core;
 using Velto.Gameplay;
@@ -62,22 +63,69 @@ public class InputOverlayView : View
         _bounceValSecondary = MathHelper.Lerp(_bounceValSecondary, easeSecondary * -20f, 0.25f);
     }
 
+    private float f = 0;
+
     public override void Draw(double delta)
     {
+        f += (float)delta/10f;
         Vector4 highlightColor = new Vector4(0.6f, 0.6f, 0.6f, 1f);
         Vector4 baseColor = new Vector4(0.9f, 0.9f, 1.0f, 1f);
         
-        _renderer.DrawRectangle(Width - 180, Height/2f - 200, 300, 400, new Vector4(0.3f, 0.5f, 0.8f, 0.95f));
+        //_renderer.DrawRectangle(Width - 180, Height/2f - 200, 300, 400, new Vector4(0.3f, 0.5f, 0.8f, 0.95f));
+        var bg = _gameView.Skin.InputOverlayBackground;
+        var height = 500f;
+        var width = height * ((float)bg.Height / bg.Width);
+        var x = Width - width;
+        var y = (Height - height) / 2f;
+        
+        _renderer.DrawTexture(bg, x, y, width, height, new Vector4(1, 1, 1, 1), 90);
+
+        var key = _gameView.Skin.InputOverlayKey;
+
+        
+        var keyHeightPrimary = height / 4 - 20 + _bounceValPrimary;
+        var keyWidthPrimary = keyHeightPrimary * ((float)key.Width / key.Height) + _bounceValPrimary;
+
+        var baseKeyy = y + 30;
+        var baseKey1x = x + 30 - _bounceValPrimary;
+        var baseKey1y = y + 30 - _bounceValPrimary;
         
         
+        var keyHeightSecondary = height / 4 - 20 + _bounceValSecondary;
+        var keyWidthSecondary = keyHeightSecondary * ((float)key.Width / key.Height) + _bounceValSecondary;
+
+        var baseKey2x = baseKey1x - _bounceValSecondary;
+        var baseKey2y = baseKeyy + keyHeightSecondary - _bounceValSecondary;
+
         
-        Vector2 primaryCenter = new Vector2(Width - 160 + 70, Height / 2f - 100);
+        _renderer.DrawTexture(
+            key,
+            baseKey1x,
+            baseKey1y,
+            keyHeightPrimary,
+            keyWidthPrimary,
+            new Vector4(1, 1, 1, 1),
+            90
+        );
+
+        _renderer.DrawTexture(
+            key,
+            baseKey2x,
+            baseKey2y,
+            keyHeightSecondary,
+            keyWidthSecondary,
+            new Vector4(1, 1, 1, 1),
+            90
+        );
+        /*Vector2 primaryCenter = new Vector2(Width - 160 + 70, Height / 2f - 100);
         DrawCenteredRect(primaryCenter, 140 + _bounceValPrimary, 160 + _bounceValPrimary, Lerp(baseColor, highlightColor, EasingFunctions.OutQuad(_progressPrimary)));
 
 
         Vector2 secondaryCenter = new Vector2(Width - 160 + 70, Height / 2f + 100);
-        DrawCenteredRect(secondaryCenter, 140 + _bounceValSecondary, 160 + _bounceValSecondary, Lerp(baseColor, highlightColor, EasingFunctions.OutQuad(_progressSecondary)));
+        DrawCenteredRect(secondaryCenter, 140 + _bounceValSecondary, 160 + _bounceValSecondary, Lerp(baseColor, highlightColor, EasingFunctions.OutQuad(_progressSecondary)));*/
     
+        _renderer.DrawCenteredRect(new(Width/2, Height/2), 400, 100, new Vector4(1, 1, 1, 1), f);
+            
         
         _renderer.DrawText(_font, $"{_primaryCount}", new Vector2(Width - 180 + 10, Height / 2f - 200 + 60), 1.3f,
             new Vector4(0, 0, 0, 1));

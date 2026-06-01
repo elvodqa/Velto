@@ -152,7 +152,7 @@ public class SongSelectorView : View
         var l_t = l_v * (l_v / l_c); // length of thumb
         var d_t = d * (l_v / l_c); // distance of thumb
 
-        _renderer.DrawRectangle(Width - 30, d_t, 30, l_t, new Vector4(1, 1, 1, 1));
+        _renderer.DrawRectangle(Width - 30, d_t, 30, l_t, new Vector4(1, 1, 1, 0.6f));
     }
     
      

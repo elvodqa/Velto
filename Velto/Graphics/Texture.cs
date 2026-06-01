@@ -23,11 +23,13 @@ public unsafe class Texture : IDisposable
     private readonly ImageResult _result;
     private readonly WrapMode _wrapMode;
 
+    public string Path;
     public int Handle;
 
     public Texture(string path, FilterMode filterMode = FilterMode.Linear, WrapMode wrapMode = WrapMode.Repeat,
         bool generateMipmaps = true)
     {
+        Path = path;
         _filterMode = filterMode;
         _wrapMode = wrapMode;
         StbImage.stbi_set_flip_vertically_on_load(1);

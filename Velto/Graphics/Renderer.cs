@@ -320,6 +320,31 @@ public unsafe class Renderer : IDisposable
         DrawTexture(framebuffer.Texture,
             x, y, framebuffer.Width * scale, framebuffer.Height * scale, new Vector4(1, 1, 1, 1));
     }
+    
+    public void DrawCenteredRect(Vector2 center, float w, float h, Vector4 color, float rotation = 0)
+    {
+        DrawRectangle(
+            center.X - w / 2f,
+            center.Y - h / 2f,
+            w,
+            h,
+            color,
+            rotation
+        );
+    }
+    
+    public void DrawCenteredTexture(Texture texture, Vector2 center, float w, float h, Vector4 color, float rotation = 0)
+    {
+        DrawTexture(
+            texture,
+            center.X - w / 2f,
+            center.Y - h / 2f,
+            w,
+            h,
+            color,
+            rotation
+        );
+    }
 
     public void DrawTexture(int texture, float x, float y, float width, float height, Vector4 color,
         float rotation = 0)

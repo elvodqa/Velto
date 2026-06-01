@@ -15,7 +15,7 @@ public unsafe class GameView : View
     private const int PLAYFIELD_W = 512;
     private const int PLAYFIELD_H = 384;
     private const double WAITINGTIME = 0f;
-    private readonly Texture _approachCircleTexture;
+    
     private Texture _backgroundTexture;
     private float _baseCircleSize;
 
@@ -23,33 +23,22 @@ public unsafe class GameView : View
     private readonly Texture _circleTexture;
     private int _colorCounter = 0;
 
-    private readonly Texture _cursorTexture;
-    private readonly Texture _cursorTrailTexture;
-    private readonly Texture _hit0Texture;
-    private readonly Texture _hitcircleOverlayTexture;
-    private readonly Texture _hitcircleTexture;
-    private readonly Texture _modAutoplayTexture;
-
-    private readonly Texture _sliderStartCircleTexture;
     
-    private readonly Texture _reverseArrowTexture;
-    private readonly Texture _sliderFollowCircleTexture;
     private bool _isPaused;
     private readonly MSDFFont _msdfFont;
     private int _musicChannel;
     private bool _musicStarted;
     private float _musicVolume;
-    private readonly Dictionary<int, Texture> _numberTextures = new();
+  
     private int _objectComboNumber = 1;
 
     private readonly Renderer _renderer;
     private readonly string _skinName = "rafis";
-    private readonly Texture _sliderballTexture;
+    
     private double _songCursor;
     private double _songLength;
     private IOrderedEnumerable<HitObject> _sortedObjects;
     private double _startingTimer;
-    private readonly Texture _whiteTexture;
     private bool _isMenuOpen = false;
     
     private readonly BufferObject<uint> indexBuffer;
@@ -69,6 +58,7 @@ public unsafe class GameView : View
     private SettingsView _settingsView;
     private SongSelectorView _songSelectorView;
     private InputOverlayView _inputOverlayView;
+    public Skin Skin;
 
     public GameView(Renderer renderer)
     {
@@ -88,26 +78,9 @@ public unsafe class GameView : View
         //_beatmap = new(Resources.GetPath("Resources/Songs/exit/Camellia - Exit This Earth's Atomosphere (Camellia's ''PLANETARY200STEP'' Remix) (ProfessionalBox) [Primordial Nucleosynthesis].osu"));
 
         _backgroundTexture = new Texture(Path.Combine(_beatmap.Folder, _beatmap.BackgroundFile));
-
-        _whiteTexture = new Texture(Resources.GetPath("Resources/Textures/white.png"));
-        _hitcircleTexture = new Texture(Resources.GetPath($"Resources/Textures/{_skinName}/hitcircle.png"));
-        _hitcircleOverlayTexture =
-            new Texture(Resources.GetPath($"Resources/Textures/{_skinName}/hitcircleoverlay.png"));
-        _cursorTexture = new Texture(Resources.GetPath($"Resources/Textures/{_skinName}/cursor.png"));
-        _cursorTrailTexture = new Texture(Resources.GetPath($"Resources/Textures/{_skinName}/cursortrail.png"));
-        _approachCircleTexture = new Texture(Resources.GetPath($"Resources/Textures/{_skinName}/approachcircle.png"));
-        _sliderballTexture = new Texture(Resources.GetPath($"Resources/Textures/{_skinName}/sliderb.png"));
-        _hit0Texture = new Texture(Resources.GetPath($"Resources/Textures/{_skinName}/hit0.png"));
         _circleTexture = new Texture(Resources.GetPath("Resources/Textures/circle.png"));
-        _reverseArrowTexture = new Texture(Resources.GetPath($"Resources/Textures/{_skinName}/reversearrow.png"));
-        _sliderFollowCircleTexture = new Texture(Resources.GetPath($"Resources/Textures/{_skinName}/sliderfollowcircle.png"));
-        _sliderStartCircleTexture = new Texture(Resources.GetPath($"Resources/Textures/{_skinName}/sliderstartcircle.png"));
-        _modAutoplayTexture = new Texture(Resources.GetPath($"Resources/Textures/{_skinName}/selection-mod-autoplay.png"));
         _msdfFont = MSDFFont.Load(Resources.GetPath("Resources/Fonts/arial/arial"));
-
-        for (var i = 0; i < 10; i++)
-            _numberTextures.Add(i, new Texture(Resources.GetPath($"Resources/Textures/{_skinName}/default-{i}.png")));
-
+        
         Bass.Init();
         
         _hitSound = Bass.SampleLoad($"Resources/Textures/{_skinName}/normal-hitnormal.ogg", 0, 0, 16, BassFlags.Default);
@@ -130,6 +103,8 @@ public unsafe class GameView : View
         _songSelectorView = new(_renderer, this);
         _inputOverlayView = new(_renderer, this, _msdfFont);
         _inputOverlayView.SetPlayer(_player);
+
+        Skin = new Skin(Resources.GetPath("Resources/Textures/default"));
     }
 
     float playfieldWidth, playfieldHeight;
@@ -438,14 +413,14 @@ public unsafe class GameView : View
             }
             
             
-
+            // Gameplay drawing
             if (hitObject is HitCircle circle)
             {
                 if (hitObject.Time + _startingTimer - (int)_songCursor > -_beatmap.Posttime &&
                     hitObject.Time + _startingTimer - (int)_songCursor < _beatmap.Preempt)
                 {
                     if (hitObject.HitResult != HitResult.None) continue;
-                    _renderer.DrawTexture(_approachCircleTexture,
+                    _renderer.DrawTexture(Skin.ApproachCircle,
                         posX - approachCircleSize / 2,
                         posY - approachCircleSize / 2,
                         approachCircleSize,
@@ -454,13 +429,13 @@ public unsafe class GameView : View
                             W = Math.Min(fadein, fadeout)
                         });
 
-                    _renderer.DrawTexture(_hitcircleTexture,
+                    _renderer.DrawTexture(Skin.HitCircle,
                         posX - drawSize / 2,
                         posY - drawSize / 2,
                         drawSize,
                         drawSize, hitObject.Color with { W = Math.Min(fadein, fadeout) });
 
-                    _renderer.DrawTexture(_hitcircleOverlayTexture,
+                    _renderer.DrawTexture(Skin.HitCircleOverlay,
                         posX - drawSize / 2,
                         posY - drawSize / 2,
                         drawSize,
@@ -468,14 +443,16 @@ public unsafe class GameView : View
 
                     var num = hitObject.ComboNumber.ToString();
 
-                    var digitScale = drawSize / 128f; // adjust baseline size
+
+                    var digitScale = drawSize / (Skin.NumbersHd ? 256f : 128f);
+                    
                     float digitWidthTotal = 0;
 
                     // first pass: compute total width
                     foreach (var c in num)
                     {
                         var digit = c - '0';
-                        var tex = _numberTextures[digit];
+                        var tex = Skin.Numbers[digit];
                         digitWidthTotal += tex.Width * digitScale;
                     }
 
@@ -485,7 +462,7 @@ public unsafe class GameView : View
                     foreach (var c in num)
                     {
                         var digit = c - '0';
-                        var tex = _numberTextures[digit];
+                        var tex = Skin.Numbers[digit];
 
                         var w = tex.Width * digitScale;
                         var h = tex.Height * digitScale;
@@ -561,16 +538,36 @@ public unsafe class GameView : View
                     var scaledY = playfieldTopLeft.Y + position.Y * scale;
                     var _drawSize = objectCircleSize * 1f;
 
-                    _renderer.DrawTexture(_sliderballTexture,
-                        scaledX - _drawSize / 2,
-                        scaledY - _drawSize / 2,
-                        _drawSize,
-                        _drawSize,
-                        hitObject.Color with { W = 1 });
-
-
+                    if (Skin.SliderBallAnimated)
+                    {
+                        var ballIndex = Math.Clamp(
+                            (int)Util.MapRange(
+                                (float)_songCursor,
+                                (float)slider.Time,
+                                (float)(slider.Time + slider.Duration),
+                                0,
+                                Skin.SliderBalls.Count - 1),
+                            0,
+                            Skin.SliderBalls.Count - 1);
+                        _renderer.DrawTexture(Skin.SliderBalls[ballIndex],
+                            scaledX - _drawSize / 2,
+                            scaledY - _drawSize / 2,
+                            _drawSize,
+                            _drawSize,
+                            hitObject.Color with { W = 1 });
+                    }
+                    else
+                    {
+                        _renderer.DrawTexture(Skin.SliderBalls.First(),
+                            scaledX - _drawSize / 2,
+                            scaledY - _drawSize / 2,
+                            _drawSize,
+                            _drawSize,
+                            hitObject.Color with { W = 1 });
+                    }
+                    
                     _drawSize = objectCircleSize * 2;
-                    _renderer.DrawTexture(_sliderFollowCircleTexture,
+                    _renderer.DrawTexture(Skin.SliderFollowCircle,
                         scaledX - _drawSize /2,
                         scaledY - _drawSize /2,
                         _drawSize,
@@ -591,7 +588,7 @@ public unsafe class GameView : View
                     Vector2 direction = position - prevPos;
                     var rotation = Math.Atan2(direction.Y, direction.X) * MathHelper.RadToDeg - 180f;
                     
-                    _renderer.DrawTexture(_reverseArrowTexture,
+                    _renderer.DrawTexture(Skin.ReverseArrow,
                         scaledX - _drawSize / 2,
                         scaledY - _drawSize / 2,
                         _drawSize,
@@ -602,37 +599,40 @@ public unsafe class GameView : View
                 }
 
                 
-
-                //_renderer.DrawSlider(slider, posX, posY, 1, _baseCircleSize, fadein, fadeout);
-
-                _renderer.DrawTexture(_approachCircleTexture,
+                
+                _renderer.DrawTexture(Skin.ApproachCircle,
                     posX - approachCircleSize / 2,
                     posY - approachCircleSize / 2,
                     approachCircleSize,
                     approachCircleSize, hitObject.Color with { W = Math.Min(fadein, fadeout) });
 
-                _renderer.DrawTexture(_sliderStartCircleTexture,
+                _renderer.DrawTexture(Skin.SliderStartCircle,
                     posX - drawSize / 2,
                     posY - drawSize / 2,
                     drawSize,
                     drawSize, hitObject.Color with { W = Math.Min(fadein, fadeout) });
-                //
-                // _renderer.DrawTexture(_hitcircleOverlayTexture,
-                //     posX - drawSize / 2,
-                //     posY - drawSize / 2,
-                //     drawSize,
-                //     drawSize, new Vector4(1, 1, 1, 1) with { W = Math.Min(fadein, fadeout) });
+
+
+                if (!Skin.SliderStartCircleExists)
+                {
+                    _renderer.DrawTexture(Skin.HitCircleOverlay,
+                        posX - drawSize / 2,
+                        posY - drawSize / 2,
+                        drawSize,
+                        drawSize, new Vector4(1, 1, 1, 1) with { W = Math.Min(fadein, fadeout) });
+                }
+               
 
                 var num = hitObject.ComboNumber.ToString();
 
-                var digitScale = drawSize / 128f; // adjust baseline size
+                var digitScale = drawSize / (Skin.NumbersHd ? 256f : 128f);
                 float digitWidthTotal = 0;
 
                 // first pass: compute total width
                 foreach (var c in num)
                 {
                     var digit = c - '0';
-                    var tex = _numberTextures[digit];
+                    var tex = Skin.Numbers[digit];
                     digitWidthTotal += tex.Width * digitScale;
                 }
 
@@ -642,7 +642,7 @@ public unsafe class GameView : View
                 foreach (var c in num)
                 {
                     var digit = c - '0';
-                    var tex = _numberTextures[digit];
+                    var tex = Skin.Numbers[digit];
 
                     var w = tex.Width * digitScale;
                     var h = tex.Height * digitScale;
@@ -680,7 +680,7 @@ public unsafe class GameView : View
 
         if (_player.Autoplay)
         {
-            _renderer.DrawTexture(_modAutoplayTexture, Width - 200, 50, 150, 150, new Vector4(1, 1, 1, 1));
+            _renderer.DrawTexture(Skin.ModAutoplay, Width - 200, 50, 150, 150, new Vector4(1, 1, 1, 1));
         }
        
 
@@ -722,7 +722,7 @@ public unsafe class GameView : View
                 size -= 1;
 
                 var alpha = (float)i / trailSnapshot.Length;
-                _renderer.DrawTexture(_cursorTrailTexture,
+                _renderer.DrawTexture(Skin.CursorTrail,
                     trail.Position.X - size / 2,
                     trail.Position.Y - size / 2,
                     size, size, new Vector4(1, 1, 1, 1) * alpha);
@@ -732,7 +732,7 @@ public unsafe class GameView : View
 
         
         size = _baseCircleSize / 2f; // _cursorTexture.Width * 1.5f;
-        _renderer.DrawTexture(_cursorTexture,
+        _renderer.DrawTexture(Skin.Cursor,
             _posX - size / 2,
             _posY - size / 2,
             size, size, new Vector4(1, 1, 1, 1));
@@ -808,17 +808,10 @@ public unsafe class GameView : View
         vertexBuffer.Dispose();
         indexBuffer.Dispose();
         vao.Dispose();
-        _cursorTexture.Dispose();
-        _cursorTrailTexture.Dispose();
-        _whiteTexture.Dispose();
         _backgroundTexture.Dispose();
-        _hitcircleTexture.Dispose();
-        _hitcircleOverlayTexture.Dispose();
-        _approachCircleTexture.Dispose();
-        _sliderballTexture.Dispose();
+        
         _circleTexture.Dispose();
-        _hit0Texture.Dispose();
-        foreach (var pair in _numberTextures) pair.Value.Dispose();
+        Skin.Dispose();
     }
 
     public class SliderPool

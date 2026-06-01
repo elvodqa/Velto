@@ -17,4 +17,7 @@ public class Resources
     {
         return GetPath($"Resources/Fonts/{fontname}");
     }
+    
+    public static string DefaultSkinPath => GetPath($"Resources/Textures/default");
+    
 }
