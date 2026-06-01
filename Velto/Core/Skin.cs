@@ -30,7 +30,10 @@ public class Skin : IDisposable
     public Texture[] Numbers { get; private set; } = new Texture[10];
     public Texture InputOverlayBackground { get; private set; } 
     public Texture InputOverlayKey { get; private set; } 
-     
+    public Texture Hit300 { get; private set; }
+    public Texture Hit100 { get; private set; }
+    public Texture Hit50 { get; private set; }
+    public Texture Hit0 { get; private set; }
     
     public Skin(string folderPath)
     {
@@ -56,6 +59,11 @@ public class Skin : IDisposable
         ModAutoplay = GetElementTexture("selection-mod-autoplay", "selection-mod-autoplay");
         InputOverlayBackground = GetElementTexture("inputoverlay-background", "inputoverlay-background");
         InputOverlayKey = GetElementTexture("inputoverlay-key", "inputoverlay-key");
+        Hit300 = GetElementTexture("hit300", "hit300");
+        Hit100 = GetElementTexture("hit100", "hit100");
+        Hit50 = GetElementTexture("hit50", "hit50");
+        Hit0 = GetElementTexture("Hit0", "Hit0");
+        
         
         
         for (var i = 0; i < 10; i++)

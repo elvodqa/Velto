@@ -19,7 +19,6 @@ public enum HitObjectType : byte
 public enum HitResult
 {
     None,
-    Perfect,
     Good,
     Ok,
     Meh,
