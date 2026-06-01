@@ -15,11 +15,12 @@ public unsafe class AudioChannel : IDisposable
         {
             var frames = MIX_GetAudioDuration(Handle);
             
-            SDL_AudioSpec devSpec;
+            /*SDL_AudioSpec devSpec;
             int sampleFrames;
-            SDL_GetAudioDeviceFormat(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &devSpec, &sampleFrames);
+            SDL_GetAudioDeviceFormat(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &devSpec, &sampleFrames);*/
+            var ms = MIX_AudioFramesToMS(Handle, frames);
 
-            double ms = (frames * 1000.0) / devSpec.freq;
+            //double ms = (frames * 1000.0) / devSpec.freq;
             return ms;
         }
     }

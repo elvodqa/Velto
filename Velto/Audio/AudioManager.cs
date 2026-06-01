@@ -1,4 +1,5 @@
 using SDL;
+using Velto.Core;
 using static SDL.SDL3;
 using static SDL.SDL3_mixer;
 
@@ -18,6 +19,10 @@ public unsafe class AudioManager : IDisposable
     public List<AudioChannel> Audios = new();
     
     private MIX_Mixer* _mixer;
+    public List<Track> SampleTracks = new();
+    
+    public float SampleVolume { get; set; }
+    private double _counter = 0;
     
     public AudioManager()
     {
@@ -44,6 +49,34 @@ public unsafe class AudioManager : IDisposable
         track.Audio = null;
         Tracks.Add(track);
         return track;
+    }
+
+    public void PlaySample(AudioChannel audioChannel)
+    {
+        Track track = CreateTrack();
+        track.Audio = audioChannel;
+        track.Volume = SampleVolume;
+        track.Play();
+        SampleTracks.Add(track);
+    }
+
+    public void Update(double delta)
+    {
+        _counter += delta;
+
+        if (_counter < 1000)
+            return;
+
+        _counter = 0;
+
+        foreach (var track in SampleTracks.ToList())
+        {
+            if (!track.Playing)
+            {
+                SampleTracks.Remove(track);
+                track.Dispose();
+            }
+        }
     }
     
     public void Dispose()

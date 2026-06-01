@@ -1,3 +1,5 @@
+using Velto.Audio;
+
 namespace Velto;
 
 using OpenTK;
@@ -179,6 +181,7 @@ public unsafe class GameBase : IDisposable
 
     private void Loop(double deltaTime)
     {
+        AudioManager.Instance.Update(deltaTime);
         Input.GetKeyboardState();
         Input.UpdateMouse(_window);
         
