@@ -45,7 +45,15 @@ public unsafe class GameBase : IDisposable
 
     public GameBase()
     {
-        SDL_Init(SDL_InitFlags.SDL_INIT_VIDEO);
+        if (!SDL_Init(SDL_InitFlags.SDL_INIT_VIDEO | SDL_InitFlags.SDL_INIT_AUDIO))
+        {
+            throw new Exception(SDL_GetError());
+        }
+        if (!SDL3_mixer.MIX_Init())
+        {
+            throw new Exception(SDL_GetError());
+        }
+
     }
 
 
@@ -103,6 +111,7 @@ public unsafe class GameBase : IDisposable
         SDL_AddEventWatch(&EventWatch, _eventWatchUserdata);
 
         _debugFont = MSDFFont.Load(Resources.GetPath("Resources/Fonts/arial/arial"));
+        
     }
     
     public void Run()

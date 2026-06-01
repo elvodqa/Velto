@@ -48,6 +48,9 @@ public class Player
     private Vector2 _cursor = new Vector2();
     private Vector2 _playfieldOffset = new();
     private float _scale = 0;
+    
+    public bool Dance { get; set; } = false;
+    
 
     public Player(Beatmap beatmap)
     {

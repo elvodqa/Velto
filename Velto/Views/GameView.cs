@@ -4,6 +4,7 @@ using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
 using Velto.Gameplay;
 using SDL;
+using Velto.Audio;
 using Velto.Core;
 using Velto.Graphics;
 using static SDL.SDL3;
@@ -14,98 +15,58 @@ public unsafe class GameView : View
 {
     private const int PLAYFIELD_W = 512;
     private const int PLAYFIELD_H = 384;
-    private const double WAITINGTIME = 0f;
+    private const double WAITINGTIME = 3000f;
+    private double _startingTimer;
     
-    private Texture _backgroundTexture;
+    private Texture? _backgroundTexture;
+    
     private float _baseCircleSize;
 
     private Beatmap _beatmap;
-    private readonly Texture _circleTexture;
-    private int _colorCounter = 0;
-
     
     private bool _isPaused;
     private readonly MSDFFont _msdfFont;
-    private int _musicChannel;
+   
+    
     private bool _musicStarted;
     private float _musicVolume;
-  
-    private int _objectComboNumber = 1;
-
+    
     private readonly Renderer _renderer;
     private string _skinName = "rafis";
     
     private double _songCursor;
     private double _songLength;
     private IOrderedEnumerable<HitObject> _sortedObjects;
-    private double _startingTimer;
-    private bool _isMenuOpen = false;
     
-    private readonly BufferObject<uint> indexBuffer;
-
     private Vector2 lastCursorPosition = Vector2.Zero;
     private Shader shader;
 
     private readonly Queue<TrailInfo> trails = new();
-    private readonly VertexArrayObject<float, uint> vao;
-    private readonly BufferObject<float> vertexBuffer;
-
     
-    private SliderPool _sliderPool;
-    private int _hitSound;
-
     private Player _player;
     private SettingsView _settingsView;
     private SongSelectorView _songSelectorView;
     private InputOverlayView _inputOverlayView;
     public Skin Skin;
 
+    private Track? _songTrack;
+    private AudioChannel? _songAudio;
+
+    private bool _startingFlag = false;
     
     public GameView(Renderer renderer)
-    {
+    { 
+        Skin = new Skin(Resources.GetPath($"Resources/Textures/{_skinName}"));
         _renderer = renderer;
-
-        vertexBuffer = new BufferObject<float>(vertices, BufferTarget.ArrayBuffer, BufferUsage.StaticDraw);
-        indexBuffer = new BufferObject<uint>(indices, BufferTarget.ElementArrayBuffer, BufferUsage.StaticDraw);
-        vao = new VertexArrayObject<float, uint>(vertexBuffer, indexBuffer);
-        vao.VertexAttributePointer(0, 3, VertexAttribPointerType.Float, 5 * sizeof(float), 0);
-        vao.VertexAttributePointer(1, 2, VertexAttribPointerType.Float, 5 * sizeof(float), 3 * sizeof(float));
-        shader = new Shader("sprite"); // pippidonclear0
-
-        //_beatmap = new(Resources.GetPath("Resources/Songs/lotus/Susumu Hirasawa - SWITCHED-ON LOTUS (Starrodkirby86) [KIRBY Mix Deluxe].osu"));
-        _beatmap = new Beatmap(Resources.GetPath(
-            "Resources/Songs/Wakeshima Kanon/ASCA - Nisemono no Koi ni Sayounara with Wakeshima Kanon (timemon) [Kyou's Extra].osu"));
-        //_beatmap = new(Resources.GetPath("Resources/Songs/Centipede/Knife Party - Centipede (Sugoi-_-Desu) [This isn't a map, just a simple visualisation].osu"));
-        //_beatmap = new(Resources.GetPath("Resources/Songs/exit/Camellia - Exit This Earth's Atomosphere (Camellia's ''PLANETARY200STEP'' Remix) (ProfessionalBox) [Primordial Nucleosynthesis].osu"));
-
-        _backgroundTexture = new Texture(Path.Combine(_beatmap.Folder, _beatmap.BackgroundFile));
-        _circleTexture = new Texture(Resources.GetPath("Resources/Textures/circle.png"));
         _msdfFont = MSDFFont.Load(Resources.GetPath("Resources/Fonts/arial/arial"));
         
-        Bass.Init();
-        
-        _hitSound = Bass.SampleLoad($"Resources/Textures/{_skinName}/normal-hitnormal.ogg", 0, 0, 32, BassFlags.Default);
-        
-        //Console.WriteLine(_beatmap.AudioFilename);
-        _musicChannel = Bass.CreateStream(Path.Combine(_beatmap.Folder, _beatmap.AudioFilename));
-        Bass.ChannelSetAttribute(_musicChannel, ChannelAttribute.Volume, 0.02f);
-        _musicVolume = 0.02f;
-        _songLength = 1000 * Bass.ChannelBytes2Seconds(_musicChannel, Bass.ChannelGetLength(_musicChannel));
-
-        _startingTimer = WAITINGTIME + _beatmap.AudioLeadIn;
-
-        _beatmap.CalculatePrepass(_renderer.Window);
-
-        _sliderPool = new SliderPool(_renderer);
-
-        _player = new Player(_beatmap);
-
         _settingsView = new(_renderer);
         _songSelectorView = new(_renderer, this);
         _inputOverlayView = new(_renderer, this, _msdfFont);
-        _inputOverlayView.SetPlayer(_player);
 
-        Skin = new Skin(Resources.GetPath($"Resources/Textures/{_skinName}"));
+        
+        SetBeatmap(new Beatmap(Resources.GetPath(
+            "Resources/Songs/Wakeshima Kanon/ASCA - Nisemono no Koi ni Sayounara with Wakeshima Kanon (timemon) [Kyou's Extra].osu")));
     }
 
     float playfieldWidth, playfieldHeight;
@@ -113,6 +74,59 @@ public unsafe class GameView : View
 
     public override void Update(double delta)
     {
+        if (_startingTimer > 0)
+        {
+            _startingTimer -= delta;
+        
+            if (_startingTimer <= 0 && !_musicStarted)
+            {
+                _musicStarted = true;
+                _songTrack?.Play();
+                _songCursor = 0;
+            }
+        }
+
+        // Use REAL audio position when music is playing
+        if (_musicStarted && !_isPaused && _songTrack != null)
+        {
+            //_songCursor = _songTrack.Position;
+            _songCursor += delta;
+        }
+        
+        RectangleF hitbox = new(0, Height - 40, Width, 40);
+        if (Input.IsMouseDown(SDLButton.SDL_BUTTON_LEFT) && hitbox.Contains(Input.MouseX, Input.MouseY))
+        {
+            double targetMs = Util.MapRange(Input.MouseX, 0, Width, 0, (float)_songLength);
+    
+            bool wasPlaying = _songTrack!.Playing;
+
+            //_songTrack.Pause();
+            _songTrack.Position = targetMs;
+            _songCursor = targetMs;
+            ResetObjectsAfter(_songCursor);
+
+            if (wasPlaying)
+                _songTrack.Resume();
+            
+            _musicStarted = true;   // ensure it's considered playing
+        }
+        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_LEFT))
+        {
+            _songCursor -= 1000;
+            _songTrack.Position = _songCursor;
+            
+            ResetObjectsAfter(_songCursor);
+        }
+
+        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_RIGHT))
+        {
+            _songCursor += 1000;
+            _songTrack.Position = _songCursor;
+            
+            ResetObjectsAfter(_songCursor);
+        }
+
+        
         _settingsView.Width = Width;
         _settingsView.Height = Height;
         _settingsView.Update(delta);
@@ -150,78 +164,24 @@ public unsafe class GameView : View
             (Height - playfieldHeight) / 2f
         );
 
-
-        _startingTimer -= delta;
-        if (_startingTimer <= 0 && !_musicStarted)
-        {
-            Bass.ChannelPlay(_musicChannel);
-            //Bass.ChannelSetPosition(_musicChannel, Bass.ChannelSeconds2Bytes(_musicChannel, 60));
-            _musicStarted = true;
-        }
-
-        if (_musicStarted) _startingTimer = 0;
-
-        var pos = Bass.ChannelBytes2Seconds(_musicChannel, Bass.ChannelGetPosition(_musicChannel));
-        // var err = Bass.LastError;
-        // if (err != Errors.OK)
-        // {
-        //     Console.WriteLine(err);
-        // }
-        _songCursor = (ulong)(pos * 1000);
-
+        
         _sortedObjects = _beatmap.HitObjects
             .OrderByDescending(h => Math.Abs(h.Time - _songCursor));
         
-        double cursor = _songCursor;
-
         
-        RectangleF hitbox = new(0, Height - 40, Width, 40);
-        if (Input.IsMouseDown(SDLButton.SDL_BUTTON_LEFT))
-            // Console.WriteLine(hitbox);
-            // Console.WriteLine($"{Input.MouseX} {Input.MouseY}");
-            if (hitbox.Contains(Input.MouseX, Input.MouseY))
-            {
-                // Console.WriteLine("Mouse inside");
-                var songPointer = Util.MapRange(Input.MouseX, 0, Width, 0, (float)_songLength);
-                Bass.ChannelSetPosition(_musicChannel, Bass.ChannelSeconds2Bytes(_musicChannel, songPointer / 1000));
-                
-                ResetObjectsAfter(_songCursor);
-                _sortedObjects = _beatmap.HitObjects
-                    .OrderByDescending(h => Math.Abs(h.Time - _songCursor));
-                
-            }
-        
-        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_SPACE) && !_isMenuOpen)
+        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_SPACE))
         {
             if (_isPaused)
-                Bass.ChannelPlay(_musicChannel);
+            {
+                _songTrack?.Resume();
+            }
             else
-                Bass.ChannelPause(_musicChannel);
-
+            {
+                _songTrack?.Pause();
+            }
             _isPaused = !_isPaused;
         }
-
-        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_LEFT))
-        {
-            _songCursor -= 1000;
-            Bass.ChannelSetPosition(_musicChannel, Bass.ChannelSeconds2Bytes(_musicChannel, _songCursor / 1000));
-            
-            ResetObjectsAfter(_songCursor);
-
-            // _sortedObjects = _beatmap.HitObjects
-            //     .OrderByDescending(h => Math.Abs(h.Time - _songCursor));
-        }
-
-        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_RIGHT))
-        {
-            _songCursor += 1000;
-            Bass.ChannelSetPosition(_musicChannel, Bass.ChannelSeconds2Bytes(_musicChannel, _songCursor / 1000));
-            
-            ResetObjectsAfter(_songCursor);
-
-            // _sortedObjects = _beatmap.HitObjects
-            //     .OrderByDescending(h => Math.Abs(h.Time - _songCursor));
-        }
+        
         if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_A))
         {
             _player.Autoplay = !_player.Autoplay;
@@ -235,7 +195,8 @@ public unsafe class GameView : View
             {
                 _musicVolume += Input.WheelY * 0.01f;
                 _musicVolume = Math.Clamp(_musicVolume, 0, 1);
-                Bass.ChannelSetAttribute(_musicChannel, ChannelAttribute.Volume, _musicVolume);
+                //Bass.ChannelSetAttribute(_musicChannel, ChannelAttribute.Volume, _musicVolume);
+                _songTrack.Volume = _musicVolume;
             }
 
             if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_O))
@@ -308,9 +269,9 @@ public unsafe class GameView : View
                             }
                             circle.HitTime = _songCursor;
                             AddResultParticle(hitObject.Position, hitObject.HitResult, hitObject.HitTime, 150, 400);
-                            var sampleChannel = Bass.SampleGetChannel(_hitSound);
+                            /*var sampleChannel = Bass.SampleGetChannel(_hitSound);
                             Bass.ChannelSetAttribute(sampleChannel, ChannelAttribute.Volume, _musicVolume);
-                            Bass.ChannelPlay(sampleChannel);
+                            Bass.ChannelPlay(sampleChannel);*/
                         }
                     
                     // Noteblock
@@ -326,14 +287,11 @@ public unsafe class GameView : View
             if (hitObject is Slider slider)
             {
                 // Queue before it becomes visible so the cached texture is ready.
-                if (slider.SliderFramebuffer == null && _songCursor >= slider.Time - _beatmap.Preempt)
-                    _sliderPool.QueueSlider(slider);
+                //if (slider.SliderFramebuffer == null && _songCursor >= slider.Time - _beatmap.Preempt)
+                //    _sliderPool.QueueSlider(slider);
             }
         }
 
-    
-        // Slider points are in osu! playfield coordinates, so cache/build using osu-radius (unscaled).
-        _sliderPool.Update(_songCursor, osuRadius);
         
         // if (lastCursorPosition != Vector2.Zero && Vector2.Distance(_player.Cursor, lastCursorPosition) > 8)
         //     trails.Enqueue(new TrailInfo
@@ -456,10 +414,19 @@ public unsafe class GameView : View
             }
             else
             {
-                fadein = 0;
-                fadeout = 0;
-                approachCircleSize = 0;
-                drawSize = 0;
+                fadein = 1;
+                
+                fadeout =
+                    Math.Clamp(
+                        Util.MapRange((float)_songCursor, (float)hitObject.HitTime, (float)(hitObject.HitTime + _beatmap.Posttime), 1, 0),
+                        0, 1);
+                
+                drawSize = (float)(objectCircleSize + objectCircleSize * (1 - fadeout) * 0.2);
+                approachCircleSize =
+                    Math.Max(
+                        Util.MapRange((float)_songCursor, hitObject.Time - _beatmap.Preempt, hitObject.Time + 0,
+                            drawSize * 4, drawSize), drawSize);
+                
             }
             
             
@@ -469,7 +436,7 @@ public unsafe class GameView : View
                 if (hitObject.Time + _startingTimer - (int)_songCursor > -_beatmap.Posttime &&
                     hitObject.Time + _startingTimer - (int)_songCursor < _beatmap.Preempt)
                 {
-                    if (hitObject.HitResult != HitResult.None) continue;
+                    //if (hitObject.HitResult != HitResult.None) continue;
                     _renderer.DrawTexture(Skin.ApproachCircle,
                         posX - approachCircleSize / 2,
                         posY - approachCircleSize / 2,
@@ -557,7 +524,7 @@ public unsafe class GameView : View
                     var scaledY = playfieldTopLeft.Y + point.Y * scale;
                     
                     var _drawSize = objectCircleSize * 0.92f;
-                    _renderer.DrawTexture(_circleTexture,
+                    _renderer.DrawCircle(
                         scaledX - _drawSize / 2,
                         scaledY - _drawSize / 2,
                         _drawSize,
@@ -570,7 +537,7 @@ public unsafe class GameView : View
                     var scaledY = playfieldTopLeft.Y + point.Y * scale;
                     var _drawSize = objectCircleSize * 0.8f;
                     
-                    _renderer.DrawTexture(_circleTexture,
+                    _renderer.DrawCircle(
                         scaledX - _drawSize / 2,
                         scaledY - _drawSize / 2,
                         _drawSize,
@@ -822,53 +789,59 @@ public unsafe class GameView : View
             _player.Cursor.Y - size / 2,
             size, size, new Vector4(1, 1, 1, 1));
         
+        
+        _renderer.DrawText(_msdfFont, 
+            $"Cursor: {_songCursor:F0}ms | TrackPos: {_songTrack?.Position:F0}ms", 
+            new Vector2(10, 300), 1, new Vector4(1,1,0,1));
+        
         _songSelectorView.Draw(delta);
         _settingsView.Draw(delta);
         _renderer.SetScissor(0, 0, (int)Width, (int)Height);
+        
     }
 
     public void SetBeatmap(Beatmap beatmap)
     {
         _beatmap = beatmap;
 
-        Bass.StreamFree(_musicChannel);
-        _musicChannel = Bass.CreateStream(Path.Combine(_beatmap.Folder, _beatmap.AudioFilename));
-        Bass.ChannelSetAttribute(_musicChannel, ChannelAttribute.Volume, _musicVolume);
-
-        _songLength = 1000 *
-                      Bass.ChannelBytes2Seconds(_musicChannel, Bass.ChannelGetLength(_musicChannel));
-
+        _songTrack?.Dispose();
+        _songAudio?.Dispose();
+        
+        
+        _songTrack = AudioManager.Instance.CreateTrack();
+        _songAudio = AudioManager.Instance.LoadAudio(Path.Combine(_beatmap.Folder, _beatmap.AudioFilename));
+        _songTrack.Volume = 0.10f;
+        _songTrack.Audio = _songAudio;
+        _songLength = _songAudio.Length; // Todo: maybe move Length back to Audio
+        _songCursor = 0;
+        
         _startingTimer = WAITINGTIME + _beatmap.AudioLeadIn;
 
         _beatmap.CalculatePrepass(_renderer.Window);
         _player = new Player(_beatmap);
         SDL_ShowCursor();
+        
         _inputOverlayView.SetPlayer(_player);
         _inputOverlayView.Reset();
-        
         ResetObjectsAfter(0);
         
         _sortedObjects = _beatmap.HitObjects
             .OrderByDescending(h => Math.Abs(h.Time - _songCursor));
 
-        _backgroundTexture.Dispose();
+        _backgroundTexture?.Dispose();
         _backgroundTexture = new Texture(Path.Combine(_beatmap.Folder, _beatmap.BackgroundFile));
-        Bass.ChannelPlay(_musicChannel);
+        
         Logger.Instance.Info($"Beatmap set to {beatmap}");
     }
     
     public void Dispose()
     {
         //Bass.Stop();
-        Bass.ChannelStop(_musicChannel);
-        Bass.StreamFree(_musicChannel);
-
-        vertexBuffer.Dispose();
-        indexBuffer.Dispose();
-        vao.Dispose();
-        _backgroundTexture.Dispose();
+        //Bass.ChannelStop(_musicChannel);
+        //Bass.StreamFree(_musicChannel);
         
-        _circleTexture.Dispose();
+        _backgroundTexture?.Dispose();
+        
         Skin.Dispose();
     }
     

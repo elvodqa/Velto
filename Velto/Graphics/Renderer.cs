@@ -66,6 +66,7 @@ public unsafe class Renderer : IDisposable
 
 
     private readonly Texture _whiteTexture;
+    private readonly Texture _circleTexture;
 
     private readonly SDL_Window* _window;
     public uint DrawCallCount = 0;
@@ -89,6 +90,7 @@ public unsafe class Renderer : IDisposable
         GL.PixelStorei(PixelStoreParameter.UnpackAlignment , 1);
         
         _whiteTexture = new Texture(Resources.GetPath("Resources/Textures/white.png"));
+        _circleTexture = new Texture(Resources.GetPath("Resources/Textures/circle.png"));
 
         _fontShader = new Shader("text");
         _fontShader.Use();
@@ -111,7 +113,7 @@ public unsafe class Renderer : IDisposable
 
         // instance buffer
         GL.BindBuffer(BufferTarget.ArrayBuffer, _fontInstanceVbo);
-        GL.BufferData(BufferTarget.ArrayBuffer, 1024*4 * Marshal.SizeOf<FontCall>(), IntPtr.Zero,
+        GL.BufferData(BufferTarget.ArrayBuffer, 1024*8 * Marshal.SizeOf<FontCall>(), IntPtr.Zero,
             BufferUsage.DynamicDraw);
 
         var vec4Size = Vector4.SizeInBytes;
@@ -449,6 +451,12 @@ public unsafe class Renderer : IDisposable
         float rotation = 0)
     {
         DrawTexture(_whiteTexture, x, y, width, height, color, rotation);
+    }
+    
+    public void DrawCircle(float x, float y, float width, float height, Vector4 color,
+        float rotation = 0)
+    {
+        DrawTexture(_circleTexture, x, y, width, height, color, rotation);
     }
 
     // font stuff 

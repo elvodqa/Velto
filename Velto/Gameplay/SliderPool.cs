@@ -12,8 +12,7 @@ public class SliderPool
             public Vector2 UV;
             public float Progress; // 0..1 along slider
         }
-
-
+        
         private uint _capacity;
         private Renderer _renderer;
         private Queue<Slider> _sliderQueue = new();
