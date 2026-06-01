@@ -37,7 +37,7 @@ public class Player
 
     private readonly Beatmap _beatmap;
     private int _lastAutoplayHitIndex = -1;
-    private bool _autoplay = false;
+    private bool _autoplay = true;
 
     public bool ActionPrimaryPressed = false;
     public bool ActionPrimaryDown = false;
@@ -138,7 +138,8 @@ public class Player
             // ---------------------------------------------------------
             // HITCIRCLE / NORMAL OBJECT HIT
             // ---------------------------------------------------------
-            float hitWindow = 80f - 6f * _beatmap.OverallDifficulty; // ms window (adjust to your game)
+            float hitWindow = 80f - 6f * _beatmap.OverallDifficulty; // ms window, this is right before you can get a 300
+          
 
             if (Math.Abs(songCursor - current.Time) <= hitWindow)
             {

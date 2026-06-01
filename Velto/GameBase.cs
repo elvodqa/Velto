@@ -156,12 +156,6 @@ public unsafe class GameBase : IDisposable
                             _gameDisplay = new(_renderer);
                         }
                         break;
-                    case (uint)SDL_EventType.SDL_EVENT_WINDOW_FOCUS_GAINED:
-                        if (!_gameDisplay.Paused) _gameDisplay.Pause();
-                        break;
-                    case (uint)SDL_EventType.SDL_EVENT_WINDOW_FOCUS_LOST:
-                        _gameDisplay.Pause();
-                        break;
                 }
                 Input.UpdateEvents(ev);
             }

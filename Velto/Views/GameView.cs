@@ -60,17 +60,7 @@ public unsafe class GameView : View
     private InputOverlayView _inputOverlayView;
     public Skin Skin;
 
-    public void Pause()
-    { 
-        _isPaused = !_isPaused;
-        if (_isPaused)
-            Bass.ChannelPlay(_musicChannel);
-        else
-            Bass.ChannelPause(_musicChannel);
-    }
-
-    public bool Paused => _isPaused;
-
+    
     public GameView(Renderer renderer)
     {
         _renderer = renderer;
@@ -290,15 +280,16 @@ public unsafe class GameView : View
                     // mouse.X = (mouse.X - playfieldTopLeft.X) / scale;
                     // mouse.Y = (mouse.Y - playfieldTopLeft.Y) / scale;
                     var playerCursor = _player.Cursor;
-                    var radiusPlayfield = osuRadius;
+                    //var radiusPlayfield = osuRadius;
+                    float radiusScreen = osuRadius * scale;
                     var circlePosition = playfieldTopLeft + circle.Position * scale;
-                    if (Vector2.Distance(circlePosition, playerCursor) <= radiusPlayfield)
+                    if (Vector2.Distance(circlePosition, playerCursor) <= radiusScreen)
                         if (_player.ActionPrimaryPressed || _player.ActionSecondaryPressed)
                         {
                             // bkz: https://osu.ppy.sh/wiki/en/Gameplay/Judgement/osu%21
                             //circle.Color = Vector4.Zero;
                             hitObject.HitTime = _songCursor;
-                            var difference = Math.Abs(_songCursor - hitObject.HitTime);
+                            var difference = Math.Abs(_songCursor - hitObject.Time);
                             if (difference <= 80 - 6 * _beatmap.OverallDifficulty) // 300
                             {
                                 hitObject.HitResult = HitResult.Good;
@@ -344,15 +335,34 @@ public unsafe class GameView : View
         // Slider points are in osu! playfield coordinates, so cache/build using osu-radius (unscaled).
         _sliderPool.Update(_songCursor, osuRadius);
         
-        if (lastCursorPosition != Vector2.Zero && Vector2.Distance(_player.Cursor, lastCursorPosition) > 5)
-            trails.Enqueue(new TrailInfo
+        // if (lastCursorPosition != Vector2.Zero && Vector2.Distance(_player.Cursor, lastCursorPosition) > 8)
+        //     trails.Enqueue(new TrailInfo
+        //     {
+        //         Position = lastCursorPosition,
+        //         Life = 50
+        //     });
+        float distance = Vector2.Distance(_player.Cursor, lastCursorPosition);
+        if (lastCursorPosition != Vector2.Zero && distance > 8)
+        {
+            int steps = (int)(distance / 6f);
+            for (int i = 1; i <= steps; i++)
             {
-                Position = lastCursorPosition,
-                Life = 50
-            });
+                float t = i / (float)steps;
+                Vector2 interpolated = Vector2.Lerp(lastCursorPosition, _player.Cursor, t);
+            
+                trails.Enqueue(new TrailInfo 
+                { 
+                    Position = interpolated, 
+                    Life = 45 + (steps - i) * 2   // newer points live longer
+                });
+            }
+        }
+           
 
-        if (trails.Count > 48*2)
+        while (trails.Count > 120)
             trails.Dequeue();
+        
+        
 
         foreach (var particle in _hitResultParticles.ToList())
         {
@@ -832,6 +842,7 @@ public unsafe class GameView : View
 
         _beatmap.CalculatePrepass(_renderer.Window);
         _player = new Player(_beatmap);
+        SDL_ShowCursor();
         _inputOverlayView.SetPlayer(_player);
         _inputOverlayView.Reset();
         

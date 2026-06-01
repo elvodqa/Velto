@@ -1,4 +1,5 @@
 using System.IO;
+using System.Runtime.InteropServices;
 
 namespace Velto.Core;
 
@@ -9,6 +10,13 @@ public class Resources
 {
     public static string GetPath(string filename)
     {
+        // if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        // {
+        //     string baseDir = AppContext.BaseDirectory;
+        //
+        //     return Path.GetFullPath(Path.Combine(baseDir, "..", /*"Resources",*/ filename));
+        // }
+        
         return Path.Combine(SDL_GetBasePath(), filename);
         //return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), filename);
     }
