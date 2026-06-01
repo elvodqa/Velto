@@ -367,12 +367,14 @@ public unsafe class Renderer : IDisposable
                 -1f,
                 1f);
 
+        // Correct 2D composition order (prevents skew/"wrong axis" look on non-square sprites):
+        // center (unit quad) -> scale (local space) -> rotate (around center) -> translate (to sprite center).
+        // Keeps rotation=0 behavior identical: [0..1] quad maps to [x..x+width, y..y+height].
         var model =
             Matrix4.CreateTranslation(-0.5f, -0.5f, 0f) *
-            Matrix4.CreateRotationZ(MathHelper.DegreesToRadians(rotation)) *
-            Matrix4.CreateTranslation(0.5f, 0.5f, 0f) *
             Matrix4.CreateScale(width, height, 1f) *
-            Matrix4.CreateTranslation(x, y, 0f);
+            Matrix4.CreateRotationZ(MathHelper.DegreesToRadians(-rotation)) *
+            Matrix4.CreateTranslation(x + width / 2f, y + height / 2f, 0f);
 
         GL.ActiveTexture(TextureUnit.Texture0);
         GL.BindTexture(TextureTarget.Texture2D, texture);
@@ -415,12 +417,14 @@ public unsafe class Renderer : IDisposable
                 -1f,
                 1f);
 
+        // Correct 2D composition order (prevents skew/"wrong axis" look on non-square sprites):
+        // center (unit quad) -> scale (local space) -> rotate (around center) -> translate (to sprite center).
+        // Keeps rotation=0 behavior identical: [0..1] quad maps to [x..x+width, y..y+height].
         var model =
             Matrix4.CreateTranslation(-0.5f, -0.5f, 0f) *
-            Matrix4.CreateRotationZ(MathHelper.DegreesToRadians(rotation)) *
-            Matrix4.CreateTranslation(0.5f, 0.5f, 0f) *
             Matrix4.CreateScale(width, height, 1f) *
-            Matrix4.CreateTranslation(x, y, 0f);
+            Matrix4.CreateRotationZ(MathHelper.DegreesToRadians(-rotation)) *
+            Matrix4.CreateTranslation(x + width / 2f, y + height / 2f, 0f);
 
         texture.Bind();
 

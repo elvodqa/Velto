@@ -104,7 +104,7 @@ public unsafe class GameView : View
         _inputOverlayView = new(_renderer, this, _msdfFont);
         _inputOverlayView.SetPlayer(_player);
 
-        Skin = new Skin(Resources.GetPath("Resources/Textures/default"));
+        Skin = new Skin(Resources.GetPath("Resources/Textures/rafis"));
     }
 
     float playfieldWidth, playfieldHeight;
@@ -586,7 +586,7 @@ public unsafe class GameView : View
                     var prevPos = slider.Points[slider.Points.Count - 2];
 
                     Vector2 direction = position - prevPos;
-                    var rotation = Math.Atan2(direction.Y, direction.X) * MathHelper.RadToDeg - 180f;
+                    var rotation = Math.Atan2(direction.Y, direction.X) * -MathHelper.RadToDeg + 180;
                     
                     _renderer.DrawTexture(Skin.ReverseArrow,
                         scaledX - _drawSize / 2,
