@@ -4,8 +4,20 @@ using OpenTK.Graphics.OpenGL;
 
 public unsafe class Framebuffer : IDisposable
 {
-    public int Width { get; set; }
-    public int Height { get; set; }
+    public int Width
+    {
+        get
+        {
+            return _width;
+        }
+        private set => _width = value;
+    }
+
+    public int Height
+    {
+        get => _height;
+        private set => _height = value;
+    }
     public int Handle { get; private set; }
     public int Texture { get; private set; }
     
@@ -40,7 +52,7 @@ public unsafe class Framebuffer : IDisposable
 
         Texture = GL.GenTexture();
         GL.BindTexture(TextureTarget.Texture2D, Texture);
-        GL.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba, _width, _height, 0,
+        GL.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8, _width, _height, 0,
             PixelFormat.Rgba, PixelType.UnsignedByte, null);
 
         // Must use OpenGL enums here (NOT Velto.Graphics.FilterMode). Otherwise the texture stays incomplete and samples black.
