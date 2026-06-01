@@ -33,7 +33,7 @@ public unsafe class GameView : View
     private int _objectComboNumber = 1;
 
     private readonly Renderer _renderer;
-    private readonly string _skinName = "rafis";
+    private string _skinName = "rafis";
     
     private double _songCursor;
     private double _songLength;
@@ -60,6 +60,17 @@ public unsafe class GameView : View
     private InputOverlayView _inputOverlayView;
     public Skin Skin;
 
+    public void Pause()
+    { 
+        _isPaused = !_isPaused;
+        if (_isPaused)
+            Bass.ChannelPlay(_musicChannel);
+        else
+            Bass.ChannelPause(_musicChannel);
+    }
+
+    public bool Paused => _isPaused;
+
     public GameView(Renderer renderer)
     {
         _renderer = renderer;
@@ -83,7 +94,7 @@ public unsafe class GameView : View
         
         Bass.Init();
         
-        _hitSound = Bass.SampleLoad($"Resources/Textures/{_skinName}/normal-hitnormal.ogg", 0, 0, 16, BassFlags.Default);
+        _hitSound = Bass.SampleLoad($"Resources/Textures/{_skinName}/normal-hitnormal.ogg", 0, 0, 32, BassFlags.Default);
         
         //Console.WriteLine(_beatmap.AudioFilename);
         _musicChannel = Bass.CreateStream(Path.Combine(_beatmap.Folder, _beatmap.AudioFilename));
@@ -104,7 +115,7 @@ public unsafe class GameView : View
         _inputOverlayView = new(_renderer, this, _msdfFont);
         _inputOverlayView.SetPlayer(_player);
 
-        Skin = new Skin(Resources.GetPath("Resources/Textures/default"));
+        Skin = new Skin(Resources.GetPath($"Resources/Textures/{_skinName}"));
     }
 
     float playfieldWidth, playfieldHeight;
@@ -241,6 +252,14 @@ public unsafe class GameView : View
             {
                 _settingsView.Toggle();
             }
+            
+            if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_S))
+            {
+                Skin.Dispose();
+                if (_skinName == "rafis") _skinName = "default";
+                else _skinName = "rafis";
+                Skin = new Skin(Resources.GetPath($"Resources/Textures/{_skinName}"));
+            }
         }
             
         if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_TAB))
@@ -277,7 +296,6 @@ public unsafe class GameView : View
                         if (_player.ActionPrimaryPressed || _player.ActionSecondaryPressed)
                         {
                             // bkz: https://osu.ppy.sh/wiki/en/Gameplay/Judgement/osu%21
-                            //Bass.ChannelPlay(Bass.SampleGetChannel(_hitSound));
                             //circle.Color = Vector4.Zero;
                             hitObject.HitTime = _songCursor;
                             var difference = Math.Abs(_songCursor - hitObject.HitTime);
@@ -299,6 +317,9 @@ public unsafe class GameView : View
                             }
                             circle.HitTime = _songCursor;
                             AddResultParticle(hitObject.Position, hitObject.HitResult, hitObject.HitTime, 150, 400);
+                            var sampleChannel = Bass.SampleGetChannel(_hitSound);
+                            Bass.ChannelSetAttribute(sampleChannel, ChannelAttribute.Volume, _musicVolume);
+                            Bass.ChannelPlay(sampleChannel);
                         }
                     
                     // Noteblock
@@ -704,7 +725,7 @@ public unsafe class GameView : View
                 HitResult.Miss => Skin.Hit0,
                 _ => throw new ArgumentOutOfRangeException()
             };
-
+            
             
             var drawSize = (float)(objectCircleSize + objectCircleSize * (1 - fadeout) * 0.2);
             var w = drawSize;

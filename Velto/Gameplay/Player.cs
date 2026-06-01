@@ -24,10 +24,20 @@ public class Player
         }
     }
 
-    public bool Autoplay { get; set; } = true;
+    public bool Autoplay
+    {
+        get { return _autoplay; }
+        set { 
+            _lastAutoplayHitIndex = -1;
+            _primaryLastPressed = false;
+            _autoplay = value;
+
+        }
+    }
 
     private readonly Beatmap _beatmap;
     private int _lastAutoplayHitIndex = -1;
+    private bool _autoplay = false;
 
     public bool ActionPrimaryPressed = false;
     public bool ActionPrimaryDown = false;
@@ -55,15 +65,17 @@ public class Player
         ActionPrimaryPressed = false;
         ActionSecondaryPressed = false;
         ActionSecondaryDown = false;
-
-        if (!Autoplay)
+        //Console.WriteLine($"Z JustPressed: {Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_Z)}");
+        if (!_autoplay)
         {
-            _cursor = new Vector2(Input.MouseX, Input.MouseY);
-
-            if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_Z)) ActionPrimaryPressed = true;
-            if (Input.IsKeyDown(SDL_Scancode.SDL_SCANCODE_Z)) ActionPrimaryDown = true;
-            if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_X)) ActionSecondaryPressed = true;
-            if (Input.IsKeyDown(SDL_Scancode.SDL_SCANCODE_X)) ActionSecondaryDown = true;
+            if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_Z)) 
+                ActionPrimaryPressed = true;
+            if (Input.IsKeyDown(SDL_Scancode.SDL_SCANCODE_Z)) 
+                ActionPrimaryDown = true;
+            if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_X)) 
+                ActionSecondaryPressed = true;
+            if (Input.IsKeyDown(SDL_Scancode.SDL_SCANCODE_X)) 
+                ActionSecondaryDown = true;
         }
         else
         {
@@ -126,7 +138,7 @@ public class Player
             // ---------------------------------------------------------
             // HITCIRCLE / NORMAL OBJECT HIT
             // ---------------------------------------------------------
-            float hitWindow = 50f; // ms window (adjust to your game)
+            float hitWindow = 80f - 6f * _beatmap.OverallDifficulty; // ms window (adjust to your game)
 
             if (Math.Abs(songCursor - current.Time) <= hitWindow)
             {

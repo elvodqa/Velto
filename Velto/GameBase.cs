@@ -156,6 +156,12 @@ public unsafe class GameBase : IDisposable
                             _gameDisplay = new(_renderer);
                         }
                         break;
+                    case (uint)SDL_EventType.SDL_EVENT_WINDOW_FOCUS_GAINED:
+                        if (!_gameDisplay.Paused) _gameDisplay.Pause();
+                        break;
+                    case (uint)SDL_EventType.SDL_EVENT_WINDOW_FOCUS_LOST:
+                        _gameDisplay.Pause();
+                        break;
                 }
                 Input.UpdateEvents(ev);
             }
@@ -170,14 +176,15 @@ public unsafe class GameBase : IDisposable
 
     private void Loop(double deltaTime)
     {
+        Input.GetKeyboardState();
+        Input.UpdateMouse(_window);
+        
         _renderer.BeginFrame();
 
         _gameDisplay.Width = (int)_renderer.WindowSizeInPixels.X;
         _gameDisplay.Height = (int)_renderer.WindowSizeInPixels.Y;
         
-        Input.GetKeyboardState();
-        Input.UpdateMouse(_window);
-            
+       
         _gameDisplay.Update(deltaTime);
         _gameDisplay.Draw(deltaTime);
         //_renderer.Line();
