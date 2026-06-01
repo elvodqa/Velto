@@ -463,6 +463,7 @@ public unsafe class Renderer : IDisposable
     public void DrawText(MSDFFont font, string text, Vector2 position, float scale,
         Vector4 color)
     {
+        scale /= 1.3f; // remove this later
         var x = position.X;
         var baseline = position.Y + font.Ascender * font.EmSize * scale;
         uint prev = 0;

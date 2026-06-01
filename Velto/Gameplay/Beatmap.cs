@@ -309,10 +309,10 @@ public unsafe class Beatmap
             //if (comboCounter >= 9) comboCounter = 9;
             var color = colorCounter switch
             {
-                0 => new Vector4(1, 0, 0, 1),
-                1 => new Vector4(0, 1, 0, 1),
-                2 => new Vector4(0, 0, 1, 1),
-                3 => new Vector4(1, 1, 0, 1)
+                0 => new Vector4(1, 192f/255, 0, 1),
+                1 => new Vector4(0, 202/255f, 0, 1),
+                2 => new Vector4(18/255f, 124/255f, 1, 1),
+                3 => new Vector4(242/255f, 24/255f, 57/255f, 1)
             };
 
             hitobject.Color = color;

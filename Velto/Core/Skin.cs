@@ -34,6 +34,12 @@ public class Skin : IDisposable
     public Texture Hit100 { get; private set; }
     public Texture Hit50 { get; private set; }
     public Texture Hit0 { get; private set; }
+    public Texture ScorebarBg { get; private set; }
+    public Texture ScorebarColour { get; private set; }
+    
+    
+    public List<Vector4> Colors { get; private set; }
+    
     
     public Skin(string folderPath)
     {
@@ -63,6 +69,8 @@ public class Skin : IDisposable
         Hit100 = GetElementTexture("hit100", "hit100");
         Hit50 = GetElementTexture("hit50", "hit50");
         Hit0 = GetElementTexture("Hit0", "Hit0");
+        ScorebarBg = GetElementTexture("scorebar-bg", "scorebar-bg");
+        ScorebarColour = GetElementTexture("scorebar-colour", "scorebar-colour");
         
         
         
@@ -89,6 +97,17 @@ public class Skin : IDisposable
         {
             SliderBalls.Add(GetElementTexture("sliderb", "sliderb-nd"));
         }
+    }
+
+    private Vector4 ParseColor(string str)
+    {
+        var split = str.Trim().Split(",");
+        return new(
+            int.Parse(split[0]) / 255f,
+            int.Parse(split[1]) / 255f,
+            int.Parse(split[2]) / 255f,
+            1
+        );
     }
 
     private bool ElementExists(string element)

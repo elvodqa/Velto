@@ -53,6 +53,18 @@ public unsafe class Track : IDisposable
         SDL_DestroyProperties(props);
     }
 
+    public float Speed
+    {
+        get
+        {
+            return MIX_GetTrackFrequencyRatio(Handle);
+        }
+        set
+        {
+            MIX_SetTrackFrequencyRatio(Handle, value);
+        }
+    }
+
     public bool Paused => MIX_TrackPaused(Handle);
     public bool Playing => MIX_TrackPlaying(Handle);
 

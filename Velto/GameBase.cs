@@ -47,6 +47,8 @@ public unsafe class GameBase : IDisposable
 
     public GameBase()
     {
+        
+        SDL_SetHint(SDL_HINT_AUDIO_DEVICE_SAMPLE_FRAMES, "128");
         if (!SDL_Init(SDL_InitFlags.SDL_INIT_VIDEO | SDL_InitFlags.SDL_INIT_AUDIO))
         {
             throw new Exception(SDL_GetError());
@@ -194,7 +196,7 @@ public unsafe class GameBase : IDisposable
         _gameDisplay.Update(deltaTime);
         _gameDisplay.Draw(deltaTime);
         //_renderer.Line();
-        _renderer.DrawText(_debugFont, $"FPS: {_fps.ToString("0000.0")} [{deltaTime.ToString("00.00")}ms] | DrawCallCount: {_renderer.DrawCallCount:000000}", new (5, 5), 0.6f, new Vector4(1, 1, 1, 1));
+        _renderer.DrawText(_debugFont, $"FPS: {_fps.ToString("0000.0")} [{deltaTime.ToString("00.00")}ms] | DrawCallCount: {_renderer.DrawCallCount:000000}", new (5, 500), 0.6f, new Vector4(1, 1, 1, 1));
         _renderer.FlushText(_debugFont);
     }
     
