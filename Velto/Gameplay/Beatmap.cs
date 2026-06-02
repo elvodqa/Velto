@@ -293,7 +293,7 @@ public unsafe class Beatmap
             else
                 preempt = 1200 - 150 * (ApproachRate - 5);
             
-            float posttime = 150;
+            float posttime = 250;
 
             Preempt = preempt;
             Posttime = posttime;

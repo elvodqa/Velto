@@ -57,9 +57,7 @@ public unsafe class GameBase : IDisposable
         {
             throw new Exception(SDL_GetError());
         }
-
     }
-
 
     public void Initialize()
     {
@@ -163,11 +161,11 @@ public unsafe class GameBase : IDisposable
                         Logger.Instance.Info($"Window Resized: {ev.window.data1} x {ev.window.data2}");
                         break;
                     case (uint)SDL_EventType.SDL_EVENT_KEY_DOWN:
-                        if (ev.key.key == SDL_Keycode.SDLK_F1)
-                        {
-                            _gameDisplay.Dispose();
-                            _gameDisplay = new(_renderer);
-                        }
+                        // if (ev.key.key == SDL_Keycode.SDLK_F1)
+                        // {
+                        //     _gameDisplay.Dispose();
+                        //     _gameDisplay = new(_renderer);
+                        // }
                         break;
                 }
                 Input.UpdateEvents(ev);
@@ -188,7 +186,7 @@ public unsafe class GameBase : IDisposable
         Input.UpdateMouse(_window);
         
         _renderer.BeginFrame();
-
+        
         _gameDisplay.Width = (int)_renderer.WindowSizeInPixels.X;
         _gameDisplay.Height = (int)_renderer.WindowSizeInPixels.Y;
         

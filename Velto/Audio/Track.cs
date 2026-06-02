@@ -64,7 +64,7 @@ public unsafe class Track : IDisposable
             MIX_SetTrackFrequencyRatio(Handle, value);
         }
     }
-
+    
     public bool Paused => MIX_TrackPaused(Handle);
     public bool Playing => MIX_TrackPlaying(Handle);
 

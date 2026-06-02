@@ -12,6 +12,13 @@ using static SDL3;
 
 public unsafe class Renderer : IDisposable
 {
+    [StructLayout(LayoutKind.Sequential)]
+    public struct PrimitiveCall
+    {
+        public Matrix4 Model;
+        public Vector4 Color;
+    }
+    
     private readonly float[] fontQuadVertices =
     {
         1f, 0f, 0f, 1f, 0f,
@@ -28,7 +35,7 @@ public unsafe class Renderer : IDisposable
     private readonly int _fontQuadVbo;
     private readonly Shader _fontShader;
     private readonly int _fontVao;
-
+    
     private Framebuffer? _framebuffer;
     private Stack<Framebuffer> _framebufferStack = new();
 
@@ -40,16 +47,11 @@ public unsafe class Renderer : IDisposable
 
     private readonly BufferObject<uint> _quadIndexBuffer;
     private readonly BufferObject<float> _quadVertexBuffer;
-
+    
     private readonly Shader _spriteShader;
     private readonly VertexArrayObject<float, uint> _spriteVao;
-
-    private Shader _lineShader;
-    private VertexArrayObject<float> _lineVao;
-    private BufferObject<float> _lineVbo;
-
-    private Shader _sliderShader;
-
+    
+    
     private readonly float[] _vertices =
     [
         // position         // uv
@@ -154,23 +156,8 @@ public unsafe class Renderer : IDisposable
         GL.VertexAttribDivisor(9, 1);
 
         GL.BindVertexArray(0);
-        
-        _sliderShader = new Shader("slider");
-
-        _lineShader = new("line");
-
-        _lineVbo = new(lineVertices, BufferTarget.ArrayBuffer, BufferUsage.StaticDraw);
-        _lineVao = new(_lineVbo);
-        _lineVao.VertexAttributePointer(0, 2, VertexAttribPointerType.Float, sizeof(float)*2, 0);
     }
-
-    public void Line()
-    {
-        _lineShader.Use();
-        _lineVao.Bind();
-        GL.DrawArrays(PrimitiveType.Lines, 0, 2);
-    }
-
+    
     public Vector2 WindowSizeInPixels
     {
         get
@@ -265,62 +252,6 @@ public unsafe class Renderer : IDisposable
         GL.Clear(ClearBufferMask.ColorBufferBit /*| ClearBufferMask.DepthBufferBit*/);
         //GL.LineWidth(50);
         //GL.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Line);
-    }
-
-    public void DrawSlider(Slider slider, float x, float y, float scale, float osuRadius, float fadein, float fadeout)
-    {
-        DrawCallCount++;
-        var framebuffer = slider.SliderFramebuffer;
-        if (framebuffer == null)
-            return;
-
-        // Render into the offscreen texture in its own local coordinate system.
-        BindFramebuffer(framebuffer);
-
-        GL.Disable(EnableCap.DepthTest);
-        GL.Enable(EnableCap.Blend);
-        GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
-        GL.ClearColor(0, 0, 0, 0);
-        GL.Clear(ClearBufferMask.ColorBufferBit);
-
-        var projection =
-            Matrix4.CreateOrthographicOffCenter(
-                0,
-                framebuffer.Width,
-                framebuffer.Height,
-                0,
-                -1f,
-                1f);
-
-        // Slider mesh vertices are in osu-playfield coordinates; shift them so CacheOffset becomes (0,0) in the FBO.
-        var model = Matrix4.CreateTranslation(-slider.CacheOffset.X, -slider.CacheOffset.Y, 0f);
-
-        _sliderShader.Use();
-
-        _sliderShader.SetMatrix4("uProjection", projection);
-        _sliderShader.SetMatrix4("uView", Matrix4.Identity);
-        _sliderShader.SetMatrix4("uModel", model);
-
-        _sliderShader.SetVector4("uColor", slider.Color);
-
-        // Approximate end-cap size in normalized slider length units.
-        float totalLen = 0f;
-        for (int i = 1; i < slider.Points.Count; i++)
-            totalLen += Vector2.Distance(slider.Points[i - 1], slider.Points[i]);
-        float cap = totalLen > 0.001f ? (osuRadius / totalLen) : 0f;
-
-        _sliderShader.SetFloat("uCap", cap);
-        _sliderShader.SetFloat("uFadeIn", fadein);
-        _sliderShader.SetFloat("uFadeOut", fadeout);
-
-        slider.Vao.Bind();
-        GL.DrawElements(PrimitiveType.Triangles, slider.IndexCount, DrawElementsType.UnsignedInt, 0);
-
-        UnbindFramebuffer(framebuffer);
-
-        // Draw cached texture to screen. (x,y) is expected to be the top-left screen position.
-        DrawTexture(framebuffer.Texture,
-            x, y, framebuffer.Width * scale, framebuffer.Height * scale, new Vector4(1, 1, 1, 1));
     }
     
     public void DrawCenteredRect(Vector2 center, float w, float h, Vector4 color, float rotation = 0)
@@ -446,7 +377,7 @@ public unsafe class Renderer : IDisposable
             IntPtr.Zero);
         
     }
-
+    
     public void DrawRectangle(float x, float y, float width, float height, Vector4 color,
         float rotation = 0)
     {
@@ -597,6 +528,5 @@ public unsafe class Renderer : IDisposable
         _whiteTexture.Dispose();
         _spriteShader.Dispose();
         _fontShader.Dispose();
-        _sliderShader.Dispose();
     }
 }

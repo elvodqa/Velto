@@ -27,11 +27,11 @@ public class Player
     public bool Autoplay
     {
         get { return _autoplay; }
-        set { 
+        set
+        {
             _lastAutoplayHitIndex = -1;
             _primaryLastPressed = false;
             _autoplay = value;
-
         }
     }
 
@@ -48,9 +48,9 @@ public class Player
     private Vector2 _cursor = new Vector2();
     private Vector2 _playfieldOffset = new();
     private float _scale = 0;
-    
+
     public bool Dance { get; set; } = false;
-    
+
 
     public Player(Beatmap beatmap)
     {
@@ -64,11 +64,12 @@ public class Player
     {
         _playfieldOffset = playfieldOffset;
         _scale = scale;
+
         ActionPrimaryDown = false;
         ActionPrimaryPressed = false;
         ActionSecondaryPressed = false;
         ActionSecondaryDown = false;
-        //Console.WriteLine($"Z JustPressed: {Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_Z)}");
+
         if (!_autoplay)
         {
             if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_Z)) 
@@ -79,129 +80,112 @@ public class Player
                 ActionSecondaryPressed = true;
             if (Input.IsKeyDown(SDL_Scancode.SDL_SCANCODE_X)) 
                 ActionSecondaryDown = true;
+            return;
+        }
+
+        var objects = _beatmap.HitObjects;
+        if (objects.Count == 0) return;
+
+        // Find the object we should be interacting with
+        int currentIndex = -1;
+        HitObject current = null;
+
+        for (int i = 0; i < objects.Count; i++)
+        {
+            var obj = objects[i];
+
+            if (obj is Slider slider)
+            {
+                if (songCursor >= slider.Time && songCursor <= slider.Time + slider.Duration)
+                {
+                    currentIndex = i;
+                    current = obj;
+                    break;
+                }
+            }
+
+            if (songCursor < obj.Time)
+            {
+                currentIndex = i;
+                current = obj;
+                break;
+            }
+        }
+
+        if (currentIndex == -1)
+        {
+            _cursor = objects[^1].Position;
+            return;
+        }
+
+        // ====================== SLIDER ======================
+        if (current is Slider activeSlider &&
+            songCursor >= activeSlider.Time &&
+            songCursor <= activeSlider.Time + activeSlider.Duration)
+        {
+            _cursor = activeSlider.GetPositionAt(songCursor);
+            ActionPrimaryDown = true;
+
+            if (_lastAutoplayHitIndex != currentIndex)
+            {
+                Alternate();
+                _lastAutoplayHitIndex = currentIndex;
+            }
+
+            return;
+        }
+
+        // ====================== HIT CIRCLE / NEXT OBJECT ======================
+        double timeToHit = current.Time - songCursor;
+
+        // Move towards target
+        _cursor = GetPositionAtTime(songCursor, currentIndex);
+
+        // Hit timing - more reliable
+        double HIT_WINDOW = 80.0 - 6.0 * _beatmap.OverallDifficulty;
+
+        if (timeToHit <= HIT_WINDOW && timeToHit >= -20.0) // allow slight late hit
+        {
+            if (_lastAutoplayHitIndex != currentIndex)
+            {
+                Alternate();
+                _lastAutoplayHitIndex = currentIndex;
+            }
+        }
+    }
+
+    private Vector2 GetPositionAtTime(double songCursor, int targetIndex)
+    {
+        var objects = _beatmap.HitObjects;
+        if (targetIndex == 0)
+            return objects[0].Position;
+
+        var current = objects[targetIndex];
+        var previous = objects[targetIndex - 1];
+
+        Vector2 startPos;
+        double startTime;
+
+        if (previous is Slider prevSlider)
+        {
+            startTime = prevSlider.Time + prevSlider.Duration;
+            startPos = prevSlider.GetPositionAt(startTime);
         }
         else
         {
-            var objects = _beatmap.HitObjects;
-
-            if (objects.Count == 0)
-                return;
-
-            // Find current object
-            int currentIndex = -1;
-
-            for (int i = 0; i < objects.Count; i++)
-            {
-                if (songCursor < objects[i].Time)
-                {
-                    currentIndex = i;
-                    break;
-                }
-
-                if (objects[i] is Slider slider)
-                {
-                    if (songCursor >= slider.Time &&
-                        songCursor <= slider.Time + slider.Duration)
-                    {
-                        currentIndex = i;
-                        break;
-                    }
-                }
-            }
-
-            if (currentIndex == -1)
-            {
-                _cursor = objects[^1].Position;
-                return;
-            }
-
-            var current = objects[currentIndex];
-
-            // ---------------------------------------------------------
-            // SLIDER HANDLING (follow + hold input)
-            // ---------------------------------------------------------
-            if (current is Slider activeSlider &&
-                songCursor >= activeSlider.Time &&
-                songCursor <= activeSlider.Time + activeSlider.Duration)
-            {
-                _cursor = activeSlider.GetPositionAt(songCursor);
-
-                ActionPrimaryDown = true;
-
-                // Only "press" once when entering slider
-                if (_lastAutoplayHitIndex != currentIndex)
-                {
-                    Alternate();
-                    _lastAutoplayHitIndex = currentIndex;
-                }
-
-                return;
-            }
-
-            // ---------------------------------------------------------
-            // HITCIRCLE / NORMAL OBJECT HIT
-            // ---------------------------------------------------------
-            float hitWindow = 80f - 6f * _beatmap.OverallDifficulty; // ms window, this is right before you can get a 300
-          
-
-            if (Math.Abs(songCursor - current.Time) <= hitWindow)
-            {
-                _cursor = current.Position;
-
-                if (_lastAutoplayHitIndex != currentIndex)
-                {
-                    Alternate();
-                    _lastAutoplayHitIndex = currentIndex;
-                }
-
-                return;
-            }
-
-            // ---------------------------------------------------------
-            // MOVEMENT (between objects)
-            // ---------------------------------------------------------
-            if (currentIndex == 0)
-            {
-                _cursor = current.Position;
-                return;
-            }
-
-            var previous = objects[currentIndex - 1];
-
-            Vector2 startPos;
-            double startTime;
-
-            if (previous is Slider previousSlider)
-            {
-                startTime = previousSlider.Time + previousSlider.Duration;
-                startPos = previousSlider.GetPositionAt(startTime);
-            }
-            else
-            {
-                startPos = previous.Position;
-                startTime = previous.Time;
-            }
-
-            Vector2 endPos = current.Position;
-            double endTime = current.Time;
-
-            double duration = endTime - startTime;
-
-            if (duration <= 0)
-            {
-                _cursor = endPos;
-                return;
-            }
-
-            float t = (float)((songCursor - startTime) / duration);
-            t = Math.Clamp(t, 0f, 1f);
-
-            t = t * t * (3f - 2f * t);
-
-            // startPos = playfieldOffset + startPos * scale;
-            // endPos = playfieldOffset + endPos * scale;
-            _cursor = Vector2.Lerp(startPos, endPos, t);
+            startTime = previous.Time;
+            startPos = previous.Position;
         }
+
+        double duration = current.Time - startTime;
+        if (duration <= 0)
+            return current.Position;
+
+        float t = (float)((songCursor - startTime) / duration);
+        t = Math.Clamp(t, 0f, 1f);
+        t = t * t * (3f - 2f * t); // smoothstep
+
+        return Vector2.Lerp(startPos, current.Position, t);
     }
 
     private void Alternate()
