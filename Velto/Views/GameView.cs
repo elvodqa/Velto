@@ -35,6 +35,7 @@ public unsafe class GameView : View
     private string _skinName = "rafis";
 
     private double _songCursor;
+    private double _lastSongCursor;
     private double _songLength;
     private IOrderedEnumerable<HitObject> _sortedObjects;
 
@@ -115,6 +116,8 @@ public unsafe class GameView : View
 
     public override void Update(double delta)
     {
+        var previousSongCursor = _lastSongCursor;
+        _lastSongCursor = _songCursor;
         
         if (_prevWidth != Width || _prevHeight != Height)
         {
@@ -340,7 +343,7 @@ public unsafe class GameView : View
         // you can click for too early for a miss
 
         // Update player just before doing judgement
-        _player.Update(delta, _songCursor, playfieldTopLeft, scale);
+        _player.Update(delta, _songCursor, previousSongCursor, playfieldTopLeft, scale);
         _inputOverlayView.Update(delta);
         // Handle objects bkz: https://osu.ppy.sh/wiki/en/Gameplay/Judgement/osu%21 
         foreach (var hitObject in _beatmap.HitObjects)
@@ -428,21 +431,23 @@ public unsafe class GameView : View
                     {
                         slider.WasFollowedAtEnd = slider.IsCurrentlyBeingFollowed;
                     }
+
+                    var sliderCompletion = 0;
                     
-                    if (slider.WasFollowedAtEnd)
-                    {
-                        _comboCount++;
-                        var score = 300 * (1 + (Math.Max(_comboCount - 1, 0) * _difficultyMultiplier * _modMultiplier / 25));
-                        _totalScore += score;
-                        AddResultParticle(slider.GetPositionAt(slider.Time + slider.Duration), HitResult.Good, _songCursor);
-                        AudioManager.Instance.PlaySample(Skin.Normal.HitNormal);
-                    }
-                    else
-                    {
-                        _comboCount = 0;
-                        AddResultParticle(slider.GetPositionAt(slider.Time + slider.Duration), HitResult.Miss, _songCursor);
-                        AudioManager.Instance.PlaySample(Skin.ComboBreak);
-                    }
+                    // if (slider.WasFollowedAtEnd)
+                    // {
+                    //     _comboCount++;
+                    //     var score = 300 * (1 + (Math.Max(_comboCount - 1, 0) * _difficultyMultiplier * _modMultiplier / 25));
+                    //     _totalScore += score;
+                    //     AddResultParticle(slider.GetPositionAt(slider.Time + slider.Duration), HitResult.Good, _songCursor);
+                    //     AudioManager.Instance.PlaySample(Skin.Normal.HitNormal);
+                    // }
+                    // else
+                    // {
+                    //     _comboCount = 0;
+                    //     AddResultParticle(slider.GetPositionAt(slider.Time + slider.Duration), HitResult.Miss, _songCursor);
+                    //     AudioManager.Instance.PlaySample(Skin.ComboBreak);
+                    // }
 
                     slider.JudgementDone = true;
                 }
@@ -512,24 +517,47 @@ public unsafe class GameView : View
                 }
                 
                 
+                
                 var followCirclePos = slider.GetPositionAt(_songCursor);
                 var ballPosition = playfieldTopLeft + followCirclePos * scale;
                 var radiusFollowCircle = (_baseCircleSize * 2.5f) / 2f;
 
                 bool sliderActive = _songCursor >= slider.Time && _songCursor <= slider.Time + slider.Duration;
-
-                bool isInFollowRange = sliderActive &&
+                bool isInFollowRange = sliderActive && 
                                        Vector2.Distance(ballPosition, playerCursor) <= radiusFollowCircle;
-
                 bool isHolding = _player.ActionPrimaryDown || _player.ActionSecondaryDown;
-                
+
+                bool isFollowingNow = sliderActive && isInFollowRange && isHolding;
+
                 if (sliderActive)
                 {
-                    slider.IsCurrentlyBeingFollowed = isInFollowRange && isHolding;
-                    if (slider.IsCurrentlyBeingFollowed)
+                    slider.IsCurrentlyBeingFollowed = isFollowingNow;
+
+                    if (isFollowingNow)
                     {
+                        // Accumulate follow time
+                        double deltaFollow = _songCursor - Math.Max(slider.LastFollowUpdate, slider.Time);
+                        slider.TotalFollowTime += deltaFollow;
+
+                        // Continuous follow tracking
+                        if (slider.WasFollowingPreviousFrame)
+                        {
+                            slider.CurrentContinuousFollow += deltaFollow;
+                        }
+                        else
+                        {
+                            // Just started following again
+                            slider.CurrentContinuousFollow = deltaFollow;
+                        }
+
+                        if (slider.CurrentContinuousFollow > slider.LongestContinuousFollow)
+                            slider.LongestContinuousFollow = slider.CurrentContinuousFollow;
+
                         slider.LastHeld = _songCursor;
+                        slider.LastFollowUpdate = _songCursor;
                     }
+
+                    slider.WasFollowingPreviousFrame = isFollowingNow;
                 }
                 
                 // Optional: play tick sounds while following
@@ -597,6 +625,11 @@ public unsafe class GameView : View
                 {
                     s.WasFollowedAtEnd = false;
                     s.IsCurrentlyBeingFollowed = false;
+                    s.TotalFollowTime = 0.0;
+                    s.LastFollowUpdate = 0.0;
+                    s.CurrentContinuousFollow = 0.0;
+                    s.LongestContinuousFollow = 0.0;
+                    s.WasFollowingPreviousFrame = false;
                 }
             }
         }

@@ -30,13 +30,17 @@ public class Slider : HitObject
     public bool Sliding = false;
     public int BallTarget = 0;
     public bool JudgementDone = false;
+    public double TotalFollowTime { get; set; } = 0.0;     // Total time successfully followed
+    public double LastFollowUpdate { get; set; } = 0.0;    // Last time we updated follow time
+    public bool WasFollowingPreviousFrame { get; set; } = false;
+    public double LongestContinuousFollow { get; set; } = 0.0;
+    public double CurrentContinuousFollow { get; set; } = 0.0;
     
-    public bool WasFollowedAtEnd { get; set; } = false;   // ← Add this
+    public bool WasFollowedAtEnd { get; set; } = false;  
     public bool IsCurrentlyBeingFollowed { get; set; } = false;
     public double LastHeld = 0;
 
-    public static double FORGIVING_TIME = 200f;
-    
+    public static double FORGIVING_TIME = 50f;
     
     
     public Framebuffer SliderFramebuffer;

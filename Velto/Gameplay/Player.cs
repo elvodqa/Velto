@@ -133,13 +133,13 @@ public class Player
         }
     }
 
-    public void Update(double deltaTime, double songCursor, Vector2 playfieldOffset, float scale)
+    public void Update(double deltaTime, double songCursor, double previousSongCursor, Vector2 playfieldOffset, float scale)
     {
-        if (_songCursor < _prevSongCursor)
+        if (_songCursor < previousSongCursor)
         {
             _replayFrameIndex = 0;
         }
-        _prevSongCursor = _songCursor;
+        _prevSongCursor = previousSongCursor;
         
         _playfieldOffset = playfieldOffset;
         _scale = scale;
@@ -242,6 +242,7 @@ public class Player
             {
                 var frame = Replay.Frames.OrderBy(f => Math.Abs(f.MsSinceStart - songCursor))
                     .First();
+                
                 foreach (var keypress in frame.KeysPressed)
                 {
                     if (keypress == Keypress.K1 && !_prevPrimary) ActionPrimaryPressed = true;
