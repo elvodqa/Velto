@@ -119,7 +119,7 @@ public unsafe class GameBase : IDisposable
     public void Run()
     {
         Initialize();
-        SDL_MaximizeWindow(_window);
+        // SDL_MaximizeWindow(_window);
         //SDL_HideCursor();
         
         ulong tickNow = SDL_GetPerformanceCounter();

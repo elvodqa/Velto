@@ -66,6 +66,8 @@ public unsafe class GameView : View
     private float _totalScore = 0;
     private float _difficultyMultiplier = 1.0f;
     private float _modMultiplier = 1.0f;
+    private const double HIT_INDICATOR_MAX_LIFE = 2000f;
+    private List<HitIndicator> _hitIndicators = new();
     
 
     public struct SliderFramebuffer
@@ -219,7 +221,21 @@ public unsafe class GameView : View
         if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_GRAVE))
         {
             _songTrack?.Position = 0;
+            _songCursor = 0;
+            _comboCount = 0;
+            _totalScore = 0;
+            ResetObjectsAfter(0);
         }
+
+        foreach (var hitIndicator in _hitIndicators.ToList())
+        {
+            hitIndicator.Life -= delta;
+            if (hitIndicator.Life <= 0)
+            {
+                _hitIndicators.Remove(hitIndicator);
+            }
+        }
+        
 
         _settingsView.Width = Width;
         _settingsView.Height = Height;
@@ -345,6 +361,11 @@ public unsafe class GameView : View
                         {
                             // bkz: https://osu.ppy.sh/wiki/en/Gameplay/Judgement/osu%21
                             //circle.Color = Vector4.Zero;
+                            _hitIndicators.Add(new()
+                            {
+                                Life = HIT_INDICATOR_MAX_LIFE,
+                                Offset = hitObject.Time - _songCursor,
+                            });
                             hitObject.HitTime = _songCursor;
                             var difference = Math.Abs(_songCursor - hitObject.Time);
                             if (difference <= 80 - 6 * _beatmap.OverallDifficulty) // 300
@@ -409,6 +430,11 @@ public unsafe class GameView : View
                     {
                         if ((_player.ActionPrimaryPressed || _player.ActionSecondaryPressed) && slider.HitResult == HitResult.None)
                         {
+                            _hitIndicators.Add(new()
+                            {
+                                Life = HIT_INDICATOR_MAX_LIFE,
+                                Offset = _songCursor - hitObject.Time,
+                            });
                             slider.HitTime = _songCursor;
                             var difference = Math.Abs(_songCursor - slider.Time);
                             if (difference <= 80 - 6 * _beatmap.OverallDifficulty) // 300
@@ -974,7 +1000,7 @@ public unsafe class GameView : View
         // Draw combo count
         var comboNum = _comboCount.ToString();
 
-        var comboDigitScale = 400 / (Skin.NumbersHd ? 256f : 128f);
+        var comboDigitScale = Height / 15 / Skin.ScoreNumbers[0].Height; 
         float comboTotalWidth = 0;
 
         // first pass: compute total width
@@ -1006,12 +1032,16 @@ public unsafe class GameView : View
 
             comboCursorX += w;
         }
+        
+        // TODO: Fix the way combo x's position/scale is calculated. its def wrong i think
+        var comboxXScale =  Height / 20 /Skin.ScoreX.Height;
+        
         _renderer.DrawTexture(
             Skin.ScoreX,
             comboCursorX,
-            Height - Skin.ScoreX.Height - 30,
-            Skin.ScoreX.Width,
-            Skin.ScoreX.Height,
+            Height - Skin.ScoreX.Height * comboxXScale - 30,
+            Skin.ScoreX.Width * comboxXScale,
+            Skin.ScoreX.Height * comboxXScale,
             new Vector4(1, 1, 1, 1) 
         );
         
@@ -1019,7 +1049,7 @@ public unsafe class GameView : View
         // Draw score
         var scoreNum = ((int)_totalScore).ToString();
 
-        var scoreDigitScale = 400 / (Skin.NumbersHd ? 256f : 128f);
+        var scoreDigitScale = Height / 15 / Skin.ScoreNumbers[0].Height; //400 / (Skin.NumbersHd ? 256f : 128f);
         float scoreTotalWidth = 0;
 
         // first pass: compute total width
@@ -1037,8 +1067,8 @@ public unsafe class GameView : View
             var digit = c - '0';
             var tex = Skin.ScoreNumbers[digit];
 
-            var w = tex.Width * comboDigitScale;
-            var h = tex.Height * comboDigitScale;
+            var w = tex.Width * scoreDigitScale;
+            var h = tex.Height * scoreDigitScale;
 
             _renderer.DrawTexture(
                 tex,
@@ -1084,7 +1114,46 @@ public unsafe class GameView : View
         }
 
         _inputOverlayView.Draw(delta);
+        
+        // Draw timing window
+        var timingWindowWidth = Width / 7;
+        var timingWindowHeight = timingWindowWidth / 25;
+        var timingWindowX = Width / 2 - timingWindowWidth / 2;
+        var timingWindowY = Height - timingWindowHeight - timingWindowHeight;
+        _renderer.DrawRectangle(timingWindowX, timingWindowY, timingWindowWidth, timingWindowHeight, new Vector4(1, 1, 1, 1));
 
+        var timingSegmentSize = timingWindowWidth / 6;
+        for (int i = 0; i < 6; i++)
+        {
+            var hitWindowColor = new Vector4(1, 1, 1, 1);
+            if (i == 0 || i == 5)
+            {
+                hitWindowColor = new Vector4(246 / 255f, 205 / 255f, 77 / 255f, 1.0f);
+            } else if (i == 1 || i == 4)
+            {
+                hitWindowColor = new Vector4(144 / 255f, 177 / 255f, 54 / 255f, 1.0f);
+            }
+            else
+            {
+                hitWindowColor = new Vector4(128 / 255f, 201 / 255f, 249 / 255f, 1.0f);
+            }
+
+            _renderer.DrawRectangle(
+                Width / 2 - timingWindowWidth / 2 + (timingSegmentSize * i),
+                Height - timingWindowHeight - timingWindowHeight,
+                timingSegmentSize,
+                timingWindowHeight,
+                hitWindowColor);
+        }
+
+        foreach (var indicator in _hitIndicators)
+        {
+            var range = 200 - 10 * _beatmap.OverallDifficulty;
+            var cursorX = Util.MapRange((float)indicator.Offset, -range, range, timingWindowX,
+                timingWindowX + timingWindowWidth);
+            _renderer.DrawRectangle(cursorX, timingWindowY-timingWindowHeight, 3, timingWindowHeight*2, new Vector4(1, 1, 1, (float)(indicator.Life/HIT_INDICATOR_MAX_LIFE)));
+        }
+        
         // Game cursor
         // Update trail lifetimes first so the draw loop can use a stable count (prevents 1-frame alpha spikes).
         var trailCount = trails.Count;
@@ -1268,4 +1337,12 @@ public unsafe class GameView : View
         public float CurrentAlpha = 1f;
         public Vector2 CurrentOffset = Vector2.Zero;
     }
+
+    public class HitIndicator
+    {
+        public double Offset;
+        public double Life;
+    }
+    
+    
 }
