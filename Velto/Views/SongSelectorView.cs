@@ -1,5 +1,4 @@
 using System.Drawing;
-using ManagedBass;
 using OpenTK.Mathematics;
 using SDL;
 using Velto.Core;
