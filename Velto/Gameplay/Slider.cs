@@ -29,7 +29,13 @@ public class Slider : HitObject
     public Vector2 BallPosition = new();
     public bool Sliding = false;
     public int BallTarget = 0;
+    public bool JudgementDone = false;
     
+    public bool WasFollowedAtEnd { get; set; } = false;   // ← Add this
+    public bool IsCurrentlyBeingFollowed { get; set; } = false;
+    public double LastHeld = 0;
+
+    public static double FORGIVING_TIME = 100f;
     
     
     

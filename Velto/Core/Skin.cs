@@ -1,8 +1,10 @@
 using IniParser;
 using OpenTK.Mathematics;
+using Velto.Audio;
 using Velto.Graphics;
 
 namespace Velto.Core;
+
 
 public class Skin : IDisposable
 {
@@ -16,6 +18,7 @@ public class Skin : IDisposable
     public bool NumbersHd = false;
     public List<Vector4> Colors { get; private set; }
     public bool HasCursorMiddle = false;
+    public bool HasSliderSpec = false;
 
     
     public string Folder { get; private set; }  
@@ -29,6 +32,7 @@ public class Skin : IDisposable
     public Texture ReverseArrow { get; private set;  }
     public Texture SliderFollowCircle { get; private set; }
     public Texture SliderStartCircle { get; private set; }
+    public Texture SliderSpec { get; private set; }
     public Texture ModAutoplay { get; private set; }
     public Texture ModNightcore { get; private set; }
     public List<Texture> SliderBalls { get; private set; } = new();
@@ -44,6 +48,11 @@ public class Skin : IDisposable
     public Texture ScorebarColour { get; private set; }
     public Texture ScoreX { get; private set; }
     public Texture ScorePercent { get; private set; }
+
+    public SampleSet Normal { get; private set; }
+    public SampleSet Soft { get; private set; }
+    public SampleSet Drum { get; private set; }
+    public AudioChannel ComboBreak { get; private set; }
   
     
     public Skin(string folderPath)
@@ -113,6 +122,16 @@ public class Skin : IDisposable
             HasCursorMiddle = true;
             CursorMiddle = GetElementTexture("cursormiddle", "cursormiddle");
         }
+        if (ElementExists("sliderb-spec"))
+        {
+            HasSliderSpec = true;
+            SliderSpec = GetElementTexture("sliderb-spec", "sliderb-spec");
+        }
+
+        Normal = new SampleSet(Folder, SampleSet.SampleSetType.Normal);
+        Soft = new SampleSet(Folder, SampleSet.SampleSetType.Soft);
+        Drum = new SampleSet(Folder, SampleSet.SampleSetType.Drum);
+        ComboBreak = GetSample("combobreak");
     }
 
     private Vector4 ParseColor(string str)
@@ -174,6 +193,36 @@ public class Skin : IDisposable
 
         return new Texture(Path.Combine(Resources.DefaultSkinPath, element));
     }
+    
+    private bool CheckAudio(string name, out string extension)
+    {
+        string wavPath = Path.Combine(Folder, $"{name}.wav");
+        string oggPath = Path.Combine(Folder, $"{name}.ogg");
+
+        if (File.Exists(wavPath))
+        {
+            extension = ".wav";
+            return true;
+        }
+
+        if (File.Exists(oggPath))
+        {
+            extension = ".ogg";
+            return true;
+        }
+
+        extension = string.Empty;
+        return false;
+    }
+    
+    private AudioChannel GetSample(string name)
+    {
+        if (CheckAudio(name, out var extension))
+        {
+            return AudioManager.Instance.LoadAudio(Path.Combine(Folder, $"{name}{extension}"));
+        }
+        return AudioManager.Instance.LoadAudio(Path.Combine(Resources.DefaultSkinPath, $"{name}.wav"));
+    }
 
     public void Dispose()
     {
@@ -186,6 +235,7 @@ public class Skin : IDisposable
         ReverseArrow?.Dispose();
         SliderFollowCircle?.Dispose();
         SliderStartCircle?.Dispose();
+        SliderSpec?.Dispose();
         ModAutoplay?.Dispose();
         ModNightcore?.Dispose();
 
@@ -201,6 +251,11 @@ public class Skin : IDisposable
         ScorebarColour?.Dispose();
         ScoreX?.Dispose();
         ScorePercent?.Dispose();
+        
+        Normal.Dispose();
+        Soft.Dispose();
+        Drum.Dispose();
+        ComboBreak.Dispose();
 
         foreach (var texture in SliderBalls)
             texture?.Dispose();
