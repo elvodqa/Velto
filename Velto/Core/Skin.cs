@@ -19,6 +19,7 @@ public class Skin : IDisposable
     public List<Vector4> Colors { get; private set; }
     public bool HasCursorMiddle = false;
     public bool HasSliderSpec = false;
+    public bool HasAnimatedFollowPoints = false;
 
     
     public string Folder { get; private set; }  
@@ -49,11 +50,14 @@ public class Skin : IDisposable
     public Texture ScoreX { get; private set; }
     public Texture ScorePercent { get; private set; }
     public Texture PlayUnranked { get; private set; }
+    public Texture FollowPoint { get; private set; }
+    public List<Texture> FollowPoints { get; private set; } = new();
 
     public SampleSet Normal { get; private set; }
     public SampleSet Soft { get; private set; }
     public SampleSet Drum { get; private set; }
     public AudioChannel ComboBreak { get; private set; }
+    
   
     
     public Skin(string folderPath)
@@ -129,6 +133,23 @@ public class Skin : IDisposable
         {
             HasSliderSpec = true;
             SliderSpec = GetElementTexture("sliderb-spec", "sliderb-spec");
+        }
+
+        if (ElementExists("followpoint-0"))
+        {
+            HasAnimatedFollowPoints = true;
+            for (int i = 0; ; i++)
+            {
+                if (!ElementExists($"followpoint-{i}"))
+                    break;
+                
+                SliderBalls.Add(GetElementTexture($"followpoint-{i}", "followpoint"));
+            }
+            
+        }
+        else
+        {
+            FollowPoint = GetElementTexture("followpoint", "followpoint");
         }
 
         Normal = new SampleSet(Folder, SampleSet.SampleSetType.Normal);
@@ -242,6 +263,7 @@ public class Skin : IDisposable
         ModAutoplay?.Dispose();
         ModNightcore?.Dispose();
         PlayUnranked?.Dispose();
+        FollowPoint?.Dispose();
 
         InputOverlayBackground?.Dispose();
         InputOverlayKey?.Dispose();
@@ -260,6 +282,9 @@ public class Skin : IDisposable
         Soft.Dispose();
         Drum.Dispose();
         ComboBreak.Dispose();
+        
+        foreach (var texture in FollowPoints)
+            texture?.Dispose();
 
         foreach (var texture in SliderBalls)
             texture?.Dispose();

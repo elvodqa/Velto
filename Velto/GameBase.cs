@@ -81,9 +81,13 @@ public unsafe class GameBase : IDisposable
         // SDL_GL_SetSwapInterval(0);
 
         int interval;
+        if (!SDL_GL_SetSwapInterval(-1))
+        {
+            SDL_GL_SetSwapInterval(1);
+        }
         SDL_GL_GetSwapInterval(&interval);
         Logger.Instance.Info($"Swap Interval = {interval}");
-        SDL_GL_SetSwapInterval(1);
+       
         
         GLLoader.LoadBindings(new BindingContext());
         

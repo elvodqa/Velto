@@ -69,7 +69,6 @@ public unsafe class GameView : View
     private const double HIT_INDICATOR_MAX_LIFE = 2000f;
     private List<HitIndicator> _hitIndicators = new();
 
-
     public struct SliderFramebuffer
     {
         public Framebuffer Framebuffer;
@@ -97,21 +96,31 @@ public unsafe class GameView : View
                 Time = 0,
             };
         }
-
-        
-        
-        //SetBeatmap(new Beatmap(Resources.GetPath("Resources/Songs/Wakeshima Kanon/ASCA - Nisemono no Koi ni Sayounara with Wakeshima Kanon (timemon) [Kyou's Extra].osu")));
-        //_player.SetReplay(Replay.ParseReplay(Resources.GetPath("Resources/Replays/kanon.osr")));
+        //
+        // SetBeatmap(new Beatmap(Resources.GetPath("Resources/Songs/Wakeshima Kanon/ASCA - Nisemono no Koi ni Sayounara with Wakeshima Kanon (timemon) [Kyou's Extra].osu")));
+        // _player.SetReplay(Replay.ParseReplay(Resources.GetPath("Resources/Replays/kanon.osr")));
         SetBeatmap(new Beatmap(Resources.GetPath("Resources/Songs/983942 Oomori Seiko - JUSTadICE (TV Size)/Oomori Seiko - JUSTadICE (TV Size) (fieryrage) [Extreme].osu")));
         _player.SetReplay(Replay.ParseReplay(Resources.GetPath("Resources/Replays/fiery.osr")));
-        _doubleTimeEnabled = true;
-        _songTrack.Speed = 1.5f;
+        _doubleTimeEnabled = true; _songTrack.Speed = 1.5f;
         
         _player.SetState(PlayerState.Replay);
     }
 
     float playfieldWidth, playfieldHeight;
     private Vector2 playfieldTopLeft;
+
+    public void ToggleMenu()
+    {
+        _isPaused = !_isPaused;
+        if (_isPaused)
+        {
+            _songTrack?.Pause();
+        }
+        else
+        {
+            _songTrack?.Resume();
+        }
+    }
     
 
     public override void Update(double delta)
@@ -180,6 +189,8 @@ public unsafe class GameView : View
             if (wasPlaying)
                 _songTrack.Resume();
         }
+        
+        
 
 
         if (Input.IsKeyDown(SDL_Scancode.SDL_SCANCODE_LSHIFT))
@@ -216,6 +227,11 @@ public unsafe class GameView : View
         if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_F1))
         {
             _debugEnabled = !_debugEnabled;
+        }
+        
+        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_ESCAPE))
+        {
+            ToggleMenu();
         }
 
         if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_GRAVE))
@@ -450,6 +466,7 @@ public unsafe class GameView : View
                     // }
 
                     slider.JudgementDone = true;
+                    Logger.Instance.Info($"Slider held for {slider.TotalFollowTime}/{slider.Duration}");
                 }
                 
                 if (_songCursor > slider.Time + slider.Duration)
@@ -675,9 +692,73 @@ public unsafe class GameView : View
 
 
         var scale = playfieldWidth / PLAYFIELD_W;
+        
+        var prevHitObject = (HitObject)null;
+        var nextHitObject = (HitObject)null;
+
+        foreach (var obj in _sortedObjects)
+        {
+            var currTime = _songCursor + 500;
+            
+            if (obj.Time <= currTime)
+            {
+                prevHitObject = obj; // keeps updating until we pass currTime
+            }
+            else
+            {
+                nextHitObject = obj; // first one after currTime
+                break;  
+            }
+        }
+
+        double prevHitObjectTime = 0;
+        double nextHitObjectTime = 0;
+        Vector2 prevHitObjectPos = new();
+        Vector2 nextHitObjectPos = new();
+        if (prevHitObject != null)
+        {
+            prevHitObjectPos = prevHitObject.Position;
+            prevHitObjectTime = prevHitObject.Time;
+        }
+        if (nextHitObject != null)
+        {
+            nextHitObjectPos = nextHitObject.Position;
+            nextHitObjectTime = nextHitObject.Time;
+        }
+
+        nextHitObjectPos = playfieldTopLeft + nextHitObjectPos * scale;
+        prevHitObjectPos = playfieldTopLeft + prevHitObjectPos * scale;
+
+        var diff = nextHitObjectPos - prevHitObjectPos;
+        var degree = Math.Atan2(diff.Y, diff.X);
+        var distance = 300;
+        
+        if (!Skin.HasAnimatedFollowPoints)
+        {
+            var direction = new Vector2(
+                (float)Math.Cos(degree),
+                (float)Math.Sin(degree)
+            );
+
+            int count = (int)(diff.Length / distance);
+
+            for (int i = 0; i < count; i++)
+            {
+                var pos = prevHitObjectPos + direction * (i * distance);
+
+                _renderer.DrawTexture(Skin.FollowPoint, pos.X, pos.Y, 100f, 100f, new Vector4(1, 1, 1, 1), (float)degree * MathHelper.RadToDeg);
+            }
+        }
+        
+        
+        
+        
 
         foreach (var hitObject in _sortedObjects)
         {
+            
+            
+            
             var posX = playfieldTopLeft.X + hitObject.Position.X * scale;
             var posY = playfieldTopLeft.Y + hitObject.Position.Y * scale;
             var objectCircleSize = _baseCircleSize;
@@ -887,27 +968,34 @@ public unsafe class GameView : View
                         prevPos = slider.GetPositionAt(_songCursor - 1);
                     }
 
-                    if (slider.SlideRepeatCount > 1)
+                    if (slider.SlideRepeatCount > 1) // sliderepeatcount = actual repeat count + 1
                     {
-                        var repeatPosition = slider.Points.Last();
-                        var repeatScaledX = playfieldTopLeft.X + repeatPosition.X * scale;
-                        var repeatScaledY = playfieldTopLeft.Y + repeatPosition.Y * scale;
-                        var repeatDrawSize = objectCircleSize * 1f;
+                        for (int i = 0; i < slider.SlideRepeatCount; i++)
+                        {
+                            //if (_songCursor >= slider.Time + slider.Duration - slider.SpanDuration) continue;
+                            if (i - 2 >= slider.SlideRepeatCount) continue;
+                            
+                            var repeatPosition = slider.GetPositionAt(slider.Time + i * slider.SpanDuration);
+                                
+                            var repeatScaledX = playfieldTopLeft.X + repeatPosition.X * scale;
+                            var repeatScaledY = playfieldTopLeft.Y + repeatPosition.Y * scale;
+                            var repeatDrawSize = objectCircleSize * 1f;
 
-                        var repeatPrevPos = slider.Points[slider.Points.Count - 2];
+                            var repeatPrevPos = slider.Points[slider.Points.Count - 2];
+                                
+                            Vector2 repeatDirection = repeatPosition - repeatPrevPos;
+                            var repeatRotation = Math.Atan2(repeatDirection.Y, repeatDirection.X) * -MathHelper.RadToDeg +
+                                                 180;
 
-                        Vector2 repeatDirection = repeatPosition - repeatPrevPos;
-                        var repeatRotation = Math.Atan2(repeatDirection.Y, repeatDirection.X) * -MathHelper.RadToDeg +
-                                             180;
-
-                        _renderer.DrawTexture(Skin.ReverseArrow,
-                            repeatScaledX - repeatDrawSize / 2,
-                            repeatScaledY - repeatDrawSize / 2,
-                            repeatDrawSize,
-                            repeatDrawSize,
-                            new Vector4(1, 1, 1, 1) with { W = sliderOpacity },
-                            (float)repeatRotation
-                        );
+                            _renderer.DrawTexture(Skin.ReverseArrow,
+                                repeatScaledX - repeatDrawSize / 2,
+                                repeatScaledY - repeatDrawSize / 2,
+                                repeatDrawSize,
+                                repeatDrawSize,
+                                new Vector4(1, 1, 1, 1) with { W = sliderOpacity },
+                                (float)repeatRotation
+                            );
+                        }
                     }
 
                     Vector2 direction = position - prevPos;
@@ -1056,7 +1144,7 @@ public unsafe class GameView : View
             {
                 float fadeT = (age - 380f) / (particle.MaxLife - 380f);
                 alpha = MathHelper.Lerp(1f, 0f, fadeT);
-                yOffset = fadeT * -45f; // move up ~45 pixels
+                //yOffset = fadeT * -45f; // move up ~45 pixels
             }
 
             var texture = particle.Result switch
@@ -1271,6 +1359,11 @@ public unsafe class GameView : View
             _renderer.DrawTexture(Skin.PlayUnranked, Width/2 - unrankedWidth/2, Height/10, unrankedWidth, unrankedHeight, new Vector4(1, 1, 1, 1));
         }
 
+        if (_isPaused)
+        {
+            //_renderer.DrawRectangle(0, 0, Width, Height, new Vector4(0, 0, 0, 0.85f));
+        }
+        
         // Game cursor
         // Update trail lifetimes first so the draw loop can use a stable count (prevents 1-frame alpha spikes).
         var trailCount = trails.Count;
@@ -1283,20 +1376,7 @@ public unsafe class GameView : View
         }
 
         var trailSnapshot = trails.ToArray();
-
         var size = _baseCircleSize / 2f;
-
-
-        // var _posX = playfieldTopLeft.X + _player.Cursor.X * scale;
-        // var _posY = playfieldTopLeft.Y + _player.Cursor.Y * scale;
-        // _posX = _player.Cursor.X;
-        // _posY = _player.Cursor.Y;
-        // if (!_player.Autoplay)
-        // {
-        //     _posX = Input.MouseX;
-        //     _posY = Input.MouseY;
-        // }
-
         lastCursorPosition = new(_player.Cursor.X, _player.Cursor.Y);
 
         if (trailSnapshot.Length > 0)
@@ -1331,7 +1411,8 @@ public unsafe class GameView : View
             _player.Cursor.X - size / 2,
             _player.Cursor.Y - size / 2,
             size, size, new Vector4(1, 1, 1, 1));
-
+        
+        
         if (_debugEnabled)
         {
             _renderer.DrawText(_msdfFont,
