@@ -35,7 +35,7 @@ public class Slider : HitObject
     public bool IsCurrentlyBeingFollowed { get; set; } = false;
     public double LastHeld = 0;
 
-    public static double FORGIVING_TIME = 100f;
+    public static double FORGIVING_TIME = 200f;
     
     
     

@@ -99,7 +99,10 @@ public unsafe class GameView : View
 
 
         SetBeatmap(new Beatmap(Resources.GetPath(
-            "Resources/Songs/1144490 Wakeshima Kanon - Not For Sale Fossil/Wakeshima Kanon - Not For Sale Fossil (mnyui) [Test].osu")));
+            "Resources/Songs/Wakeshima Kanon/ASCA - Nisemono no Koi ni Sayounara with Wakeshima Kanon (timemon) [Kyou's Extra].osu")));
+        
+        _player.SetState(PlayerState.Replay);
+        _player.SetReplay(Replay.ParseReplay(Resources.GetPath("Resources/Replays/kanon.osr")));
     }
 
     float playfieldWidth, playfieldHeight;
@@ -284,9 +287,9 @@ public unsafe class GameView : View
 
         if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_A))
         {
-            _player.Autoplay = !_player.Autoplay;
+            /*_player.Autoplay = !_player.Autoplay;
             if (_player.Autoplay) SDL_ShowCursor();
-            else SDL_HideCursor();
+            else SDL_HideCursor();*/
         }
 
         if (Input.IsKeyDown(SDL_Scancode.SDL_SCANCODE_LCTRL))
@@ -1165,7 +1168,7 @@ public unsafe class GameView : View
         }
 
 
-        if (_player.Autoplay)
+        if (_player.State == PlayerState.Autoplay)
         {
             _renderer.DrawTexture(Skin.ModAutoplay, Width - Width / 20 - 50, Height / 8, Width / 20, Width / 20,
                 new Vector4(1, 1, 1, 1));
@@ -1285,7 +1288,7 @@ public unsafe class GameView : View
         if (_debugEnabled)
         {
             _renderer.DrawText(_msdfFont,
-                $"Cursor: {_songCursor:F0}ms | TrackPos: {_songTrack?.Position:F0}ms\nSongLength: {_songLength:F0}ms\nSampleTracks: {AudioManager.Instance.SampleTracks.Count}",
+                $"Cursor: {_songCursor:F0}ms | TrackPos: {_songTrack?.Position:F0}ms\nSongLength: {_songLength:F0}ms\nSampleTracks: {AudioManager.Instance.SampleTracks.Count}/50",
                 new Vector2(10, 200), 1, new Vector4(1, 1, 0, 1));
             _renderer.FlushText(_msdfFont);
         }

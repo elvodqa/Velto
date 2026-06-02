@@ -89,25 +89,25 @@ public class InputOverlayView : View
         _renderer.FlushText(_font);
         
         // my rotation logic is fuckign stupid
-        /*var bgTextureHeight= Height / 14; // magic number
-        var bgTextureWidth = _gameView.Skin.InputOverlayBackground.Width * (bgTextureHeight/ _gameView.Skin.InputOverlayBackground.Height);
-        
-        _renderer.DrawCenteredTexture(_gameView.Skin.InputOverlayBackground, new(Width - bgTextureHeight/2, Height/2), 
-            bgTextureWidth, bgTextureHeight, new Vector4(1, 1, 1, 1), 270);
-
-        Vector2[] points = new Vector2[4];
-        points[0] = new Vector2(Width - bgTextureHeight / 2, (Height / 2) - ((bgTextureWidth) / 8 * 3));
-
-        var keyTexture = _gameView.Skin.InputOverlayKey;
-        var ratioW = (float)_gameView.Skin.InputOverlayKey.Width / _gameView.Skin.InputOverlayBackground.Width;
-        var ratioH = (float)_gameView.Skin.InputOverlayKey.Height / _gameView.Skin.InputOverlayBackground.Height;
-        
-        _renderer.DrawCenteredTexture(keyTexture, points[0], bgTextureHeight*ratioH, bgTextureWidth*ratioW, new Vector4(1, 1, 1, 1), 0);
+        // var bgTextureHeight= Height / 14; // magic number
+        // var bgTextureWidth = _gameView.Skin.InputOverlayBackground.Width * (bgTextureHeight/ _gameView.Skin.InputOverlayBackground.Height);
+        //
+        // _renderer.DrawCenteredTexture(_gameView.Skin.InputOverlayBackground, new(Width - bgTextureHeight/2, Height/2), 
+        //     bgTextureWidth, bgTextureHeight, new Vector4(1, 1, 1, 1), 270);
+        //
+        // Vector2[] points = new Vector2[4];
+        // points[0] = new Vector2(Width - bgTextureHeight / 2, (Height / 2) - ((bgTextureWidth) / 8 * 3));
+        //
+        // var keyTexture = _gameView.Skin.InputOverlayKey;
+        // var ratioW = (float)_gameView.Skin.InputOverlayKey.Width / _gameView.Skin.InputOverlayBackground.Width;
+        // var ratioH = (float)_gameView.Skin.InputOverlayKey.Height / _gameView.Skin.InputOverlayBackground.Height;
+        //
+        // _renderer.DrawCenteredTexture(keyTexture, points[0], bgTextureHeight*ratioH, bgTextureWidth*ratioW, new Vector4(1, 1, 1, 1), 0);
         
         for (int i = 0; i < 4; i++)
         {
            
-        }*/
+        }
     }
     
     void DrawCenteredRect(Vector2 center, float w, float h, Vector4 color)

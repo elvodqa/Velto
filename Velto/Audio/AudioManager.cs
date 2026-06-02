@@ -19,8 +19,8 @@ public unsafe class AudioManager : IDisposable
     public List<AudioChannel> Audios = new();
     
     private MIX_Mixer* _mixer;
-    public List<Track> SampleTracks = new();
-    
+    public readonly Queue<Track> SampleTracks = new();
+    private const int MaxSamples = 50;
     public float SampleVolume { get; set; }
     private double _counter = 0;
     
@@ -53,11 +53,31 @@ public unsafe class AudioManager : IDisposable
 
     public void PlaySample(AudioChannel audioChannel)
     {
-        Track track = CreateTrack();
-        track.Audio = audioChannel;
-        track.Volume = SampleVolume;
-        track.Play();
-        SampleTracks.Add(track);
+        lock (_lock)
+        {
+            while (SampleTracks.Count >= MaxSamples)
+            {
+                var oldTrack = SampleTracks.Dequeue();
+
+                try
+                {
+                    oldTrack.Stop(); // if Track supports stopping
+                }
+                catch
+                {
+                    // ignore
+                }
+
+                oldTrack.Dispose();
+            }
+
+            Track track = CreateTrack();
+            track.Audio = audioChannel;
+            track.Volume = SampleVolume;
+            track.Play();
+
+            SampleTracks.Enqueue(track);
+        }
     }
 
     public void Update(double delta)
@@ -69,12 +89,22 @@ public unsafe class AudioManager : IDisposable
 
         _counter = 0;
 
-        foreach (var track in SampleTracks.ToList())
+        lock (_lock)
         {
-            if (!track.Playing)
+            int count = SampleTracks.Count;
+
+            for (int i = 0; i < count; i++)
             {
-                SampleTracks.Remove(track);
-                track.Dispose();
+                var track = SampleTracks.Dequeue();
+
+                if (track.Playing)
+                {
+                    SampleTracks.Enqueue(track);
+                }
+                else
+                {
+                    track.Dispose();
+                }
             }
         }
     }
