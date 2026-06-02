@@ -48,6 +48,7 @@ public class Skin : IDisposable
     public Texture ScorebarColour { get; private set; }
     public Texture ScoreX { get; private set; }
     public Texture ScorePercent { get; private set; }
+    public Texture PlayUnranked { get; private set; }
 
     public SampleSet Normal { get; private set; }
     public SampleSet Soft { get; private set; }
@@ -89,6 +90,8 @@ public class Skin : IDisposable
         ScorebarColour = GetElementTexture("scorebar-colour", "scorebar-colour");
         ScoreX = GetElementTexture("score-x", "score-x");
         ScorePercent = GetElementTexture("score-percent", "score-percent");
+        
+        PlayUnranked = GetElementTexture("play-unranked", "play-unranked");
         
         for (var i = 0; i < 10; i++)
             ScoreNumbers[i] = GetElementTexture($"score-{i}", $"score-{i}");
@@ -238,6 +241,7 @@ public class Skin : IDisposable
         SliderSpec?.Dispose();
         ModAutoplay?.Dispose();
         ModNightcore?.Dispose();
+        PlayUnranked?.Dispose();
 
         InputOverlayBackground?.Dispose();
         InputOverlayKey?.Dispose();

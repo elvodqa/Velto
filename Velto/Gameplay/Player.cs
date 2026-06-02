@@ -77,6 +77,7 @@ public class Player
     public PlayerState State { get; private set; } = PlayerState.Autoplay;
     public Replay? Replay { get; private set; } = null;
     private int _replayFrameIndex = 0;
+    private double _prevSongCursor;
     private readonly Beatmap _beatmap;
     private int _lastAutoplayHitIndex = -1;
 
@@ -134,6 +135,12 @@ public class Player
 
     public void Update(double deltaTime, double songCursor, Vector2 playfieldOffset, float scale)
     {
+        if (_songCursor < _prevSongCursor)
+        {
+            _replayFrameIndex = 0;
+        }
+        _prevSongCursor = _songCursor;
+        
         _playfieldOffset = playfieldOffset;
         _scale = scale;
         _songCursor = songCursor;

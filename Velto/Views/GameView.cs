@@ -32,7 +32,7 @@ public unsafe class GameView : View
     private float _musicVolume;
 
     private readonly Renderer _renderer;
-    private string _skinName = "default";
+    private string _skinName = "rafis";
 
     private double _songCursor;
     private double _songLength;
@@ -97,12 +97,16 @@ public unsafe class GameView : View
             };
         }
 
-
-        SetBeatmap(new Beatmap(Resources.GetPath(
-            "Resources/Songs/Wakeshima Kanon/ASCA - Nisemono no Koi ni Sayounara with Wakeshima Kanon (timemon) [Kyou's Extra].osu")));
+        
+        
+        //SetBeatmap(new Beatmap(Resources.GetPath("Resources/Songs/Wakeshima Kanon/ASCA - Nisemono no Koi ni Sayounara with Wakeshima Kanon (timemon) [Kyou's Extra].osu")));
+        //_player.SetReplay(Replay.ParseReplay(Resources.GetPath("Resources/Replays/kanon.osr")));
+        SetBeatmap(new Beatmap(Resources.GetPath("Resources/Songs/983942 Oomori Seiko - JUSTadICE (TV Size)/Oomori Seiko - JUSTadICE (TV Size) (fieryrage) [Extreme].osu")));
+        _player.SetReplay(Replay.ParseReplay(Resources.GetPath("Resources/Replays/fiery.osr")));
+        _doubleTimeEnabled = true;
+        _songTrack.Speed = 1.5f;
         
         _player.SetState(PlayerState.Replay);
-        _player.SetReplay(Replay.ParseReplay(Resources.GetPath("Resources/Replays/kanon.osr")));
     }
 
     float playfieldWidth, playfieldHeight;
@@ -214,9 +218,11 @@ public unsafe class GameView : View
         if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_GRAVE))
         {
             _songTrack?.Position = 0;
+            _songTrack?.Play();
             _songCursor = 0;
             _comboCount = 0;
             _totalScore = 0;
+            _inputOverlayView.Reset();
             ResetObjectsAfter(0);
         }
 
@@ -1222,6 +1228,14 @@ public unsafe class GameView : View
                 timingWindowX + timingWindowWidth);
             _renderer.DrawRectangle(cursorX, timingWindowY - timingWindowHeight, 3, timingWindowHeight * 2,
                 new Vector4(1, 1, 1, (float)(indicator.Life / HIT_INDICATOR_MAX_LIFE)));
+        }
+        
+        // watermark unranked
+        if (_player.State == PlayerState.Autoplay || _player.State == PlayerState.Replay)
+        {
+            var unrankedWidth = Width / 10;
+            var unrankedHeight = Skin.PlayUnranked.Height * (unrankedWidth / Skin.PlayUnranked.Width);
+            _renderer.DrawTexture(Skin.PlayUnranked, Width/2 - unrankedWidth/2, Height/10, unrankedWidth, unrankedHeight, new Vector4(1, 1, 1, 1));
         }
 
         // Game cursor
