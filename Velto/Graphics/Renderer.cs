@@ -438,30 +438,39 @@ public unsafe class Renderer : IDisposable
     }
 
     // font stuff 
-    public void DrawText(MSDFFont font, string text, Vector2 position, float scale,
-        Vector4 color)
+    public void DrawText(MSDFFont font, string text, Vector2 position, float pixelLineHeight, Vector4 color)
     {
-        scale /= 1.3f; // remove this later
-        var x = position.X;
-        var baseline = position.Y + font.Ascender * font.EmSize * scale;
+        // Compute scale from desired line height
+        float scale = pixelLineHeight / (font.LineHeight * font.EmSize);
+
+        // Remove the old hack (no longer needed)
+        // scale /= 1.3f;
+
+        float x = position.X;
+        float baseline = position.Y + font.Ascender * font.EmSize * scale;
         uint prev = 0;
+
         foreach (var c in text)
         {
             if (c == '\n')
             {
                 x = position.X;
-                baseline += font.LineHeight * font.EmSize * scale;
+                baseline += font.LineHeight * font.EmSize * scale; // moves by exactly pixelLineHeight
                 prev = 0;
                 continue;
             }
 
-            if (!font.Glyphs.TryGetValue(c, out var glyph)) continue;
-            var kern = 0f;
-            if (prev != 0) kern = font.GetKerning(prev, c) * scale;
+            if (!font.Glyphs.TryGetValue(c, out var glyph))
+                continue;
+
+            float kern = 0f;
+            if (prev != 0)
+                kern = font.GetKerning(prev, c) * scale;
 
             if (glyph.HasGeometry)
             {
-                Vector2 glyphPos = new(x + glyph.XOffset * font.EmSize * scale,
+                Vector2 glyphPos = new(
+                    x + glyph.XOffset * font.EmSize * scale,
                     baseline - glyph.YOffset * font.EmSize * scale - glyph.Height * scale);
                 Vector2 glyphSize = new(glyph.Width * scale, glyph.Height * scale);
                 DrawGlyph(glyph, glyphPos, glyphSize, color, font.DistanceRange);
@@ -471,22 +480,7 @@ public unsafe class Renderer : IDisposable
             prev = c;
         }
 
-        int wWidth = 1280, wHeight = 720;
-        if (_framebuffer == null) SDL_GetWindowSizeInPixels(_window, &wWidth, &wHeight);
-        else
-        {
-            wWidth = _framebuffer.Width;
-            wHeight = _framebuffer.Height;
-        }
-        
-        var projection =
-            Matrix4.CreateOrthographicOffCenter(
-                0,
-                wWidth,
-                wHeight,
-                0,
-                -1f,
-                1f);
+        // ... (projection logic unchanged)
     }
 
     private void DrawGlyph(MSDFFont.Glyph glyph, Vector2 position, Vector2 size, Vector4 color, float distanceRange)

@@ -1404,7 +1404,7 @@ public unsafe class GameView : View
         {
             _renderer.DrawText(_msdfFont,
                 $"Cursor: {_songCursor:F0}ms | TrackPos: {_songTrack?.Position:F0}ms\nSongLength: {_songLength:F0}ms\nSampleTracks: {AudioManager.Instance.SampleTracks.Count}/50",
-                new Vector2(10, 200), 1, new Vector4(1, 1, 0, 1));
+                new Vector2(10, 200), Height/45, new Vector4(1, 1, 0, 1));
             _renderer.FlushText(_msdfFont);
         }
         

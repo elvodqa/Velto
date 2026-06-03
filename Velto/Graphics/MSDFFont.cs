@@ -1,5 +1,6 @@
 using System.Text.Json;
 using OpenTK.Graphics.OpenGL;
+using OpenTK.Mathematics;
 using StbImageSharp;
 
 namespace Velto.Graphics;
@@ -103,6 +104,83 @@ public class MSDFFont
     {
         if (Kerning.TryGetValue((first, second), out var k)) return k;
         return 0f;
+    }
+
+    public Vector2 GetTextBounds(string text, float pixelLineHeight, float maxWidth = float.MaxValue)
+    {
+        // same scale as DrawText
+        float scale = pixelLineHeight / (LineHeight * EmSize);
+
+        float totalWidth = 0f;
+        float currentLineWidth = 0f;
+        int lineCount = 1;
+
+        uint prev = 0;
+
+        for (int i = 0; i < text.Length; i++)
+        {
+            char c = text[i];
+
+            // Newline – end current line, start new one
+            if (c == '\n')
+            {
+                totalWidth = MathF.Max(totalWidth, currentLineWidth);
+                currentLineWidth = 0f;
+                lineCount++;
+                prev = 0;
+                continue;
+            }
+
+            if (!Glyphs.TryGetValue(c, out var glyph))
+                continue;
+
+            // kerning
+            float kern = 0f;
+            if (prev != 0)
+                kern = GetKerning(prev, c) * scale;
+
+            float glyphAdvance = glyph.XAdvance * EmSize * scale;
+            float step = glyphAdvance + kern;
+
+            // if we have a width limit, check if this glyph would exceed it
+            if (maxWidth < float.MaxValue && currentLineWidth + step > maxWidth)
+            {
+                // find the start of the current word (for word‑wrap)
+                int wordStart = i;
+                while (wordStart > 0 && text[wordStart - 1] != ' ' && text[wordStart - 1] != '\n')
+                    wordStart--;
+
+                // if the whole word fits on its own line, break before the word
+                if (wordStart < i)
+                {
+                    // rewind to word start
+                    i = wordStart - 1;
+                    prev = 0;
+
+                    totalWidth = MathF.Max(totalWidth, currentLineWidth);
+                    currentLineWidth = 0f;
+                    lineCount++;
+                    continue;
+                }
+
+                // else the word is longer than the line – let it overflow (break after this char)
+                totalWidth = MathF.Max(totalWidth, currentLineWidth);
+                currentLineWidth = step; // start new line with this glyph
+                lineCount++;
+            }
+            else
+            {
+                currentLineWidth += step;
+            }
+
+            prev = c;
+        }
+
+        // account for last line
+        totalWidth = MathF.Max(totalWidth, currentLineWidth);
+
+        float totalHeight = pixelLineHeight * lineCount;
+        return new Vector2(totalWidth, totalHeight);
     }
 
     public struct Glyph

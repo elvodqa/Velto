@@ -235,10 +235,10 @@ public unsafe class GameBase : IDisposable
         double valueX = (Math.Cos(f) + 1.0) * 0.5;
         double valueY = (Math.Sin(f) + 1.0) * 0.5;
 
-        _gameView.Width = (float)((_renderer.WindowSizeInPixels.X / 2) + (_renderer.WindowSizeInPixels.X / 2) * valueX);
-        _gameView.Height = (float)((_renderer.WindowSizeInPixels.Y / 2) + (_renderer.WindowSizeInPixels.Y / 2) * valueY);
-        _gameView.X = _renderer.WindowSizeInPixels.X / 2 - _gameView.Width / 2;
-        _gameView.Y = _renderer.WindowSizeInPixels.Y / 2 - _gameView.Height / 2;
+        _gameView.Width = _renderer.WindowSizeInPixels.X; //(float)((_renderer.WindowSizeInPixels.X / 2) + (_renderer.WindowSizeInPixels.X / 2) * valueX);
+        _gameView.Height = _renderer.WindowSizeInPixels.Y; //(float)((_renderer.WindowSizeInPixels.Y / 2) + (_renderer.WindowSizeInPixels.Y / 2) * valueY);
+        _gameView.X = 0; //_renderer.WindowSizeInPixels.X / 2 - _gameView.Width / 2;
+        _gameView.Y = 0; // _renderer.WindowSizeInPixels.Y / 2 - _gameView.Height / 2;
 
 
         if (Input.IsKeyDown(SDL_Scancode.SDL_SCANCODE_LCTRL))
@@ -348,7 +348,8 @@ public unsafe class GameBase : IDisposable
             }
         }
         
-        _renderer.DrawText(_debugFont, $"FPS: {_fps.ToString("0000.0")} [{deltaTime.ToString("00.00")}ms] | DrawCallCount: {_renderer.DrawCallCount:000000}", new (5, 5), 0.5f, new Vector4(1, 1, 1, 1));
+        _renderer.DrawText(_debugFont, $"FPS: {_fps.ToString("0000.0")} [{deltaTime.ToString("00.00")}ms] | DrawCallCount: {_renderer.DrawCallCount:000000}", 
+            new (5, 5), _renderer.WindowSizeInPixels.Y / 45, new Vector4(1, 1, 1, 1));
         _renderer.FlushText(_debugFont);
     }
     
