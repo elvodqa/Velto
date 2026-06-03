@@ -1,16 +1,45 @@
 # Velto
 
-osu! player written with my ass, featuring yahay505.
+An osu! player written with my ass, featuring yahay505.
 
-debug controls:
-F1 - toggle timeline + debug info
-ctrl + scroll wheel - adjust volume\
-space/esc - pause\
-left/right arrow - move 1s\
-shift + left/right - force change song speed\
-click and drag timeline at the bottom\
-tab to song select
-ctrl + s to swap skins
-ctrl + d to toggle nightcore
+> Yes, the repository contains copyrighted material.
 
-and yes there are copyrighted material in the repo.
+## Preview
+
+![Velto Preview](preview.png)
+
+## Controls
+
+### General
+| Key | Action |
+|------|---------|
+| `Space` / `Esc` | Pause |
+| `Left Arrow` / `Right Arrow` | Seek ±1 second |
+| `Shift` + `Left/Right Arrow` | Change song speed |
+| `Click + Drag` Timeline | Seek through the song |
+| `Tab` | Open song select |
+
+### Debug
+| Key | Action |
+|------|---------|
+| `F1` | Toggle timeline and debug information |
+
+### Extras
+| Key | Action |
+|------|---------|
+| `Ctrl + Scroll Wheel` | Adjust volume |
+| `Ctrl + S` | Swap skins |
+| `Ctrl + D` | Toggle Nightcore |
+
+## Features
+
+- osu! beatmap playback
+- Song selection menu
+- Skin swapping
+- DT/NC (sort of)
+- Replay / Autoplay / Freeplay
+- Debug timeline and playback controls
+
+## Disclaimer
+
+This repository includes copyrighted assets and materials. They are provided for preservation, compatibility, and demonstration purposes.
