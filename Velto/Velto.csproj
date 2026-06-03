@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="ini-parser-netcore" Version="3.0.0" />
+      <PackageReference Include="OpenTK" Version="5.0.0-pre.16" />
+      <PackageReference Include="OpenTK.Mathematics" Version="5.0.0-pre.16" />
+      <PackageReference Include="ppy.SDL3-CS" Version="2026.520.0" />
+      <PackageReference Include="ppy.SDL3_mixer-CS" Version="2026.520.0" />
+      <PackageReference Include="SevenZip" Version="19.0.0" />
+      <PackageReference Include="StbImageSharp" Version="2.30.15" />
+    </ItemGroup>
+    
+    <ItemGroup>
+        <Content Include="Resources/**/*.*">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
+    
+    <ItemGroup>
+      <Folder Include="Resources\Songs\" />
+      <Folder Include="Resources\Textures\" />
+    </ItemGroup>
+</Project>
