@@ -695,9 +695,9 @@ public unsafe class GameView : View
         var prevHitObject = (HitObject)null;
         var nextHitObject = (HitObject)null;
 
-        foreach (var obj in _sortedObjects)
+        foreach (var obj in _beatmap.HitObjects)
         {
-            var currTime = _songCursor + 500;
+            var currTime = _songCursor + 200;
             
             if (obj.Time <= currTime)
             {
@@ -730,7 +730,7 @@ public unsafe class GameView : View
 
         var diff = nextHitObjectPos - prevHitObjectPos;
         var degree = Math.Atan2(diff.Y, diff.X);
-        var distance = 300;
+        var distance = 100;
         
         if (!Skin.HasAnimatedFollowPoints)
         {
@@ -745,7 +745,7 @@ public unsafe class GameView : View
             {
                 var pos = prevHitObjectPos + direction * (i * distance);
 
-                _renderer.DrawTexture(Skin.FollowPoint, pos.X, pos.Y, 100f, 100f, new Vector4(1, 1, 1, 1), (float)degree * MathHelper.RadToDeg);
+                _renderer.DrawTexture(Skin.FollowPoint, pos.X, pos.Y, 100f, 100f, new Vector4(1, 1, 1, 1), (float)degree * MathHelper.RadToDeg + 135);
             }
         }
         

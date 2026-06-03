@@ -377,6 +377,53 @@ public unsafe class Renderer : IDisposable
             IntPtr.Zero);
         
     }
+
+    public void DrawLine(float x1, float y1, float x2, float y2,
+        float thickness, Vector4 color)
+    {
+        float dx = x2 - x1;
+        float dy = y2 - y1;
+
+        float length = MathF.Sqrt(dx * dx + dy * dy);
+        float angle = MathHelper.RadiansToDegrees(MathF.Atan2(-dy, dx));
+
+        float centerX = (x1 + x2) * 0.5f;
+        float centerY = (y1 + y2) * 0.5f;
+
+        DrawCenteredRect(
+            new Vector2(centerX, centerY),
+            length,
+            thickness,
+            color,
+            angle
+        );
+    }
+    
+    public void DrawLine(Vector2 begin, Vector2 end,
+        float thickness, Vector4 color)
+    {
+        float x1 = begin.X;
+        float y1 = begin.Y;
+        float x2 = end.X;
+        float y2 = end.Y;
+        
+        float dx = x2 - x1;
+        float dy = y2 - y1;
+
+        float length = MathF.Sqrt(dx * dx + dy * dy);
+        float angle = MathHelper.RadiansToDegrees(MathF.Atan2(-dy, dx));
+
+        float centerX = (x1 + x2) * 0.5f;
+        float centerY = (y1 + y2) * 0.5f;
+
+        DrawCenteredRect(
+            new Vector2(centerX, centerY),
+            length,
+            thickness,
+            color,
+            angle
+        );
+    }
     
     public void DrawRectangle(float x, float y, float width, float height, Vector4 color,
         float rotation = 0)
