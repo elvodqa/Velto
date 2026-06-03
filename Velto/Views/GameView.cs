@@ -44,8 +44,6 @@ public unsafe class GameView : View
     private readonly Queue<TrailInfo> trails = new();
 
     private Player _player;
-    private SettingsView _settingsView;
-    private SongSelectorView _songSelectorView;
     private InputOverlayView _inputOverlayView;
     public Skin Skin;
 
@@ -68,6 +66,9 @@ public unsafe class GameView : View
     private const double HIT_INDICATOR_MAX_LIFE = 2000f;
     private List<HitIndicator> _hitIndicators = new();
 
+    public float MouseX;
+    public float MouseY;
+
     public struct SliderFramebuffer
     {
         public Framebuffer Framebuffer;
@@ -81,10 +82,8 @@ public unsafe class GameView : View
         Skin = new Skin(Resources.GetPath($"Resources/Textures/{_skinName}"));
         _renderer = renderer;
         _msdfFont = MSDFFont.Load(Resources.GetPath("Resources/Fonts/arial/arial"));
-
-        _settingsView = new(_renderer);
-        _songSelectorView = new(_renderer, this);
-        _inputOverlayView = new(_renderer, this, _msdfFont);
+        
+        //_inputOverlayView = new(_renderer, this, _msdfFont);
 
         for (int i = 0; i < 16; i++)
         {
@@ -101,8 +100,8 @@ public unsafe class GameView : View
         SetBeatmap(new Beatmap(Resources.GetPath("Resources/Songs/983942 Oomori Seiko - JUSTadICE (TV Size)/Oomori Seiko - JUSTadICE (TV Size) (fieryrage) [Extreme].osu")));
         _player.SetReplay(Replay.ParseReplay(Resources.GetPath("Resources/Replays/fiery.osr")));
         _doubleTimeEnabled = true; _songTrack.Speed = 1.5f;
-        
         _player.SetState(PlayerState.Replay);
+  
     }
 
     float playfieldWidth, playfieldHeight;
@@ -167,10 +166,10 @@ public unsafe class GameView : View
         }
 
         RectangleF hitbox = new(0, Height - 40, Width, 40);
-        if (Input.IsMouseDown(SDLButton.SDL_BUTTON_LEFT) && hitbox.Contains(Input.MouseX, Input.MouseY) &&
+        if (Input.IsMouseDown(SDLButton.SDL_BUTTON_LEFT) && hitbox.Contains(MouseX, MouseY) &&
             _debugEnabled)
         {
-            double targetMs = Util.MapRange(Input.MouseX, 0, Width, 0, (float)_songLength);
+            double targetMs = Util.MapRange(MouseX, 0, Width, 0, (float)_songLength);
 
             if (_startingTimer >= 0 && !_musicStarted)
             {
@@ -240,7 +239,7 @@ public unsafe class GameView : View
             _songCursor = 0;
             _comboCount = 0;
             _totalScore = 0;
-            _inputOverlayView.Reset();
+            //_inputOverlayView.Reset();
             ResetObjectsAfter(0);
         }
 
@@ -253,16 +252,7 @@ public unsafe class GameView : View
             }
         }
 
-
-        _settingsView.Width = Width;
-        _settingsView.Height = Height;
-        _settingsView.Update(delta);
-        _songSelectorView.Width = Width;
-        _songSelectorView.Height = Height;
-        _songSelectorView.Update(delta);
-        _inputOverlayView.Width = Width;
-        _inputOverlayView.Height = Height;
-
+        
         var scale = playfieldWidth / PLAYFIELD_W;
         var osuRadius = 54.4f - 4.48f * _beatmap.CircleSize;
         _baseCircleSize = osuRadius * 2f * scale;
@@ -332,12 +322,7 @@ public unsafe class GameView : View
                 //Bass.ChannelSetAttribute(_musicChannel, ChannelAttribute.Volume, _musicVolume);
                 _songTrack?.Volume = _musicVolume;
             }
-
-            if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_O))
-            {
-                _settingsView.Toggle();
-            }
-
+            
             if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_S))
             {
                 Skin.Dispose();
@@ -346,12 +331,7 @@ public unsafe class GameView : View
                 Skin = new Skin(Resources.GetPath($"Resources/Textures/{_skinName}"));
             }
         }
-
-        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_TAB))
-        {
-            _songSelectorView.Toggle();
-        }
-
+        
         // notes
         // you can click another object after hitting a slider head
         // TODO:
@@ -359,7 +339,7 @@ public unsafe class GameView : View
 
         // Update player just before doing judgement
         _player.Update(delta, _songCursor, previousSongCursor, playfieldTopLeft, scale);
-        _inputOverlayView.Update(delta);
+        //_inputOverlayView.Update(delta);
         // Handle objects bkz: https://osu.ppy.sh/wiki/en/Gameplay/Judgement/osu%21 
         foreach (var hitObject in _beatmap.HitObjects)
         {
@@ -625,6 +605,14 @@ public unsafe class GameView : View
 
         _prevWidth = Width;
         _prevHeight = Height;
+    }
+    
+    public override void OnMouseMove(MouseEventArgs e)
+    {
+        base.OnMouseMove(e);
+        
+        MouseX = e.X;
+        MouseY = e.Y;
     }
 
     void ResetObjectsAfter(double cursorMs)
@@ -1306,7 +1294,7 @@ public unsafe class GameView : View
                 Width / 20, new Vector4(1, 1, 1, 1));
         }
 
-        _inputOverlayView.Draw(delta);
+        //_inputOverlayView.Draw(delta);
 
         // Draw timing window
         var timingWindowWidth = Width / 7;
@@ -1419,9 +1407,9 @@ public unsafe class GameView : View
                 new Vector2(10, 200), 1, new Vector4(1, 1, 0, 1));
             _renderer.FlushText(_msdfFont);
         }
-
-        _songSelectorView.Draw(delta);
-        _settingsView.Draw(delta);
+        
+        //_renderer.DrawCenteredRect(new Vector2(MouseX, MouseY), 50, 50, new Vector4(1, 0, 1, 1));
+        
         _renderer.SetScissor(0, 0, (int)Width, (int)Height);
     }
 
@@ -1446,10 +1434,11 @@ public unsafe class GameView : View
 
         _beatmap.CalculatePrepass(_renderer.Window);
         _player = new Player(_beatmap);
+        _player.View = this;
         SDL_ShowCursor();
 
-        _inputOverlayView.SetPlayer(_player);
-        _inputOverlayView.Reset();
+        //_inputOverlayView.SetPlayer(_player);
+        //_inputOverlayView.Reset();
         ResetObjectsAfter(0);
 
         _sortedObjects = _beatmap.HitObjects

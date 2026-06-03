@@ -2,6 +2,7 @@ using OpenTK.Mathematics;
 using OpenTK.Mathematics;
 using SDL;
 using Velto.Core;
+using Velto.Graphics;
 
 namespace Velto.Gameplay;
 
@@ -21,7 +22,22 @@ public class Player
             switch (State)
             {
                 case PlayerState.Player:
-                    return new Vector2(Input.MouseX, Input.MouseY);
+                    if (View != null)
+                    {
+                        float mouseX = Input.MouseX;
+                        float mouseY = Input.MouseY;
+                        
+                        mouseX = Math.Clamp(mouseX, View.X, View.X + View.Width);
+                        mouseY = Math.Clamp(mouseY, View.Y, View.Y + View.Height);
+
+                        return new Vector2(mouseX - View.X, mouseY - View.Y);
+                       /* _gameView.OnMouse(new MouseEventArgs()
+                        {
+                            X = (int)(mouseX - _gameView.X),
+                            Y = (int)(mouseY - _gameView.Y),
+                        });*/
+                    } 
+                    return new Vector2(0, 0);
                 case PlayerState.Autoplay:
                     return _playfieldOffset + _cursor * _scale;
                 case PlayerState.Replay:
@@ -74,6 +90,8 @@ public class Player
         }
     }
 
+    public View? View = null;
+
     public PlayerState State { get; private set; } = PlayerState.Autoplay;
     public Replay? Replay { get; private set; } = null;
     private int _replayFrameIndex = 0;
@@ -98,8 +116,7 @@ public class Player
    
     
     public bool Dance { get; set; } = false;
-
-
+    
     public Player(Beatmap beatmap)
     {
         _beatmap = beatmap;
@@ -107,7 +124,7 @@ public class Player
         if (_beatmap.HitObjects.Count > 0)
             _cursor = _beatmap.HitObjects[0].Position;
     }
-
+    
     public void SetReplay(Replay replay)
     {
         Replay = replay;

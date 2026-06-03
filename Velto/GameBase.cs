@@ -1,3 +1,4 @@
+using System.Drawing;
 using Velto.Audio;
 
 namespace Velto;
@@ -33,7 +34,10 @@ public unsafe class GameBase : IDisposable
     private IntPtr _eventWatchUserdata;
     private ulong _eventWatchTickLast;
 
-    private GameView _gameDisplay;
+    private GameView _gameView;
+    private SettingsView _settingsView;
+    private SongSelectorView _songSelectorView;
+    
     private bool _running;
 
     private Renderer _renderer;
@@ -43,6 +47,21 @@ public unsafe class GameBase : IDisposable
     private double _fps = 0;
 
     private MSDFFont _debugFont;
+
+    private List<IInputReceiver> _views = new();
+    private IInputReceiver _hovered;
+    private IInputReceiver _captured;
+    
+    private IInputReceiver GetTopView(float x, float y)
+    {
+        for (int i = _views.Count - 1; i >= 0; i--)
+        {
+            var v = _views[i];
+            if (v.HitTest(x, y))
+                return v;
+        }
+        return null;
+    }
 
 
     public GameBase()
@@ -109,7 +128,20 @@ public unsafe class GameBase : IDisposable
         
         _running = false;
         _renderer = new(_window);
-        _gameDisplay = new(_renderer);
+        _gameView = new(_renderer)
+        {
+            Framebuffer = new Framebuffer(_renderer, 1280, 720)
+        };
+        _settingsView = new(_renderer)
+        {
+            Framebuffer = new Framebuffer(_renderer, 1280, 720)
+        };
+        _songSelectorView = new(_renderer, _gameView)
+        {
+            Framebuffer = new Framebuffer(_renderer, 1280, 720)
+        };
+        
+        _views.Add(_gameView);
 
         // During a live window resize, the OS may block the main loop. An event watch lets us redraw.
         _eventWatchHandle = GCHandle.Alloc(this);
@@ -162,6 +194,10 @@ public unsafe class GameBase : IDisposable
                         _running = false;
                         break;
                     case (uint)SDL_EventType.SDL_EVENT_WINDOW_RESIZED:
+                        _gameView.Framebuffer.Resize((int)_renderer.WindowSizeInPixels.X, (int)_renderer.WindowSizeInPixels.Y);
+                        _settingsView.Framebuffer.Resize((int)_renderer.WindowSizeInPixels.X, (int)_renderer.WindowSizeInPixels.Y);
+                        _songSelectorView.Framebuffer.Resize((int)_renderer.WindowSizeInPixels.X, (int)_renderer.WindowSizeInPixels.Y);
+                        
                         Logger.Instance.Info($"Window Resized: {ev.window.data1} x {ev.window.data2}");
                         break;
                     case (uint)SDL_EventType.SDL_EVENT_KEY_DOWN:
@@ -170,6 +206,8 @@ public unsafe class GameBase : IDisposable
                         //     _gameDisplay.Dispose();
                         //     _gameDisplay = new(_renderer);
                         // }
+                        break;
+                    case (uint)SDL_EventType.SDL_EVENT_MOUSE_MOTION:
                         break;
                 }
                 Input.UpdateEvents(ev);
@@ -181,26 +219,137 @@ public unsafe class GameBase : IDisposable
         }
     }
 
-   
+
+    private double f = 0;
 
     private void Loop(double deltaTime)
     {
         AudioManager.Instance.Update(deltaTime);
         Input.GetKeyboardState();
         Input.UpdateMouse(_window);
+
+        f += deltaTime / 1000;
         
         _renderer.BeginFrame();
+    
+        double valueX = (Math.Cos(f) + 1.0) * 0.5;
+        double valueY = (Math.Sin(f) + 1.0) * 0.5;
+
+        _gameView.Width = (float)((_renderer.WindowSizeInPixels.X / 2) + (_renderer.WindowSizeInPixels.X / 2) * valueX);
+        _gameView.Height = (float)((_renderer.WindowSizeInPixels.Y / 2) + (_renderer.WindowSizeInPixels.Y / 2) * valueY);
+        _gameView.X = _renderer.WindowSizeInPixels.X / 2 - _gameView.Width / 2;
+        _gameView.Y = _renderer.WindowSizeInPixels.Y / 2 - _gameView.Height / 2;
+
+
+        if (Input.IsKeyDown(SDL_Scancode.SDL_SCANCODE_LCTRL))
+        {
+            if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_O))
+            {
+                foreach (var receiver in _views)
+                {
+                    if (receiver is View view)
+                    {
+                        if (view is SettingsView settingsView)
+                        {
+                            
+                        }
+
+                        if (view is GameView gameView)
+                        {
+                            
+                        }
+                    }
+                }
+                
+            }
+        }
         
-        _gameDisplay.Width = (int)_renderer.WindowSizeInPixels.X;
-        _gameDisplay.Height = (int)_renderer.WindowSizeInPixels.Y;
+        var top = GetTopView(Input.MouseX, Input.MouseY);
         
-       
-        _gameDisplay.Update(deltaTime);
-        _gameDisplay.Draw(deltaTime);
-        //_renderer.Line();
-        _renderer.DrawText(_debugFont, $"FPS: {_fps.ToString("0000.0")} [{deltaTime.ToString("00.00")}ms] | DrawCallCount: {_renderer.DrawCallCount:000000}", new (5, 100), 0.6f, new Vector4(1, 1, 1, 1));
+        // Mouse move
+        IInputReceiver target = _captured ?? top;
+        if (target != null)
+        {
+            float localX = Input.MouseX - target.X;
+            float localY = Input.MouseY - target.Y;
+
+            target.OnMouseMove(new MouseEventArgs
+            {
+                X = (int)localX,
+                Y = (int)localY
+            });
+        }
+        
+
+        if (top != null)
+        {
+            _captured = top;
+
+            var button = MouseButton.None;
+            if (Input.IsMouseJustPressed(SDLButton.SDL_BUTTON_LEFT)) button = MouseButton.Left;
+            if (Input.IsMouseJustPressed(SDLButton.SDL_BUTTON_RIGHT)) button = MouseButton.Right;
+            if (Input.IsMouseJustPressed(SDLButton.SDL_BUTTON_MIDDLE)) button = MouseButton.Middle;
+
+            if (button != MouseButton.None)
+            {
+                top.OnMouseDown(button, new MouseEventArgs
+                {
+                    X = (int)(Input.MouseX - top.X),
+                    Y = (int)(Input.MouseY - top.Y)
+                });
+            }
+            
+        }
+        
+        if (_captured != null)
+        {
+            var button = MouseButton.None;
+            if (Input.IsMouseJustReleased(SDLButton.SDL_BUTTON_LEFT)) button = MouseButton.Left;
+            if (Input.IsMouseJustReleased(SDLButton.SDL_BUTTON_RIGHT)) button = MouseButton.Right;
+            if (Input.IsMouseJustReleased(SDLButton.SDL_BUTTON_MIDDLE)) button = MouseButton.Middle;
+            
+            _captured.OnMouseUp(button, new MouseEventArgs
+            {
+                X = (int)(Input.MouseX - _captured.X),
+                Y = (int)(Input.MouseY - _captured.Y)
+            });
+
+            _captured = null;
+        }
+        
+        if (top != _hovered)
+        {
+            _hovered?.OnMouseLeave();
+
+            _hovered = top;
+
+            _hovered?.OnMouseEnter();
+        }
+
+        foreach (var receiver in _views)
+        {
+            if (receiver is View view)
+            {
+                view.Update(deltaTime);
+                
+                _renderer.BindFramebuffer(view.Framebuffer);
+                view.Draw(deltaTime);
+                _renderer.UnbindFramebuffer(view.Framebuffer);
+            }
+        }
+        
+        _renderer.SetScissor(0, 0, (int)_renderer.WindowSizeInPixels.X, (int)_renderer.WindowSizeInPixels.Y);
+        _renderer.Clear(new Vector4(0, 0, 0, 1));
+        foreach (var receiver in _views)
+        {
+            if (receiver is View view)
+            {
+                _renderer.DrawTexture(_gameView.Framebuffer.Texture, view.X, view.Y,view.Width, view.Height, new Vector4(1, 1, 1, 1));
+            }
+        }
+        
+        _renderer.DrawText(_debugFont, $"FPS: {_fps.ToString("0000.0")} [{deltaTime.ToString("00.00")}ms] | DrawCallCount: {_renderer.DrawCallCount:000000}", new (5, 5), 0.5f, new Vector4(1, 1, 1, 1));
         _renderer.FlushText(_debugFont);
-        
     }
     
     private void RenderFromEventWatch()

@@ -1,15 +1,66 @@
 namespace Velto.Graphics;
 
-public abstract class View : IDisposable
+public struct ResizeEventArgs
 {
-    public float Width;
-    public float Height;
+    public int Width;
+    public int Height;
+}
+
+public struct MouseEventArgs
+{
+    public int X;
+    public int Y;
+}
+
+public abstract class View : IInputReceiver, IDisposable
+{
+    public Framebuffer Framebuffer;
+    public float X { get; set; }
+    public float Y { get; set;  }
+ 
+    public float Width
+    {
+        get
+        {
+            return Framebuffer.Width;
+        }
+        set
+        {
+            if ((int)value == Framebuffer.Width) return;
+            Framebuffer.Resize((int)value, Framebuffer.Height);
+        }
+    }
+
+    public float Height
+    {
+        get
+        {
+            return Framebuffer.Height;
+        }
+        set
+        {
+            if ((int)value == Framebuffer.Height) return;
+            Framebuffer.Resize(Framebuffer.Width, (int)value);
+        }
+    }
     
-    public abstract void Update(double delta);
-    public abstract void Draw(double delta);
+    public virtual bool HitTest(float mouseX, float mouseY)
+    {
+        return mouseX >= X && mouseX <= X + Width &&
+               mouseY >= Y && mouseY <= Y + Height;
+    }
+
+    public virtual void OnMouseEnter() { }
+    public virtual void OnMouseLeave() { }
+    public virtual void OnMouseMove(MouseEventArgs e) { }
+    public virtual void OnMouseDown(MouseButton button, MouseEventArgs e) { }
+    public virtual void OnMouseUp(MouseButton button, MouseEventArgs e) { }
+
+    public abstract void Update(double dt);
+    public abstract void Draw(double dt);
 
     public void Dispose()
     {
-        // TODO release managed resources here
+        Framebuffer.Dispose();
     }
 }
