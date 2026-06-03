@@ -31,19 +31,16 @@ public class SongSelectorView : View
     
     private float _progress; // 0 = closed, 1 = open
     private const float Duration = 0.3f;
-    private MSDFFont _font;
     private float _cursor = 0;
     private List<BeatmapBox> _beatmapBoxes = new();
     private GameView _gameView;
     private float _totalContentHeight;
     private bool _isMouseHovering = false;
     
-    
     public SongSelectorView(Renderer renderer, GameView gameview)
     {
         _gameView = gameview;
         _renderer = renderer;
-        _font = MSDFFont.Load(Resources.GetPath("Resources/Fonts/arial/arial"));
         LoadBeatmaps();
     }
    
@@ -124,14 +121,14 @@ public class SongSelectorView : View
 
             _renderer.DrawRectangle(box.Position.X, box.Position.Y, box.Size.X, box.Size.Y, color);
             _renderer.DrawTexture(box.Texture, box.Position.X, box.Position.Y, 230, 150, new Vector4(1, 1, 1, 1));
-            _renderer.DrawText(_font, box.Beatmap.ToString(),
+            _renderer.DrawText(Fonts.Default, box.Beatmap.ToString(),
                 new Vector2(box.Position.X + 25 + 230, box.Position.Y + 25),
                 box.Size.Y/5, new Vector4(1, 1, 1, 1));
-            _renderer.DrawText(_font, $"By: {box.Beatmap.Creator}",
+            _renderer.DrawText(Fonts.Default, $"By: {box.Beatmap.Creator}",
                 new Vector2(box.Position.X + 25 + 230, box.Position.Y + 65),
                 box.Size.Y/5, new Vector4(1, 1, 1, 1));
         }
-        _renderer.FlushText(_font);
+        _renderer.FlushText(Fonts.Default);
         
         // draw thumb (https://thorlaksson.com/2025/scrollbars-from-scratch/)
         var l_c = _totalContentHeight;

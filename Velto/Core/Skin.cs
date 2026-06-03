@@ -36,6 +36,7 @@ public class Skin : IDisposable
     public Texture SliderSpec { get; private set; }
     public Texture ModAutoplay { get; private set; }
     public Texture ModNightcore { get; private set; }
+    public Texture ModHidden { get; private set; }
     public List<Texture> SliderBalls { get; private set; } = new();
     public Texture[] DefaultNumbers { get; private set; } = new Texture[10];
     public Texture[] ScoreNumbers { get; private set; } = new Texture[10];
@@ -83,6 +84,7 @@ public class Skin : IDisposable
         SliderStartCircle = GetElementTexture("sliderstartcircle", "hitcircle");
         ModAutoplay = GetElementTexture("selection-mod-autoplay", "selection-mod-autoplay");
         ModNightcore = GetElementTexture("selection-mod-nightcore", "selection-mod-nightcore");
+        ModHidden = GetElementTexture("selection-mod-hidden", "selection-mod-hidden");
         
         InputOverlayBackground = GetElementTexture("inputoverlay-background", "inputoverlay-background");
         InputOverlayKey = GetElementTexture("inputoverlay-key", "inputoverlay-key");
@@ -262,6 +264,7 @@ public class Skin : IDisposable
         SliderSpec?.Dispose();
         ModAutoplay?.Dispose();
         ModNightcore?.Dispose();
+        ModHidden?.Dispose();
         PlayUnranked?.Dispose();
         FollowPoint?.Dispose();
 

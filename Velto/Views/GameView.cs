@@ -46,6 +46,7 @@ public unsafe class GameView : View
     private Player _player;
     private InputOverlayView _inputOverlayView;
     public Skin Skin;
+    public bool Hidden;
 
     private Track? _songTrack;
     private AudioChannel? _songAudio;
@@ -94,7 +95,8 @@ public unsafe class GameView : View
                 Time = 0,
             };
         }
-        //
+
+        Hidden = true;
         // SetBeatmap(new Beatmap(Resources.GetPath("Resources/Songs/Wakeshima Kanon/ASCA - Nisemono no Koi ni Sayounara with Wakeshima Kanon (timemon) [Kyou's Extra].osu")));
         // _player.SetReplay(Replay.ParseReplay(Resources.GetPath("Resources/Replays/kanon.osr")));
         SetBeatmap(new Beatmap(Resources.GetPath("Resources/Songs/983942 Oomori Seiko - JUSTadICE (TV Size)/Oomori Seiko - JUSTadICE (TV Size) (fieryrage) [Extreme].osu")));
@@ -787,15 +789,18 @@ public unsafe class GameView : View
                     hitObject.Time + _startingTimer - (int)_songCursor < _beatmap.Preempt)
                 {
                     //if (hitObject.HitResult != HitResult.None) continue;
-                    _renderer.DrawTexture(Skin.ApproachCircle,
-                        posX - approachCircleSize / 2,
-                        posY - approachCircleSize / 2,
-                        approachCircleSize,
-                        approachCircleSize, hitObject.Color with
-                        {
-                            W = Math.Min(fadein, fadeout)
-                        });
-
+                    if (!Hidden)
+                    {
+                        _renderer.DrawTexture(Skin.ApproachCircle,
+                            posX - approachCircleSize / 2,
+                            posY - approachCircleSize / 2,
+                            approachCircleSize,
+                            approachCircleSize, hitObject.Color with
+                            {
+                                W = Math.Min(fadein, fadeout)
+                            });
+                    }
+                    
                     _renderer.DrawTexture(Skin.HitCircle,
                         posX - drawSize / 2,
                         posY - drawSize / 2,
@@ -1027,11 +1032,15 @@ public unsafe class GameView : View
                         new Vector4(1, 1, 1, 1) with { W = 1 });
                 }
 
-                _renderer.DrawTexture(Skin.ApproachCircle,
-                    posX - approachCircleSize / 2,
-                    posY - approachCircleSize / 2,
-                    approachCircleSize,
-                    approachCircleSize, hitObject.Color with { W = Math.Min(fadein, fadeout) });
+                if (!Hidden)
+                {
+                    _renderer.DrawTexture(Skin.ApproachCircle,
+                        posX - approachCircleSize / 2,
+                        posY - approachCircleSize / 2,
+                        approachCircleSize,
+                        approachCircleSize, hitObject.Color with { W = Math.Min(fadein, fadeout) });
+                }
+                
 
                 _renderer.DrawTexture(Skin.SliderStartCircle,
                     posX - drawSize / 2,
@@ -1273,7 +1282,7 @@ public unsafe class GameView : View
                 new Vector4(1, 1, 1, 1));
         }
 
-
+        // TODO: add actual stacking for mod icons
         if (_player.State == PlayerState.Autoplay)
         {
             _renderer.DrawTexture(Skin.ModAutoplay, Width - Width / 20 - 50, Height / 8, Width / 20, Width / 20,
@@ -1282,7 +1291,12 @@ public unsafe class GameView : View
 
         if (_doubleTimeEnabled)
         {
-            _renderer.DrawTexture(Skin.ModNightcore, Width - Width / 20 - 50 - Width / 20 / 2, Height / 8, Width / 20,
+            _renderer.DrawTexture(Skin.ModNightcore, Width - Width / 20 - 50 - Width / 40, Height / 8, Width / 20,
+                Width / 20, new Vector4(1, 1, 1, 1));
+        }
+        if (Hidden)
+        {
+            _renderer.DrawTexture(Skin.ModHidden, Width - Width / 20 - 50 - Width / 40 - 50 - Width / 40, Height / 8, Width / 20,
                 Width / 20, new Vector4(1, 1, 1, 1));
         }
 
