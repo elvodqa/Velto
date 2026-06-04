@@ -1,0 +1,48 @@
+name: Build Velto
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+          - os: macos-latest
+            rid: osx-arm64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore Velto/Velto.csproj
+
+      - name: Build
+        run: dotnet build Velto/Velto.csproj --configuration Release --no-restore
+
+      - name: Publish
+        run: >
+          dotnet publish Velto/Velto.csproj
+          -c Release
+          -r ${{ matrix.rid }}
+          --self-contained true
+          -o publish/${{ matrix.rid }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Velto-${{ matrix.rid }}
+          path: publish/${{ matrix.rid }}
