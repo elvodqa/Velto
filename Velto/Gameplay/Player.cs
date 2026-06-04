@@ -1,8 +1,8 @@
 using OpenTK.Mathematics;
-using OpenTK.Mathematics;
 using SDL;
 using Velto.Core;
 using Velto.Graphics;
+using Velto.Views;
 
 namespace Velto.Gameplay;
 
@@ -15,264 +15,343 @@ public enum PlayerState
 
 public class Player
 {
-    public Vector2 Cursor
-    {
-        get
-        {
-            switch (State)
-            {
-                case PlayerState.Player:
-                    if (View != null)
-                    {
-                        float mouseX = Input.MouseX;
-                        float mouseY = Input.MouseY;
-                        
-                        mouseX = Math.Clamp(mouseX, View.X, View.X + View.Width);
-                        mouseY = Math.Clamp(mouseY, View.Y, View.Y + View.Height);
-
-                        return new Vector2(mouseX - View.X, mouseY - View.Y);
-                       /* _gameView.OnMouse(new MouseEventArgs()
-                        {
-                            X = (int)(mouseX - _gameView.X),
-                            Y = (int)(mouseY - _gameView.Y),
-                        });*/
-                    } 
-                    return new Vector2(0, 0);
-                case PlayerState.Autoplay:
-                    return _playfieldOffset + _cursor * _scale;
-                case PlayerState.Replay:
-                    if (Replay != null)
-                    {
-                        var frames = Replay.Frames;
-
-                        if (frames.Count == 0)
-                            return _playfieldOffset;
-
-                        // Advance frame index forward only (no scanning backwards)
-                        while (_replayFrameIndex < frames.Count - 2 &&
-                               frames[_replayFrameIndex + 1].MsSinceStart <= _songCursor)
-                        {
-                            _replayFrameIndex++;
-                        }
-
-                        var frame = frames[_replayFrameIndex];
-                        var next = frames[_replayFrameIndex + 1];
-
-                        double startTime = frame.MsSinceStart;
-                        double endTime = next.MsSinceStart;
-
-                        Vector2 startPos = new Vector2(frame.X, frame.Y);
-                        Vector2 endPos = new Vector2(next.X, next.Y);
-
-                        float t;
-
-                        if (endTime <= startTime)
-                        {
-                            t = 0f;
-                        }
-                        else
-                        {
-                            t = (float)((_songCursor - startTime) / (endTime - startTime));
-                            t = Math.Clamp(t, 0f, 1f);
-
-                            // smoothstep for nicer motion
-                            t = t * t * (3f - 2f * t);
-                        }
-
-                        var pos = Vector2.Lerp(startPos, endPos, t);
-
-                        return _playfieldOffset + pos * _scale;
-                    }
-                    return new Vector2(0, 0);
-                default:
-                    throw new ArgumentOutOfRangeException();
-            }
-        }
-    }
-
-    public View? View = null;
-
+    public Vector2 Cursor => GetCurrentCursor();
+    
     public PlayerState State { get; private set; } = PlayerState.Autoplay;
     public Replay? Replay { get; private set; } = null;
-    private int _replayFrameIndex = 0;
-    private double _prevSongCursor;
+
+    public bool ActionPrimaryPressed { get; private set; }
+    public bool ActionPrimaryDown { get; private set; }
+    public bool ActionSecondaryPressed { get; private set; }
+    public bool ActionSecondaryDown { get; private set; }
+
+    public bool Dance { get; set; } = false;
+
     private readonly Beatmap _beatmap;
+    private readonly GameView _gameView;
+
+    // Replay fields
+    private int _replayFrameIndex = 0;
+    private double _songCursor = 0;
+    private Vector2 _playfieldOffset = Vector2.Zero;
+    private float _scale = 1f;
+
+    // Autoplay fields
     private int _lastAutoplayHitIndex = -1;
+    private Vector2 _autoplayCursor = Vector2.Zero;
+    private bool _primaryLastPressed = false;
 
-    public bool ActionPrimaryPressed = false;
-    public bool ActionPrimaryDown = false;
-    public bool ActionSecondaryPressed = false;
-    public bool ActionSecondaryDown = false;
-
+    // Input state tracking
     private bool _prevPrimary;
     private bool _prevSecondary;
 
-    private bool _primaryLastPressed = false;
-    private Vector2 _cursor = new Vector2();
-    private Vector2 _playfieldOffset = new();
-    private float _scale = 0;
-    private double _songCursor = 0;
-    
-   
-    
-    public bool Dance { get; set; } = false;
-    
-    public Player(Beatmap beatmap)
+    public Player(Beatmap beatmap, GameView view)
     {
         _beatmap = beatmap;
+        _gameView = view;
 
         if (_beatmap.HitObjects.Count > 0)
-            _cursor = _beatmap.HitObjects[0].Position;
+            _autoplayCursor = _beatmap.HitObjects[0].Position;
     }
-    
+
     public void SetReplay(Replay replay)
     {
         Replay = replay;
+        _replayFrameIndex = 0;
     }
-    
+
     public void SetState(PlayerState state)
     {
         State = state;
+
         switch (State)
         {
             case PlayerState.Player:
                 _lastAutoplayHitIndex = -1;
                 _primaryLastPressed = false;
                 break;
-            case PlayerState.Autoplay:
 
+            case PlayerState.Autoplay:
+                _lastAutoplayHitIndex = -1;
                 break;
+
             case PlayerState.Replay:
                 _replayFrameIndex = 0;
                 break;
-            default:
-                throw new ArgumentOutOfRangeException();
         }
     }
 
-    public void Update(double deltaTime, double songCursor, double previousSongCursor, Vector2 playfieldOffset, float scale)
+    /// <summary>
+    /// Main update method
+    /// </summary>
+    public void Update(double deltaTime, double songCursor, Vector2 playfieldOffset, float scale)
     {
-        if (_songCursor < previousSongCursor)
-        {
-            _replayFrameIndex = 0;
-        }
-        _prevSongCursor = previousSongCursor;
+        bool isRollback = songCursor < _songCursor;   // Detect seeking backwards
         
+        _songCursor = songCursor;
         _playfieldOffset = playfieldOffset;
         _scale = scale;
-        _songCursor = songCursor;
 
-        ActionPrimaryDown = false;
+        // Reset input states
         ActionPrimaryPressed = false;
+        ActionPrimaryDown = false;
         ActionSecondaryPressed = false;
         ActionSecondaryDown = false;
-
-        if (State == PlayerState.Player)
+        
+        if (isRollback && State == PlayerState.Replay)
         {
-            if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_Z))
-                ActionPrimaryPressed = true;
-            if (Input.IsKeyDown(SDL_Scancode.SDL_SCANCODE_Z))
-                ActionPrimaryDown = true;
-            if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_X))
-                ActionSecondaryPressed = true;
-            if (Input.IsKeyDown(SDL_Scancode.SDL_SCANCODE_X))
-                ActionSecondaryDown = true;
-            return;
+            HandleReplayRollback();
         }
 
-        if (State == PlayerState.Autoplay)
+        switch (State)
         {
-            var objects = _beatmap.HitObjects;
-            if (objects.Count == 0) return;
+            case PlayerState.Player:
+                UpdatePlayerInput();
+                break;
 
-            // Find the object we should be interacting with
-            int currentIndex = -1;
-            HitObject current = null;
+            case PlayerState.Autoplay:
+                UpdateAutoplay();
+                break;
 
-            for (int i = 0; i < objects.Count; i++)
-            {
-                var obj = objects[i];
-
-                if (obj is Slider slider)
-                {
-                    if (songCursor >= slider.Time && songCursor <= slider.Time + slider.Duration)
-                    {
-                        currentIndex = i;
-                        current = obj;
-                        break;
-                    }
-                }
-
-                if (songCursor < obj.Time)
-                {
-                    currentIndex = i;
-                    current = obj;
-                    break;
-                }
-            }
-
-            if (currentIndex == -1)
-            {
-                _cursor = objects[^1].Position;
-                return;
-            }
-
-            // ====================== SLIDER ======================
-            if (current is Slider activeSlider &&
-                songCursor >= activeSlider.Time &&
-                songCursor <= activeSlider.Time + activeSlider.Duration)
-            {
-                _cursor = activeSlider.GetPositionAt(songCursor);
-                ActionPrimaryDown = true;
-
-                if (_lastAutoplayHitIndex != currentIndex)
-                {
-                    Alternate();
-                    _lastAutoplayHitIndex = currentIndex;
-                }
-
-                return;
-            }
-
-            // ====================== HIT CIRCLE / NEXT OBJECT ======================
-            double timeToHit = current.Time - songCursor;
-
-            // Move towards target
-            _cursor = GetPositionAtTime(songCursor, currentIndex);
-
-            // Hit timing - more reliable
-            double HIT_WINDOW = 80.0 - 6.0 * _beatmap.OverallDifficulty;
-
-            if (timeToHit <= HIT_WINDOW && timeToHit >= -20.0) // allow slight late hit
-            {
-                if (_lastAutoplayHitIndex != currentIndex)
-                {
-                    Alternate();
-                    _lastAutoplayHitIndex = currentIndex;
-                }
-            }
-        }
-
-        if (State == PlayerState.Replay)
-        {
-            if (Replay != null)
-            {
-                var frame = Replay.Frames.OrderBy(f => Math.Abs(f.MsSinceStart - songCursor))
-                    .First();
-                
-                foreach (var keypress in frame.KeysPressed)
-                {
-                    if (keypress == Keypress.K1 && !_prevPrimary) ActionPrimaryPressed = true;
-                    if (keypress == Keypress.K2 && !_prevSecondary) ActionSecondaryPressed = true;
-                    if (keypress == Keypress.K1) ActionPrimaryDown = true;
-                    if (keypress == Keypress.K2) ActionSecondaryDown = true;
-                }
-            }
+            case PlayerState.Replay:
+                UpdateReplay();
+                break;
         }
 
         _prevPrimary = ActionPrimaryDown;
         _prevSecondary = ActionSecondaryDown;
+    }
+
+    private void UpdatePlayerInput()
+    {
+        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_Z))
+            ActionPrimaryPressed = true;
+        if (Input.IsKeyDown(SDL_Scancode.SDL_SCANCODE_Z))
+            ActionPrimaryDown = true;
+
+        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_X))
+            ActionSecondaryPressed = true;
+        if (Input.IsKeyDown(SDL_Scancode.SDL_SCANCODE_X))
+            ActionSecondaryDown = true;
+    }
+
+    private void UpdateAutoplay()
+    {
+        double HIT_WINDOW = 80.0 - 6.0 * _beatmap.OverallDifficulty;
+
+        var objects = _beatmap.HitObjects;
+        if (objects.Count == 0) return;
+
+        int currentIndex = -1;
+        HitObject? current = null;
         
+        for (int i = 0; i < objects.Count; i++)
+        {
+            var obj = objects[i];
+
+            if (_songCursor < obj.Time)
+            {
+                currentIndex = i;
+                current = obj;
+                break;
+            }
+            
+            if (obj is Slider slider && 
+                _songCursor >= slider.Time && 
+                _songCursor <= slider.Time + slider.Duration)
+            {
+                currentIndex = i;
+                current = obj;
+                break;
+            }
+        }
+
+        if (currentIndex == -1)
+        {
+            _autoplayCursor = objects[^1].Position;
+            return;
+        }
+
+        // Sliding. TODO: stop sliding if there is another hit object approaching
+        if (current is Slider activeSlider &&
+            _songCursor >= activeSlider.Time &&
+            _songCursor <= activeSlider.Time + activeSlider.Duration)
+        {
+            // look ahead
+            HitObject? next = null;
+            if (currentIndex + 1 < objects.Count)
+                next = objects[currentIndex + 1];
+
+            double lookaheadTime = 100; // tweak (ms)
+
+            bool nextIsComingSoon =
+                next != null &&
+                next.Time - _songCursor <= lookaheadTime;
+
+            if (nextIsComingSoon)
+            {
+                ActionPrimaryDown = false;
+                currentIndex++;
+                return;
+            }
+
+            // normal slider behavior
+            _autoplayCursor = activeSlider.GetPositionAt(_songCursor);
+            ActionPrimaryDown = true;
+
+            if (_lastAutoplayHitIndex != currentIndex)
+            {
+                Alternate();
+                _lastAutoplayHitIndex = currentIndex;
+            }
+            return;
+        }
+
+        // Hit circle / movement
+        _autoplayCursor = GetPositionAtTime(_songCursor, currentIndex);
+
+        double timeToHit = current.Time - _songCursor;
+        double hitWindow = 80.0 - 6.0 * _beatmap.OverallDifficulty;
+
+        if (timeToHit <= hitWindow && timeToHit >= -20.0)
+        {
+            if (_lastAutoplayHitIndex != currentIndex)
+            {
+                Alternate();
+                _lastAutoplayHitIndex = currentIndex;
+            }
+        }
+    }
+    
+    private void HandleReplayRollback()
+    {
+        // Reset to beginning when going backwards
+        if (_songCursor <= 0)
+        {
+            _replayFrameIndex = 0;
+            return;
+        }
+
+        // Find the correct frame for current time (binary search would be better for large replays)
+        var frames = Replay!.Frames;
+        _replayFrameIndex = 0;
+
+        while (_replayFrameIndex < frames.Count - 1 &&
+               frames[_replayFrameIndex + 1].MsSinceStart <= _songCursor)
+        {
+            _replayFrameIndex++;
+        }
+    }
+
+    private void UpdateReplay()
+    {
+        if (Replay == null || Replay.Frames.Count == 0)
+            return;
+
+        var frames = Replay.Frames;
+        
+        // Normal forward advancement
+        while (_replayFrameIndex < frames.Count - 1 &&
+               frames[_replayFrameIndex + 1].MsSinceStart <= _songCursor)
+        {
+            _replayFrameIndex++;
+        }
+
+        var currentFrame = frames[_replayFrameIndex];
+
+        // Reconstruct key states
+        foreach (var key in currentFrame.KeysPressed)
+        {
+            if (key == Keypress.K1)
+            {
+                ActionPrimaryDown = true;
+                if (!_prevPrimary) ActionPrimaryPressed = true;
+            }
+            else if (key == Keypress.K2)
+            {
+                ActionSecondaryDown = true;
+                if (!_prevSecondary) ActionSecondaryPressed = true;
+            }
+        }
+
+        // Optional: Sync GameView time smoothly (recommended)
+        _gameView.SongCursor = GetInterpolatedReplayTime();
+    }
+    
+    private double GetInterpolatedReplayTime()
+    {
+        if (Replay == null || Replay.Frames.Count == 0)
+            return _songCursor;
+
+        var frames = Replay.Frames;
+
+        if (_replayFrameIndex >= frames.Count - 1)
+            return frames[^1].MsSinceStart;
+
+        var f0 = frames[_replayFrameIndex];
+        var f1 = frames[_replayFrameIndex + 1];
+
+        double segmentStart = f0.MsSinceStart;
+        double segmentEnd = segmentStart + f1.MsSincePreviousFrame;
+
+        if (segmentEnd <= segmentStart)
+            return segmentStart;
+
+        float t = (float)((_songCursor - segmentStart) / (segmentEnd - segmentStart));
+        t = Math.Clamp(t, 0f, 1f);
+
+        return segmentStart + t * (segmentEnd - segmentStart);
+    }
+
+    private Vector2 GetCurrentCursor()
+    {
+        switch (State)
+        {
+            case PlayerState.Player:
+                if (_gameView == null) return Vector2.Zero;
+
+                float mx = Math.Clamp(Input.MouseX, _gameView.X, _gameView.X + _gameView.Width);
+                float my = Math.Clamp(Input.MouseY, _gameView.Y, _gameView.Y + _gameView.Height);
+                return new Vector2(mx - _gameView.X, my - _gameView.Y);
+
+            case PlayerState.Autoplay:
+                return _playfieldOffset + _autoplayCursor * _scale;
+
+            case PlayerState.Replay:
+                return GetInterpolatedReplayCursor();
+
+            default:
+                return Vector2.Zero;
+        }
+    }
+
+    private Vector2 GetInterpolatedReplayCursor()
+    {
+        if (Replay == null || Replay.Frames.Count == 0)
+            return _playfieldOffset;
+
+        var frames = Replay.Frames;
+
+        if (_replayFrameIndex >= frames.Count - 1)
+        {
+            var last = frames[^1];
+            return _playfieldOffset + new Vector2(last.X, last.Y) * _scale;
+        }
+
+        var f0 = frames[_replayFrameIndex];
+        var f1 = frames[_replayFrameIndex + 1];
+
+        double segmentStart = f0.MsSinceStart;
+        double segmentEnd = segmentStart + f1.MsSincePreviousFrame;
+
+        float t = (segmentEnd <= segmentStart) ? 0f :
+            (float)((_songCursor - segmentStart) / (segmentEnd - segmentStart));
+
+        t = Math.Clamp(t, 0f, 1f);
+        t = t * t * (3f - 2f * t);
+
+        var pos = Vector2.Lerp(new Vector2(f0.X, f0.Y), new Vector2(f1.X, f1.Y), t);
+        return _playfieldOffset + pos * _scale;
     }
 
     private Vector2 GetPositionAtTime(double songCursor, int targetIndex)
@@ -304,15 +383,18 @@ public class Player
 
         float t = (float)((songCursor - startTime) / duration);
         t = Math.Clamp(t, 0f, 1f);
-        t = t * t * (3f - 2f * t); // smoothstep
+        t = t * t * (3f - 2f * t);
 
         return Vector2.Lerp(startPos, current.Position, t);
     }
 
     private void Alternate()
     {
-        if (!_primaryLastPressed) ActionPrimaryPressed = true;
-        else ActionSecondaryPressed = true;
+        if (!_primaryLastPressed)
+            ActionPrimaryPressed = true;
+        else
+            ActionSecondaryPressed = true;
+
         _primaryLastPressed = !_primaryLastPressed;
     }
 }

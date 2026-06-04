@@ -1,7 +1,6 @@
 using System.Drawing;
 using StbImageSharp;
 using Velto.Audio;
-using Velto.UserInterface;
 
 namespace Velto;
 
@@ -346,8 +345,7 @@ public unsafe class GameBase : IDisposable
             _hovered?.OnMouseEnter();
         }
         
-        Builder.Test(Renderer);
-        _gameView.Enabled = false;
+        _gameView.Enabled = true;
 
         foreach (var receiver in Views)
         {
@@ -370,8 +368,6 @@ public unsafe class GameBase : IDisposable
                 Renderer.DrawTexture(view.Framebuffer.Texture, view.X, view.Y,view.Width, view.Height, new Vector4(1, 1, 1, 1));
             }
         }
-
-        Builder.Draw(Renderer, Builder.testContainer);
         
         Renderer.DrawText(_debugFont, $"FPS: {_fps.ToString("0000.0")} [{deltaTime.ToString("00.00")}ms]" +
                                       $" | DrawCallCount: {Renderer.DrawCallCount:000000}\n" +

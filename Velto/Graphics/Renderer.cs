@@ -545,8 +545,18 @@ public unsafe class Renderer : IDisposable
         float width,
         float height,
         float thickness,
-        Vector4 color)
+        Vector4 color,
+        bool inside = true)
     {
+        if (!inside)
+        {
+            // Expand the rect outward so the original rect is the inner area
+            x -= thickness;
+            y -= thickness;
+            width += thickness * 2;
+            height += thickness * 2;
+        }
+
         thickness = MathF.Min(thickness, MathF.Min(width * 0.5f, height * 0.5f));
 
         // Top

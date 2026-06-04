@@ -239,6 +239,13 @@ public unsafe class Beatmap
                         curComboNumber++;
                     }*/
                     HitObjects.Add(slider);
+                } else if (isSpinner)
+                {
+                    HitObjects.Add(new Spinner()
+                    {
+                        Time = time,
+                        EndTime = double.Parse(split[5]),
+                    });   
                 }
             }
         }
