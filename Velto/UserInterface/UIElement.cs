@@ -80,8 +80,9 @@ public enum Alignment
     BottomOrRight,
 }
 
-public class UIElement
+public class UIElement : IDisposable
 {
+    public static UIElement INFINITY = new UIElement(width: new Size(int.MaxValue), height: new Size(int.MaxValue));
     public UIElement? Parent { get; set; }= null;
     public List<UIElement> Children { get; set; } = new();
     
@@ -151,6 +152,11 @@ public class UIElement
 
         return info + Environment.NewLine + string.Join(Environment.NewLine, childStrings);
     }
+
+    public void Dispose()
+    {
+        Parent?.Dispose();
+    }
 }
 
 public static class Builder
@@ -188,20 +194,29 @@ public static class Builder
             Y = 200,
             Width = new Size((int)r.WindowSizeInPixels.X - 400),
             Height = new Size((int)r.WindowSizeInPixels.Y - 400),
-            LayoutDirection = LayoutDirection.Vertical,
+            LayoutDirection = LayoutDirection.Horizontal,
             BackgroundColor = Color4.Purple,
             Padding = new Padding(32),
-            Children = [
-                new UIElement(),
-                new UIElement(),
-                new UIElement(),
-            ]
         };
-
+        testContainer.Children =
+        [
+            new UIElement(width: new Size(300, SizeMode.Grow), height: new Size(300, SizeMode.Fixed))
+                { Parent = testContainer },
+            new UIElement(width: new Size(600, SizeMode.Fixed), height: new Size(600, SizeMode.Fixed)) { Parent = testContainer },
+            new UIElement()
+                { Parent = testContainer },
+        ];
+        testContainer.Children[2].Children =
+        [
+            new UIElement(width: new Size(400, SizeMode.Fixed), height: new Size(400, SizeMode.Fixed)) { Parent = testContainer.Children[2] },
+        ];
+        
+        //testContainer.GrowChildElements(true);
         testContainer.GrowChildElements(true);
         testContainer.ComputePositions(true);
         testContainer.GrowChildElements(false);
         testContainer.ComputePositions(false);
+        
     }
 
     public static void Draw(Renderer r, UIElement e)
@@ -214,96 +229,149 @@ public static class Builder
         }
     }
     
+    // calculate padding + fixed
+    // public static int ComputeFixedSize(this UIElement root, bool horizontal = true)
+    // {
+    //     if (root.Children.Count == 0)
+    //     {
+    //         if (horizontal)
+    //         {
+    //             if (root.Width.Mode == SizeMode.Fixed) return root.Width.Value;
+    //             if (root.Width.Mode == SizeMode.Grow) return 0;
+    //         }
+    //         else
+    //         {
+    //             if (root.Height.Mode == SizeMode.Fixed) return root.Height.Value;
+    //             if (root.Height.Mode == SizeMode.Grow) return 0;
+    //         }
+    //     }
+    //     
+    //     // https://youtu.be/by9lQvpvMIc?si=zUlYUamHEvp_p2Hi&t=1182
+    //     // have child but there is layout direction and axis mismatch
+    //     if (root.LayoutDirection == LayoutDirection.Vertical)
+    //     {
+    //         if (horizontal)
+    //         {
+    //             var max = root.Children.Max(element => element.ComputeFixedSize(horizontal));
+    //             return root.Padding.Right + root.Padding.Left + max;
+    //         }
+    //     }
+    //     else // horizontal
+    //     {
+    //         if (!horizontal) // vert
+    //         {
+    //             var max = root.Children.Max(element => element.ComputeFixedSize(!horizontal));
+    //             return root.Padding.Top + root.Padding.Bottom + max;
+    //         }
+    //     }
+    //     
+    //     // normal
+    //     var size = 0;
+    //     if (horizontal)
+    //     {
+    //         size += root.Padding.Left + root.Padding.Right;
+    //     }
+    //     else
+    //     {
+    //         size += root.Padding.Top + root.Padding.Bottom;
+    //     }
+    //     
+    //     foreach (var child in root.Children)
+    //     {
+    //         size += ComputeFixedSize(child, horizontal);
+    //     }
+    //     
+    //     if ((horizontal && root.Children.TrueForAll(e => e.Width.Mode == SizeMode.Fixed)) 
+    //         || (!horizontal && root.Children.TrueForAll(e => e.Height.Mode == SizeMode.Fixed)))
+    //     {
+    //         if (root.Children.Count != 0) size += (root.Children.Count - 1) * root.ChildGap;
+    //     }
+    //     
+    //     return size;
+    // }
     public static int ComputeFixedSize(this UIElement root, bool horizontal = true)
     {
-        if (root.Children.Count == 0)
+        var onAxis = (horizontal && root.LayoutDirection == LayoutDirection.Horizontal)
+                     || (!horizontal && root.LayoutDirection == LayoutDirection.Vertical);
+
+        if (onAxis)
         {
-            if (horizontal)
-            {
-                if (root.Width.Mode == SizeMode.Fixed) return root.Width.Value;
-                if (root.Width.Mode == SizeMode.Grow) return 0;
-            }
-            else
-            {
-                if (root.Height.Mode == SizeMode.Fixed) return root.Height.Value;
-                if (root.Height.Mode == SizeMode.Grow) return 0;
-            }
-        }
-        
-        // https://youtu.be/by9lQvpvMIc?si=zUlYUamHEvp_p2Hi&t=1182
-        // have child but there is layout direction and axis mismatch
-        if (root.LayoutDirection == LayoutDirection.Vertical)
-        {
-            if (horizontal)
-            {
-                var max = root.Children.Max(element => element.ComputeFixedSize(horizontal));
-                return root.Padding.Right + root.Padding.Left + max;
-            }
-        }
-        else // horizontal
-        {
-            if (!horizontal) // vert
-            {
-                var max = root.Children.Max(element => element.ComputeFixedSize(!horizontal));
-                return root.Padding.Top + root.Padding.Bottom + max;
-            }
-        }
-        
-        // normal
-        var size = 0;
-        if (horizontal)
-        {
-            size += root.Padding.Left + root.Padding.Right;
+            var size = 0;
+            var padding = onAxis && horizontal ? root.Padding.Left + root.Padding.Right 
+                : root.Padding.Top + root.Padding.Bottom;
+            size += padding;
+            size += (root.Children.Count - 1) * root.ChildGap;
+            size += root.Children.Select(e => e.ComputeFixedSize(horizontal)).DefaultIfEmpty(0).Sum();
+            return size;
         }
         else
         {
-            size += root.Padding.Top + root.Padding.Bottom;
+            var padding = horizontal ? root.Padding.Top + root.Padding.Bottom 
+                : root.Padding.Left + root.Padding.Right;
+            var max = root.Children.Select(e => e.ComputeFixedSize(horizontal)).DefaultIfEmpty(0).Max();
+            return padding + max;
         }
-        
-        foreach (var child in root.Children)
-        {
-            size += ComputeFixedSize(child, horizontal);
-        }
-        
-        if ((horizontal && root.Children.TrueForAll(e => e.Width.Mode == SizeMode.Fixed)) 
-            || (!horizontal && root.Children.TrueForAll(e => e.Height.Mode == SizeMode.Fixed)))
-        {
-            if (root.Children.Count != 0) size += (root.Children.Count - 1) * root.ChildGap;
-        }
-        
-        return size;
     }
 
     public static void GrowChildElements(this UIElement root, bool horizontal = true)
     {
-        if (root.Children.Count == 0) return;
-        
-        if (horizontal)
+        if (horizontal && root.LayoutDirection == LayoutDirection.Horizontal)
         {
             var growCount = root.Children.Count(e => e.Width.Mode == SizeMode.Grow);
-            //if (growCount == 0) return;
+            if (growCount == 0) return;
+            var growable = root.Children.Where(e => e.Width.Mode == SizeMode.Grow).ToList();
             
-            float remainingWidth;
-            if (root.Parent is null) remainingWidth = root.Width.Value;
-            else remainingWidth = root.Width.Value;;
-            
+            int remainingWidth = root.Width.Value;
+            int remainingHeight = root.Height.Value;
             remainingWidth -= (root.Padding.Left + root.Padding.Right);
+            remainingHeight -=  (root.Padding.Top + root.Padding.Bottom);
             foreach (var child in root.Children)
             {
                 remainingWidth -= child.Width.Value;
             }
             remainingWidth -= (root.Children.Count - 1) * root.ChildGap;
             
+            while (remainingWidth > 0)
+            {
+                int smallest = growable[0].Width.Value;
+                int secondSmallest = UIElement.INFINITY.Width.Value;
+                int widthToAdd = remainingWidth;
+                foreach (var child in growable)
+                {
+                    if (child.Width.Value < smallest)
+                    {
+                        secondSmallest = smallest;
+                        smallest = child.Width.Value;
+                    }
+
+                    if (child.Width.Value > smallest)
+                    {
+                        secondSmallest = Math.Min(secondSmallest, child.Width.Value);
+                        widthToAdd = secondSmallest - smallest;
+                    }
+                }
+                
+                widthToAdd = Math.Min(widthToAdd, (int)Math.Ceiling((float)remainingWidth / growable.Count));
+                foreach (var child in growable)
+                {
+                    if (child.Width.Value == (int)smallest)
+                    {
+                        child.Width.Value += widthToAdd;
+                        remainingWidth -= widthToAdd;
+                    }
+                }
+            }  
+            
             foreach (var child in root.Children)
             {
-                if (child.Width.Mode == SizeMode.Grow)
+                if (child.Height.Mode == SizeMode.Grow)
                 {
-                    child.Width.Value = (int)(remainingWidth / growCount);
+                    child.Height.Value += (int)remainingHeight - child.Height.Value;
                 }
             }
-
             root.RemainingWidth = (int)remainingWidth;
-
+            root.RemainingHeight = (int)remainingHeight;
+            
             foreach (var child in root.Children)
             {
                 GrowChildElements(child, horizontal);
@@ -311,31 +379,29 @@ public static class Builder
         }
         else
         {
+            return;
             var growCount = root.Children.Count(e => e.Height.Mode == SizeMode.Grow);
             //if (growCount == 0) return;
-        
+
             float remainingHeight;
             if (root.Parent is null) remainingHeight = root.Height.Value;
-            else remainingHeight = root.Height.Value;;
+            else remainingHeight = root.Parent.Height.Value - root.ComputeFixedSize(false);
 
-            
-            remainingHeight -= (root.Padding.Top + root.Padding.Bottom);
-            foreach (var child in root.Children)
-            {
-                remainingHeight -= child.Height.Value;
-            }
+
+            //remainingHeight -= (root.Padding.Top + root.Padding.Bottom);
             remainingHeight -= (root.Children.Count - 1) * root.ChildGap;
-        
+
             foreach (var child in root.Children)
             {
                 if (child.Height.Mode == SizeMode.Grow)
                 {
                     child.Height.Value = (int)(remainingHeight / growCount);
+                    remainingHeight -= child.Height.Value;
                 }
             }
-            
+
             root.RemainingHeight = (int)remainingHeight;
-            
+
             foreach (var child in root.Children)
             {
                 GrowChildElements(child, horizontal);
@@ -345,10 +411,7 @@ public static class Builder
         
     public static void ComputePositions(this UIElement root, bool horizontal = true)
     {
-        if (root.Children.Count == 0)
-        {
-            return;
-        }
+        if (root.Children.Count == 0) return;
         
         if (horizontal)
         {
@@ -377,6 +440,11 @@ public static class Builder
         }
         else
         {
+            foreach (var child in root.Children)
+            {
+                child.Y = root.Y + (int)root.Padding.Top;
+            }
+            return;
             float yOffset = 0;
             if (root.Alignment == Alignment.BottomOrRight) yOffset += root.RemainingHeight;
             if (root.Alignment == Alignment.Center) yOffset += (float)root.RemainingHeight/2;
