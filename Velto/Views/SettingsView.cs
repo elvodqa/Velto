@@ -55,19 +55,19 @@ public class SettingsView : View
 
     public override void Draw(double delta, Renderer r)
     {
-        _maxWidth = Math.Max(500 * r.DisplayScale, r.WindowSizeInPixels.X / 4f);
+        _maxWidth = Math.Max(500 * r.DisplayScale, Renderer.WindowSizeInPixels.X / 4f);
         
         if (_currentWidth == 0) return;
         r.Clear(new(0, 0, 0, 0));
         r.SetScissor(0, 0, (int)_currentWidth, (int)Height);
-        r.DrawRectangle(0, 0, _currentWidth, Height, new Vector4(74f/255, 79f/255, 33f/255, 1));
+        r.DrawRectangle(0, 0, _currentWidth, Height, new Color4<Rgba>(74f/255, 79f/255, 33f/255, 1));
         
         int leftPad = 50, rightPad = 50;
         int topPad = 50, bottomPad = 50;
         var contentWidth = _currentWidth - leftPad - rightPad;
         
         var settingsTextSize = contentWidth / 7;
-        r.DrawText(_font, "Settings", new Vector2(leftPad, rightPad), settingsTextSize, new Vector4(1, 1, 1, 1));
+        r.DrawText(_font, "Settings", new Vector2(leftPad, rightPad), settingsTextSize, new Color4<Rgba>(1, 1, 1, 1));
         r.FlushText(_font);
         
         float contentY = settingsTextSize + topPad;
@@ -79,7 +79,7 @@ public class SettingsView : View
             _currentWidth - leftPad - rightPad,
             Height - contentY - bottomPad,
             4,
-            new Vector4(1,1,1,1));
+            new Color4<Rgba>(1,1,1,1));
 
         var textBuffer = "";
         for (int i = 0; i < 100; i++)
@@ -88,7 +88,7 @@ public class SettingsView : View
         }
         
         
-        r.DrawTextWrapped(_font, textBuffer, new Vector2(leftPad*2, contentY + topPad),  45,contentWidth - rightPad, new Vector4(1, 1, 1, 1));
+        r.DrawTextWrapped(_font, textBuffer, new Vector2(leftPad*2, contentY + topPad),  45,contentWidth - rightPad, new Color4<Rgba>(1, 1, 1, 1));
         r.FlushText(_font);
     }
 

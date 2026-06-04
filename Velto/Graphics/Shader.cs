@@ -119,6 +119,11 @@ public unsafe class Shader : IDisposable
     {
         GL.Uniform4f(GetLocation(name), value.X, value.Y, value.Z, value.W);
     }
+    
+    public void SetColor4(string name, Color4<Rgba> value)
+    {
+        GL.Uniform4f(GetLocation(name), value.X, value.Y, value.Z, value.W);
+    }
 
     public void SetMatrix4(string name, Matrix4 value)
     {

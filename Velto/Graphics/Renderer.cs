@@ -21,6 +21,13 @@ public struct ScissorRect
         W = w;
         H = h;
     }
+    public ScissorRect(float x, float y, float w, float h)
+    {
+        X = (int)x;
+        Y = (int)y;
+        W = (int)w;
+        H = (int)h;
+    }
 }
 
 public unsafe class Renderer : IDisposable
@@ -57,7 +64,17 @@ public unsafe class Renderer : IDisposable
         0, 2, 1, // first triangle
         1, 2, 3 // second triangle
     ];
-
+    
+    public static Vector2 WindowSizeInPixels
+    {
+        get
+        {
+            int w, h;
+            SDL_GetWindowSizeInPixels(_window, &w, &h);
+            return new Vector2(w, h);
+        }
+    }
+    
     private readonly BufferObject<uint> _quadIndexBuffer;
     private readonly BufferObject<float> _quadVertexBuffer;
 
@@ -86,7 +103,7 @@ public unsafe class Renderer : IDisposable
     private readonly Texture _whiteTexture;
     private readonly Texture _circleTexture;
 
-    private readonly SDL_Window* _window;
+    private static SDL_Window* _window;
     public uint DrawCallCount = 0;
 
     public SDL_Window* Window
@@ -173,17 +190,6 @@ public unsafe class Renderer : IDisposable
 
         GL.BindVertexArray(0);
     }
-
-    public Vector2 WindowSizeInPixels
-    {
-        get
-        {
-            int w, h;
-            SDL_GetWindowSizeInPixels(_window, &w, &h);
-            return new Vector2(w, h);
-        }
-    }
-    
     ScissorRect Intersect(ScissorRect a, ScissorRect b)
     {
         int x1 = Math.Max(a.X, b.X);
@@ -328,7 +334,7 @@ public unsafe class Renderer : IDisposable
         GL.Scissor(rect.X, vpH - rect.Y - rect.H, Math.Max(0, rect.W), Math.Max(0, rect.H));
     }
 
-    public void Clear(Vector4 color)
+    public void Clear(Color4<Rgba> color)
     {
         if (Framebuffer == null)
         {
@@ -340,18 +346,15 @@ public unsafe class Renderer : IDisposable
         {
             GL.Viewport(0, 0, Framebuffer.Width, Framebuffer.Height);
         }
-
-        // TODO: implement framebuffers
+        
         GL.Enable(EnableCap.Blend);
         GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 
         GL.ClearColor(color.X, color.Y, color.Z, color.W);
         GL.Clear(ClearBufferMask.ColorBufferBit /*| ClearBufferMask.DepthBufferBit*/);
-        //GL.LineWidth(50);
-        //GL.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Line);
     }
 
-    public void DrawCenteredRect(Vector2 center, float w, float h, Vector4 color, float rotation = 0)
+    public void DrawCenteredRect(Vector2 center, float w, float h, Color4<Rgba> color, float rotation = 0)
     {
         DrawRectangle(
             center.X - w / 2f,
@@ -363,7 +366,7 @@ public unsafe class Renderer : IDisposable
         );
     }
 
-    public void DrawCenteredTexture(Texture texture, Vector2 center, float w, float h, Vector4 color,
+    public void DrawCenteredTexture(Texture texture, Vector2 center, float w, float h, Color4<Rgba> color,
         float rotation = 0)
     {
         DrawTexture(
@@ -376,8 +379,8 @@ public unsafe class Renderer : IDisposable
             rotation
         );
     }
-
-    public void DrawTexture(int texture, float x, float y, float width, float height, Vector4 color,
+    
+    public void DrawTexture(int texture, float x, float y, float width, float height, Color4<Rgba> color,
         float rotation = 0)
     {
         DrawCallCount++;
@@ -412,7 +415,7 @@ public unsafe class Renderer : IDisposable
 
         _spriteShader.Use();
         _spriteShader.SetInt("ourTexture", 0);
-        _spriteShader.SetVector4("color", color);
+        _spriteShader.SetColor4("color", color);
         _spriteShader.SetMatrix4("model", model);
         _spriteShader.SetMatrix4("view", Matrix4.Identity);
         _spriteShader.SetMatrix4("projection", projection);
@@ -426,7 +429,7 @@ public unsafe class Renderer : IDisposable
             IntPtr.Zero);
     }
 
-    public void DrawTexture(Texture texture, float x, float y, float width, float height, Vector4 color,
+    public void DrawTexture(Texture texture, float x, float y, float width, float height, Color4<Rgba> color,
         float rotation = 0)
 
     {
@@ -461,7 +464,7 @@ public unsafe class Renderer : IDisposable
 
         _spriteShader.Use();
         _spriteShader.SetInt("ourTexture", 0);
-        _spriteShader.SetVector4("color", color);
+        _spriteShader.SetColor4("color", color);
         _spriteShader.SetMatrix4("model", model);
         _spriteShader.SetMatrix4("view", Matrix4.Identity);
         _spriteShader.SetMatrix4("projection", projection);
@@ -476,7 +479,7 @@ public unsafe class Renderer : IDisposable
     }
 
     public void DrawLine(float x1, float y1, float x2, float y2,
-        float thickness, Vector4 color)
+        float thickness, Color4<Rgba> color)
     {
         float dx = x2 - x1;
         float dy = y2 - y1;
@@ -497,7 +500,7 @@ public unsafe class Renderer : IDisposable
     }
 
     public void DrawLine(Vector2 begin, Vector2 end,
-        float thickness, Vector4 color)
+        float thickness, Color4<Rgba> color)
     {
         float x1 = begin.X;
         float y1 = begin.Y;
@@ -522,13 +525,13 @@ public unsafe class Renderer : IDisposable
         );
     }
 
-    public void DrawRectangle(float x, float y, float width, float height, Vector4 color,
+    public void DrawRectangle(float x, float y, float width, float height, Color4<Rgba> color,
         float rotation = 0)
     {
         DrawTexture(_whiteTexture, x, y, width, height, color, rotation);
     }
 
-    public void DrawCircle(float x, float y, float width, float height, Vector4 color,
+    public void DrawCircle(float x, float y, float width, float height, Color4<Rgba> color,
         float rotation = 0)
     {
         DrawTexture(_circleTexture, x, y, width, height, color, rotation);
@@ -540,7 +543,7 @@ public unsafe class Renderer : IDisposable
         float width,
         float height,
         float thickness,
-        Vector4 color,
+        Color4<Rgba> color,
         bool inside = true)
     {
         if (!inside)
@@ -568,7 +571,7 @@ public unsafe class Renderer : IDisposable
     }
 
     // font stuff 
-    public void DrawText(MSDFFont font, string text, Vector2 position, float pixelLineHeight, Vector4 color)
+    public void DrawText(MSDFFont font, string text, Vector2 position, float pixelLineHeight, Color4<Rgba> color)
     {
         // Compute scale from desired line height
         float scale = pixelLineHeight / (font.LineHeight * font.EmSize);
@@ -619,7 +622,7 @@ public unsafe class Renderer : IDisposable
         Vector2 position,
         float pixelLineHeight,
         float maxWidth,
-        Vector4 color)
+        Color4<Rgba> color)
     {
         float scale = pixelLineHeight / (font.LineHeight * font.EmSize);
 
@@ -719,7 +722,7 @@ public unsafe class Renderer : IDisposable
         }
     }
 
-    private void DrawGlyph(MSDFFont.Glyph glyph, Vector2 position, Vector2 size, Vector4 color, float distanceRange)
+    private void DrawGlyph(MSDFFont.Glyph glyph, Vector2 position, Vector2 size, Color4<Rgba> color, float distanceRange)
     {
         var model = Matrix4.CreateScale(size.X, size.Y, 1f) * Matrix4.CreateTranslation(position.X, position.Y, 0f);
         _fontCalls.Add(new FontCall
@@ -787,7 +790,7 @@ public unsafe class Renderer : IDisposable
     public struct FontCall
     {
         public Matrix4 Model;
-        public Vector4 Color;
+        public Color4<Rgba> Color;
         public Vector4 UV;
         public Vector2 GlyphSize;
         public float DistanceRange;

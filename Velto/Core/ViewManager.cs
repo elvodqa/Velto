@@ -124,10 +124,10 @@ public class ViewManager
     public void Present(double delta)
     {
         Renderer.PushScissor(new ScissorRect(0, 0, (int)Renderer.WindowSizeInPixels.X, (int)Renderer.WindowSizeInPixels.Y));
-        Renderer.Clear(new Vector4(0, 0, 0, 1));
+        Renderer.Clear(new(0, 0, 0, 1));
         foreach (var view in _views)
         {
-            Renderer.DrawTexture(view.Framebuffer.Texture, view.X, view.Y,view.Width, view.Height, new Vector4(1, 1, 1, 1));
+            Renderer.DrawTexture(view.Framebuffer.Texture, view.X, view.Y,view.Width, view.Height, new Color4<Rgba>(1, 1, 1, 1));
         }
         Renderer.PopScissor();
     }

@@ -109,24 +109,24 @@ public class SongSelectorView : View
         
         r.Clear(new(0, 0, 0, 0));
         r.SetScissor((int)boundingBox.X, (int)boundingBox.Y, (int)boundingBox.Z, (int)boundingBox.W);
-        r.DrawRectangle(boundingBox.X, boundingBox.Y, boundingBox.Z, boundingBox.W, new Vector4(34f/255, 39f/255, 33f/255, 0.95f));
+        r.DrawRectangle(boundingBox.X, boundingBox.Y, boundingBox.Z, boundingBox.W, new Color4<Rgba>(34f/255, 39f/255, 33f/255, 0.95f));
         
         foreach (var box in _beatmapBoxes)
         {
-            var color = new Vector4(0.3f, 0.3f, 0.3f, 0.2f);
+            var color = new Color4<Rgba>(0.3f, 0.3f, 0.3f, 0.2f);
             if (box.IsHovered)
             {
-                color = new Vector4(0.6f, 0.6f, 0.6f, 0.2f);
+                color = new Color4<Rgba>(0.6f, 0.6f, 0.6f, 0.2f);
             }
 
             r.DrawRectangle(box.Position.X, box.Position.Y, box.Size.X, box.Size.Y, color);
-            r.DrawTexture(box.Texture, box.Position.X, box.Position.Y, 230, 150, new Vector4(1, 1, 1, 1));
+            //r.DrawTexture(box.Texture, box.Position.X, box.Position.Y, 230, 150, new Color4<Rgba>(1, 1, 1, 1));
             r.DrawText(Fonts.Default, box.Beatmap.ToString(),
                 new Vector2(box.Position.X + 25 + 230, box.Position.Y + 25),
-                box.Size.Y/5, new Vector4(1, 1, 1, 1));
+                box.Size.Y/5, new Color4<Rgba>(1, 1, 1, 1));
             r.DrawText(Fonts.Default, $"By: {box.Beatmap.Creator}",
                 new Vector2(box.Position.X + 25 + 230, box.Position.Y + 65),
-                box.Size.Y/5, new Vector4(1, 1, 1, 1));
+                box.Size.Y/5, new Color4<Rgba>(1, 1, 1, 1));
         }
         r.FlushText(Fonts.Default);
         
@@ -138,7 +138,7 @@ public class SongSelectorView : View
         var l_t = l_v * (l_v / l_c); // length of thumb
         var d_t = d * (l_v / l_c); // distance of thumb
 
-        r.DrawRectangle(Width - 30, d_t, 30, l_t, new Vector4(1, 1, 1, 0.6f));
+        r.DrawRectangle(Width - 30, d_t, 30, l_t, new Color4<Rgba>(1, 1, 1, 0.6f));
     }
     
      
@@ -172,7 +172,7 @@ public class SongSelectorView : View
                 {
                     var box = new BeatmapBox();
                     box.Beatmap = new Beatmap(file);
-                    box.Texture = new Texture(Path.Combine( box.Beatmap.Folder,  box.Beatmap.BackgroundFile));
+                    //box.Texture = new Texture(Path.Combine(box.Beatmap.Folder,  box.Beatmap.BackgroundFile));
                     _beatmapBoxes.Add(box);
                 }
             }

@@ -26,6 +26,5 @@
     
     <ItemGroup>
       <Folder Include="Resources\Songs\" />
-      <Folder Include="Resources\Textures\" />
     </ItemGroup>
 </Project>

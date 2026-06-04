@@ -24,6 +24,14 @@ public abstract class View : IInputReceiver, IDisposable
         return view;
     }
     
+    public static T Create<T>()
+        where T : View, new()
+    {
+        var view = new T();
+        view.Framebuffer = new Framebuffer((int)Renderer.WindowSizeInPixels.X, (int)Renderer.WindowSizeInPixels.Y);
+        return view;
+    }
+    
     public Framebuffer Framebuffer;
     public float X { get; set; }
     public float Y { get; set;  }

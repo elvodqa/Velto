@@ -40,8 +40,9 @@ public unsafe class Game : IDisposable
     private double _fpsTimer = 0.0;
     private int _frameCount = 0;
     private double _fps = 0;
+    private bool _debugInfo = true;
 
-    public Vector2 WindowSizeInPixels => _renderer.WindowSizeInPixels;
+    public Vector2 WindowSizeInPixels => Renderer.WindowSizeInPixels;
     
     public Game(GameCreateInfo createInfo)
     {
@@ -147,14 +148,15 @@ public unsafe class Game : IDisposable
                         _running = false;
                         break;
                     case (uint)SDL_EventType.SDL_EVENT_WINDOW_RESIZED:
-                        var size = _renderer.WindowSizeInPixels;
+                        var size = Renderer.WindowSizeInPixels;
                         ViewManager.Instance.ResizeCallback(ev.window.data1, ev.window.data2);
                         Logger.Instance.Info($"Window Resized: {ev.window.data1} x {ev.window.data2}");
                         break;
                 }
                 Input.UpdateEvents(ev);
             }
-            
+
+            if (Input.IsKeyboardJustReleased(SDL_Scancode.SDL_SCANCODE_F12)) _debugInfo = !_debugInfo;
             
             Loop(deltaTime);
             
@@ -173,13 +175,16 @@ public unsafe class Game : IDisposable
         ViewManager.Instance.Update(delta);
         ViewManager.Instance.Draw(delta, _renderer);
         ViewManager.Instance.Present(delta);
+
+        if (_debugInfo)
+        {
+            _renderer.DrawText(Fonts.Default, $"FPS: {_fps.ToString("0000.0")} [{delta.ToString("00.00")}ms]" +
+                                              $" | DrawCallCount: {_renderer.DrawCallCount:000000}\n" +
+                                              $"Top: {ViewManager.Instance.Top}", 
+                new (5, 5), Renderer.WindowSizeInPixels.Y / 45, new Color4<Rgba>(1, 1, 1, 1));
         
-        _renderer.DrawText(Fonts.Default, $"FPS: {_fps.ToString("0000.0")} [{delta.ToString("00.00")}ms]" +
-                                          $" | DrawCallCount: {_renderer.DrawCallCount:000000}\n" +
-                                          $"Top: {ViewManager.Instance.Top}", 
-            new (5, 5), _renderer.WindowSizeInPixels.Y / 45, new Vector4(1, 1, 1, 1));
-        
-        _renderer.FlushText(Fonts.Default);
+            _renderer.FlushText(Fonts.Default);
+        }
     }
     
     private void RenderFromEventWatch()
@@ -221,7 +226,7 @@ public unsafe class Game : IDisposable
             type == SDL_EventType.SDL_EVENT_WINDOW_HIT_TEST ||
             type == SDL_EventType.SDL_EVENT_WINDOW_RESIZED)
         {
-            var size = game._renderer.WindowSizeInPixels;
+            var size = Renderer.WindowSizeInPixels;
             ViewManager.Instance.ResizeCallback((int)size.X, (int)size.Y);
             game.RenderFromEventWatch();
         }

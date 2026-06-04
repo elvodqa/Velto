@@ -34,7 +34,7 @@ public abstract class HitObject
     public Vector2 Position { get; set; }
     public int Time { get; set; }
     public bool NewCombo { get; set; } = false;
-    public Vector4 Color { get; set; }
+    public Color4<Rgba> Color { get; set; }
     
     // public abstract void Draw(double dt, Renderer renderer, Vector2 playfieldTopLeft, float scale, double songCursor, 
     //     double startingTimer, float baseCircleSize, Texture approachCircleTexture,
