@@ -158,7 +158,7 @@ public class Player
             
             if (obj is Slider slider && 
                 _songCursor >= slider.Time && 
-                _songCursor <= slider.Time + slider.Duration)
+                _songCursor <= slider.Time + slider.Duration - 100)
             {
                 currentIndex = i;
                 current = obj;
@@ -175,7 +175,7 @@ public class Player
         // Sliding. TODO: stop sliding if there is another hit object approaching
         if (current is Slider activeSlider &&
             _songCursor >= activeSlider.Time &&
-            _songCursor <= activeSlider.Time + activeSlider.Duration)
+            _songCursor <= activeSlider.Time + activeSlider.Duration - 100)
         {
             // look ahead
             HitObject? next = null;
@@ -201,7 +201,7 @@ public class Player
 
             if (_lastAutoplayHitIndex != currentIndex)
             {
-                Alternate();
+                Alternate(current);
                 _lastAutoplayHitIndex = currentIndex;
             }
             return;
@@ -217,7 +217,7 @@ public class Player
         {
             if (_lastAutoplayHitIndex != currentIndex)
             {
-                Alternate();
+                Alternate(current);
                 _lastAutoplayHitIndex = currentIndex;
             }
         }
@@ -258,7 +258,7 @@ public class Player
         }
 
         var currentFrame = frames[_replayFrameIndex];
-
+        
         // Reconstruct key states
         foreach (var key in currentFrame.KeysPressed)
         {
@@ -274,8 +274,9 @@ public class Player
             }
         }
 
-        // Optional: Sync GameView time smoothly (recommended)
+        // Sync GameView time smoothly
         _gameView.SongCursor = GetInterpolatedReplayTime();
+        //_gameView.SongCursor = currentFrame.MsSinceStart;
     }
     
     private double GetInterpolatedReplayTime()
@@ -388,8 +389,9 @@ public class Player
         return Vector2.Lerp(startPos, current.Position, t);
     }
 
-    private void Alternate()
+    private void Alternate(HitObject o)
     {
+        _gameView.SongCursor = o.Time; // I'm a slimey bastard
         if (!_primaryLastPressed)
             ActionPrimaryPressed = true;
         else

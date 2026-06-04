@@ -49,8 +49,8 @@ public unsafe class Renderer : IDisposable
     private readonly Shader _fontShader;
     private readonly int _fontVao;
 
-    private Framebuffer? _framebuffer;
-    private Stack<Framebuffer> _framebufferStack = new();
+    public static Framebuffer? Framebuffer;
+    private Stack<Framebuffer> FramebufferStack = new();
 
     private readonly uint[] _indices =
     [
@@ -261,24 +261,24 @@ public unsafe class Renderer : IDisposable
     {
         ArgumentNullException.ThrowIfNull(framebuffer);
 
-        _framebufferStack.Push(framebuffer);
+        FramebufferStack.Push(framebuffer);
         SetFramebuffer(framebuffer);
     }
 
     public void UnbindFramebuffer(Framebuffer? framebuffer)
     {
-        if (_framebuffer != framebuffer) return;
+        if (Framebuffer != framebuffer) return;
 
-        _framebufferStack.Pop();
+        FramebufferStack.Pop();
 
-        SetFramebuffer(_framebufferStack.TryPeek(out var lastFramebuffer) ? lastFramebuffer : null);
+        SetFramebuffer(FramebufferStack.TryPeek(out var lastFramebuffer) ? lastFramebuffer : null);
     }
 
     private void SetFramebuffer(Framebuffer? framebuffer = null)
     {
-        _framebuffer = framebuffer;
+        Framebuffer = framebuffer;
 
-        if (_framebuffer == null)
+        if (Framebuffer == null)
         {
             GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
 
@@ -288,28 +288,23 @@ public unsafe class Renderer : IDisposable
         }
         else
         {
-            _framebuffer.Bind();
-            GL.Viewport(0, 0, _framebuffer.Width, _framebuffer.Height);
+            Framebuffer.Bind();
+            GL.Viewport(0, 0, Framebuffer.Width, Framebuffer.Height);
         }
-    }
-
-    public void FixFramebuffer()
-    {
-        SetFramebuffer(_framebuffer);
     }
     
     public void SetScissor(int x, int y, int w, int h)
     {
         var rect = new ScissorRect(x, y, w, h);
         int vpW, vpH;
-        if (_framebuffer == null)
+        if (Framebuffer == null)
         {
             SDL_GetWindowSizeInPixels(_window, &vpW, &vpH);
         }
         else
         {
-            vpW = _framebuffer.Width;
-            vpH = _framebuffer.Height;
+            vpW = Framebuffer.Width;
+            vpH = Framebuffer.Height;
         }
 
         GL.Enable(EnableCap.ScissorTest);
@@ -319,14 +314,14 @@ public unsafe class Renderer : IDisposable
     public void SetScissor(ScissorRect rect)
     {
         int vpW, vpH;
-        if (_framebuffer == null)
+        if (Framebuffer == null)
         {
             SDL_GetWindowSizeInPixels(_window, &vpW, &vpH);
         }
         else
         {
-            vpW = _framebuffer.Width;
-            vpH = _framebuffer.Height;
+            vpW = Framebuffer.Width;
+            vpH = Framebuffer.Height;
         }
 
         GL.Enable(EnableCap.ScissorTest);
@@ -335,7 +330,7 @@ public unsafe class Renderer : IDisposable
 
     public void Clear(Vector4 color)
     {
-        if (_framebuffer == null)
+        if (Framebuffer == null)
         {
             int width, height;
             SDL_GetWindowSizeInPixels(_window, &width, &height);
@@ -343,7 +338,7 @@ public unsafe class Renderer : IDisposable
         }
         else
         {
-            GL.Viewport(0, 0, _framebuffer.Width, _framebuffer.Height);
+            GL.Viewport(0, 0, Framebuffer.Width, Framebuffer.Height);
         }
 
         // TODO: implement framebuffers
@@ -387,11 +382,11 @@ public unsafe class Renderer : IDisposable
     {
         DrawCallCount++;
         int wWidth = 1280, wHeight = 720;
-        if (_framebuffer == null) SDL_GetWindowSizeInPixels(_window, &wWidth, &wHeight);
+        if (Framebuffer == null) SDL_GetWindowSizeInPixels(_window, &wWidth, &wHeight);
         else
         {
-            wWidth = _framebuffer.Width;
-            wHeight = _framebuffer.Height;
+            wWidth = Framebuffer.Width;
+            wHeight = Framebuffer.Height;
         }
 
         var projection =
@@ -437,11 +432,11 @@ public unsafe class Renderer : IDisposable
     {
         DrawCallCount++;
         int wWidth = 1280, wHeight = 720;
-        if (_framebuffer == null) SDL_GetWindowSizeInPixels(_window, &wWidth, &wHeight);
+        if (Framebuffer == null) SDL_GetWindowSizeInPixels(_window, &wWidth, &wHeight);
         else
         {
-            wWidth = _framebuffer.Width;
-            wHeight = _framebuffer.Height;
+            wWidth = Framebuffer.Width;
+            wHeight = Framebuffer.Height;
         }
 
         var projection =
@@ -737,11 +732,11 @@ public unsafe class Renderer : IDisposable
     public void FlushText(MSDFFont font)
     {
         int wWidth = 1280, wHeight = 720;
-        if (_framebuffer == null) SDL_GetWindowSizeInPixels(_window, &wWidth, &wHeight);
+        if (Framebuffer == null) SDL_GetWindowSizeInPixels(_window, &wWidth, &wHeight);
         else
         {
-            wWidth = _framebuffer.Width;
-            wHeight = _framebuffer.Height;
+            wWidth = Framebuffer.Width;
+            wHeight = Framebuffer.Height;
         }
 
         var projection =

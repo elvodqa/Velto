@@ -29,8 +29,7 @@ public unsafe class GameView : View
 
     private bool _musicStarted;
     private float _musicVolume;
-
-    private readonly Renderer _renderer;
+    
     private string _skinName = "rafis";
 
     public double SongCursor;
@@ -78,30 +77,29 @@ public unsafe class GameView : View
         public bool InUse;
     }
 
-    public GameView(Renderer renderer)
+    public GameView()
     {
         Skin = new Skin(Resources.GetPath($"Resources/Textures/{_skinName}"));
-        _renderer = renderer;
         _msdfFont = MSDFFont.Load(Resources.GetPath("Resources/Fonts/arial/arial"));
         
-        //_inputOverlayView = new(_renderer, this, _msdfFont);
+        //_inputOverlayView = new(r, this, _msdfFont);
 
         for (int i = 0; i < 16; i++)
         {
             _sliderFramebuffers[i] = new()
             {
-                Framebuffer = new Framebuffer(_renderer, 1280, 720),
+                Framebuffer = new Framebuffer(1280, 720),
                 Duration = 0,
                 Time = 0,
             };
         }
 
-        Hidden = true;
+        Hidden = false;
         // SetBeatmap(new Beatmap(Resources.GetPath("Resources/Songs/Wakeshima Kanon/ASCA - Nisemono no Koi ni Sayounara with Wakeshima Kanon (timemon) [Kyou's Extra].osu")));
         // _player.SetReplay(Replay.ParseReplay(Resources.GetPath("Resources/Replays/kanon.osr")));
         SetBeatmap(new Beatmap(Resources.GetPath("Resources/Songs/983942 Oomori Seiko - JUSTadICE (TV Size)/Oomori Seiko - JUSTadICE (TV Size) (fieryrage) [Extreme].osu")));
         _player.SetReplay(Replay.ParseReplay(Resources.GetPath("Resources/Replays/fiery.osr")));
-        _doubleTimeEnabled = true; _songTrack.Speed = 1.5f;
+        //_doubleTimeEnabled = true; _songTrack.Speed = 1.5f;
         _player.SetState(PlayerState.Replay);
     }
 
@@ -190,9 +188,22 @@ public unsafe class GameView : View
             if (wasPlaying)
                 _songTrack.Resume();
         }
-        
-        
 
+        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_F2))
+        {
+            _player.SetState(PlayerState.Player);
+        }
+        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_F3))
+        {
+            _player.SetState(PlayerState.Autoplay);
+        }
+
+        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_F4))
+        {
+            SetBeatmap(new Beatmap(Resources.GetPath("Resources/Songs/983942 Oomori Seiko - JUSTadICE (TV Size)/Oomori Seiko - JUSTadICE (TV Size) (fieryrage) [Extreme].osu")));
+            _player.SetReplay(Replay.ParseReplay(Resources.GetPath("Resources/Replays/fiery.osr")));
+            _player.SetState(PlayerState.Replay);
+        }
 
         if (Input.IsKeyDown(SDL_Scancode.SDL_SCANCODE_LSHIFT))
         {
@@ -600,7 +611,7 @@ public unsafe class GameView : View
             }
         }
 
-        while (trails.Count > 120)
+        while (trails.Count > 40)
             trails.Dequeue();
 
 
@@ -643,10 +654,10 @@ public unsafe class GameView : View
     }
 
 
-    public override void Draw(double delta)
+    public override void Draw(double delta, Renderer r)
     {
-        _renderer.Clear(new Vector4(0, 0, 0, 1));
-        _renderer.SetScissor(0, 0, (int)Width, (int)Height);
+        r.Clear(new Vector4(0, 0, 0, 1));
+        r.SetScissor(0, 0, (int)Width, (int)Height);
 
         // bg
         if (Width * ((float)_backgroundTexture.Height / _backgroundTexture.Width) > Height)
@@ -654,7 +665,7 @@ public unsafe class GameView : View
             // sağ sol bar
             var padding = Width -
                           Height * (_backgroundTexture.Width / (float)_backgroundTexture.Height);
-            _renderer.DrawTexture(_backgroundTexture, padding / 2, 0,
+            r.DrawTexture(_backgroundTexture, padding / 2, 0,
                 Height * ((float)_backgroundTexture.Width / _backgroundTexture.Height), Height,
                 new Vector4(1, 1, 1, 1));
         }
@@ -663,16 +674,16 @@ public unsafe class GameView : View
             // üst alt bar
             var padding = Height - Width * (_backgroundTexture.Height /
                                             (float)_backgroundTexture.Width);
-            _renderer.DrawTexture(_backgroundTexture, 0, padding / 2, Width,
+            r.DrawTexture(_backgroundTexture, 0, padding / 2, Width,
                 Width * ((float)_backgroundTexture.Height / _backgroundTexture.Width), new Vector4(1, 1, 1, 1));
         }
 
         // bg dim
-        _renderer.DrawRectangle(0, 0, Width, Height, new Vector4(0, 0, 0, 0.80f));
+        r.DrawRectangle(0, 0, Width, Height, new Vector4(0, 0, 0, 0.80f));
 
 
         // draw playfield
-        /*_renderer.DrawRectangle(
+        /*r.DrawRectangle(
             playfieldTopLeft.X,
             playfieldTopLeft.Y,
             playfieldWidth,
@@ -736,7 +747,7 @@ public unsafe class GameView : View
             {
                 var pos = prevHitObjectPos + direction * (i * distance);
 
-                _renderer.DrawTexture(Skin.FollowPoint, pos.X, pos.Y, 100f, 100f, new Vector4(1, 1, 1, 1), (float)degree * MathHelper.RadToDeg + 135);
+                r.DrawTexture(Skin.FollowPoint, pos.X, pos.Y, 100f, 100f, new Vector4(1, 1, 1, 1), (float)degree * MathHelper.RadToDeg + 135);
             }
         }
         
@@ -793,7 +804,7 @@ public unsafe class GameView : View
                     //if (hitObject.HitResult != HitResult.None) continue;
                     if (!Hidden)
                     {
-                        _renderer.DrawTexture(Skin.ApproachCircle,
+                        r.DrawTexture(Skin.ApproachCircle,
                             posX - approachCircleSize / 2,
                             posY - approachCircleSize / 2,
                             approachCircleSize,
@@ -803,13 +814,13 @@ public unsafe class GameView : View
                             });
                     }
                     
-                    _renderer.DrawTexture(Skin.HitCircle,
+                    r.DrawTexture(Skin.HitCircle,
                         posX - drawSize / 2,
                         posY - drawSize / 2,
                         drawSize,
                         drawSize, hitObject.Color with { W = Math.Min(fadein, fadeout) });
 
-                    _renderer.DrawTexture(Skin.HitCircleOverlay,
+                    r.DrawTexture(Skin.HitCircleOverlay,
                         posX - drawSize / 2,
                         posY - drawSize / 2,
                         drawSize,
@@ -841,7 +852,7 @@ public unsafe class GameView : View
                         var w = tex.Width * digitScale;
                         var h = tex.Height * digitScale;
 
-                        _renderer.DrawTexture(
+                        r.DrawTexture(
                             tex,
                             cursorX,
                             posY - h / 2,
@@ -869,8 +880,8 @@ public unsafe class GameView : View
 
                 int fbIndex = AcquireSliderFramebuffer();
                 var fb = _sliderFramebuffers[fbIndex];
-                _renderer.BindFramebuffer(fb.Framebuffer);
-                _renderer.Clear(new Vector4(0, 0, 0, 0));
+                r.BindFramebuffer(fb.Framebuffer);
+                r.Clear(new Vector4(0, 0, 0, 0));
                 GL.BlendFunc(BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha);
                 foreach (var point in slider.Points)
                 {
@@ -878,7 +889,7 @@ public unsafe class GameView : View
                     var scaledY = playfieldTopLeft.Y + point.Y * scale;
 
                     var _drawSize = objectCircleSize * 0.92f;
-                    _renderer.DrawCircle(
+                    r.DrawCircle(
                         scaledX - _drawSize / 2,
                         scaledY - _drawSize / 2,
                         _drawSize,
@@ -892,7 +903,7 @@ public unsafe class GameView : View
                     var scaledY = playfieldTopLeft.Y + point.Y * scale;
                     var _drawSize = objectCircleSize * 0.8f;
 
-                    _renderer.DrawCircle(
+                    r.DrawCircle(
                         scaledX - _drawSize / 2,
                         scaledY - _drawSize / 2,
                         _drawSize,
@@ -902,10 +913,10 @@ public unsafe class GameView : View
                 }
 
                 GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
-                _renderer.UnbindFramebuffer(fb.Framebuffer);
+                r.UnbindFramebuffer(fb.Framebuffer);
                 ReleaseSliderFramebuffer(fbIndex);
 
-                _renderer.SetScissor(0, 0, (int)Width, (int)Height);
+                r.SetScissor(0, 0, (int)Width, (int)Height);
 
                 var maxSliderOpacity = 0.8f;
                 float sliderOpacity;
@@ -933,7 +944,7 @@ public unsafe class GameView : View
                     throw new Exception("Slider opactiy > maxSliderOpacity. Fix.");
                 }
 
-                _renderer.DrawTexture(fb.Framebuffer.Texture, 0, 0, Width, Height,
+                r.DrawTexture(fb.Framebuffer.Texture, 0, 0, Width, Height,
                     new Vector4(1, 1, 1, 1) { W = sliderOpacity });
 
                 if (slider.Sliding)
@@ -973,7 +984,7 @@ public unsafe class GameView : View
                             var repeatRotation = Math.Atan2(repeatDirection.Y, repeatDirection.X) * -MathHelper.RadToDeg +
                                                  180;
 
-                            _renderer.DrawTexture(Skin.ReverseArrow,
+                            r.DrawTexture(Skin.ReverseArrow,
                                 repeatScaledX - repeatDrawSize / 2,
                                 repeatScaledY - repeatDrawSize / 2,
                                 repeatDrawSize,
@@ -989,7 +1000,7 @@ public unsafe class GameView : View
 
                     if (Skin.HasSliderSpec)
                     {
-                        _renderer.DrawCircle(
+                        r.DrawCircle(
                             scaledX - _drawSize / 2,
                             scaledY - _drawSize / 2,
                             _drawSize,
@@ -1008,7 +1019,7 @@ public unsafe class GameView : View
                                 Skin.SliderBalls.Count - 1),
                             0,
                             Skin.SliderBalls.Count - 1);
-                        _renderer.DrawTexture(Skin.SliderBalls[ballIndex],
+                        r.DrawTexture(Skin.SliderBalls[ballIndex],
                             scaledX - _drawSize / 2,
                             scaledY - _drawSize / 2,
                             _drawSize,
@@ -1017,7 +1028,7 @@ public unsafe class GameView : View
                     }
                     else
                     {
-                        _renderer.DrawTexture(Skin.SliderBalls.First(),
+                        r.DrawTexture(Skin.SliderBalls.First(),
                             scaledX - _drawSize / 2,
                             scaledY - _drawSize / 2,
                             _drawSize,
@@ -1026,7 +1037,7 @@ public unsafe class GameView : View
                     }
 
                     _drawSize = objectCircleSize * 2.5f;
-                    _renderer.DrawTexture(Skin.SliderFollowCircle,
+                    r.DrawTexture(Skin.SliderFollowCircle,
                         scaledX - _drawSize / 2,
                         scaledY - _drawSize / 2,
                         _drawSize,
@@ -1036,7 +1047,7 @@ public unsafe class GameView : View
 
                 if (!Hidden)
                 {
-                    _renderer.DrawTexture(Skin.ApproachCircle,
+                    r.DrawTexture(Skin.ApproachCircle,
                         posX - approachCircleSize / 2,
                         posY - approachCircleSize / 2,
                         approachCircleSize,
@@ -1044,7 +1055,7 @@ public unsafe class GameView : View
                 }
                 
 
-                _renderer.DrawTexture(Skin.SliderStartCircle,
+                r.DrawTexture(Skin.SliderStartCircle,
                     posX - drawSize / 2,
                     posY - drawSize / 2,
                     drawSize,
@@ -1053,7 +1064,7 @@ public unsafe class GameView : View
 
                 if (!Skin.SliderStartCircleExists)
                 {
-                    _renderer.DrawTexture(Skin.HitCircleOverlay,
+                    r.DrawTexture(Skin.HitCircleOverlay,
                         posX - drawSize / 2,
                         posY - drawSize / 2,
                         drawSize,
@@ -1085,7 +1096,7 @@ public unsafe class GameView : View
                     var w = tex.Width * digitScale;
                     var h = tex.Height * digitScale;
 
-                    _renderer.DrawTexture(
+                    r.DrawTexture(
                         tex,
                         cursorX,
                         posY - h / 2,
@@ -1152,7 +1163,7 @@ public unsafe class GameView : View
             Vector2 drawPos = playfieldTopLeft + particle.Position * scale;
             drawPos.Y += yOffset;
 
-            _renderer.DrawCenteredTexture(texture, drawPos, w, h,
+            r.DrawCenteredTexture(texture, drawPos, w, h,
                 new Vector4(1, 1, 1, alpha));
         }
 
@@ -1165,7 +1176,7 @@ public unsafe class GameView : View
         var bgScale = scoreboardBgWidth / Skin.ScorebarBg.Width;
         var scoreboardBgHeight = Skin.ScorebarBg.Height * bgScale;
 
-        _renderer.DrawTexture(Skin.ScorebarBg, 0, 0, scoreboardBgWidth, scoreboardBgHeight, new Vector4(1, 1, 1, 1));
+        r.DrawTexture(Skin.ScorebarBg, 0, 0, scoreboardBgWidth, scoreboardBgHeight, new Vector4(1, 1, 1, 1));
 
 
         var scoreboardColourWidth = Width / 2.5f;
@@ -1173,10 +1184,10 @@ public unsafe class GameView : View
         var colourScale = scoreboardColourWidth / Skin.ScorebarColour.Width;
         var scoreboardColourHeight = Skin.ScorebarColour.Height * colourScale;
 
-        _renderer.SetScissor(20, 22, (int)(20 + scoreboardColourWidth * _health), (int)scoreboardColourHeight);
-        _renderer.DrawTexture(Skin.ScorebarColour, 20, 22, scoreboardColourWidth / 1f, scoreboardColourHeight / 1f,
+        r.SetScissor(20, 22, (int)(20 + scoreboardColourWidth * _health), (int)scoreboardColourHeight);
+        r.DrawTexture(Skin.ScorebarColour, 20, 22, scoreboardColourWidth / 1f, scoreboardColourHeight / 1f,
             new Vector4(1, 1, 1, 1));
-        _renderer.SetScissor(0, 0, (int)Width, (int)Height);
+        r.SetScissor(0, 0, (int)Width, (int)Height);
 
 
         // Draw combo count
@@ -1203,7 +1214,7 @@ public unsafe class GameView : View
             var w = tex.Width * comboDigitScale;
             var h = tex.Height * comboDigitScale;
 
-            _renderer.DrawTexture(
+            r.DrawTexture(
                 tex,
                 comboCursorX,
                 Height - h - 30,
@@ -1218,7 +1229,7 @@ public unsafe class GameView : View
         // TODO: Fix the way combo x's position/scale is calculated. its def wrong i think
         var comboxXScale = Height / 20 / Skin.ScoreX.Height;
 
-        _renderer.DrawTexture(
+        r.DrawTexture(
             Skin.ScoreX,
             comboCursorX,
             Height - Skin.ScoreX.Height * comboxXScale - 30,
@@ -1252,7 +1263,7 @@ public unsafe class GameView : View
             var w = tex.Width * scoreDigitScale;
             var h = tex.Height * scoreDigitScale;
 
-            _renderer.DrawTexture(
+            r.DrawTexture(
                 tex,
                 scoreCursorX,
                 30,
@@ -1268,37 +1279,37 @@ public unsafe class GameView : View
         var yellow = new Vector4(242 / 255f, 191 / 255f, 36 / 255f, 1);
 
         // draw volume control
-        /*_renderer.DrawRectangle(0, (float)Height / 2 - 150, 40, 300, new Vector4(0.1f, 0.1f, 0.1f, 1));
+        /*r.DrawRectangle(0, (float)Height / 2 - 150, 40, 300, new Vector4(0.1f, 0.1f, 0.1f, 1));
 
         var length = Util.MapRange(_musicVolume, 0, 1, 0, 300);
-        _renderer.DrawRectangle(10, (float)Height / 2 - 150, 20, length, yellow);*/
+        r.DrawRectangle(10, (float)Height / 2 - 150, 20, length, yellow);*/
 
 
         // timeline
         if (_debugEnabled)
         {
             var songPointer = Util.MapRange((float)SongCursor, 0, (float)_songLength, 0, Width);
-            _renderer.DrawRectangle(0, Height - 20, songPointer, 20, yellow);
+            r.DrawRectangle(0, Height - 20, songPointer, 20, yellow);
             var cursorSize = new Vector2(30, 60);
-            _renderer.DrawRectangle(songPointer - cursorSize.X / 2, Height - cursorSize.Y, cursorSize.X, cursorSize.Y,
+            r.DrawRectangle(songPointer - cursorSize.X / 2, Height - cursorSize.Y, cursorSize.X, cursorSize.Y,
                 new Vector4(1, 1, 1, 1));
         }
 
         // TODO: add actual stacking for mod icons
         if (_player.State == PlayerState.Autoplay)
         {
-            _renderer.DrawTexture(Skin.ModAutoplay, Width - Width / 20 - 50, Height / 8, Width / 20, Width / 20,
+            r.DrawTexture(Skin.ModAutoplay, Width - Width / 20 - 50, Height / 8, Width / 20, Width / 20,
                 new Vector4(1, 1, 1, 1));
         }
 
         if (_doubleTimeEnabled)
         {
-            _renderer.DrawTexture(Skin.ModNightcore, Width - Width / 20 - 50 - Width / 40, Height / 8, Width / 20,
+            r.DrawTexture(Skin.ModNightcore, Width - Width / 20 - 50 - Width / 40, Height / 8, Width / 20,
                 Width / 20, new Vector4(1, 1, 1, 1));
         }
         if (Hidden)
         {
-            _renderer.DrawTexture(Skin.ModHidden, Width - Width / 20 - 50 - Width / 40 - 50 - Width / 40, Height / 8, Width / 20,
+            r.DrawTexture(Skin.ModHidden, Width - Width / 20 - 50 - Width / 40 - 50 - Width / 40, Height / 8, Width / 20,
                 Width / 20, new Vector4(1, 1, 1, 1));
         }
 
@@ -1309,7 +1320,7 @@ public unsafe class GameView : View
         var timingWindowHeight = timingWindowWidth / 25;
         var timingWindowX = Width / 2 - timingWindowWidth / 2;
         var timingWindowY = Height - timingWindowHeight - timingWindowHeight;
-        _renderer.DrawRectangle(timingWindowX, timingWindowY, timingWindowWidth, timingWindowHeight,
+        r.DrawRectangle(timingWindowX, timingWindowY, timingWindowWidth, timingWindowHeight,
             new Vector4(1, 1, 1, 1));
 
         var timingSegmentSize = timingWindowWidth / 6;
@@ -1329,7 +1340,7 @@ public unsafe class GameView : View
                 hitWindowColor = new Vector4(128 / 255f, 201 / 255f, 249 / 255f, 1.0f);
             }
 
-            _renderer.DrawRectangle(
+            r.DrawRectangle(
                 Width / 2 - timingWindowWidth / 2 + (timingSegmentSize * i),
                 Height - timingWindowHeight - timingWindowHeight,
                 timingSegmentSize,
@@ -1342,7 +1353,7 @@ public unsafe class GameView : View
             var range = 200 - 10 * _beatmap.OverallDifficulty;
             var cursorX = Util.MapRange((float)indicator.Offset, -range, range, timingWindowX,
                 timingWindowX + timingWindowWidth);
-            _renderer.DrawRectangle(cursorX, timingWindowY - timingWindowHeight, 3, timingWindowHeight * 2,
+            r.DrawRectangle(cursorX, timingWindowY - timingWindowHeight, 3, timingWindowHeight * 2,
                 new Vector4(1, 1, 1, (float)(indicator.Life / HIT_INDICATOR_MAX_LIFE)));
         }
         
@@ -1351,12 +1362,12 @@ public unsafe class GameView : View
         {
             var unrankedWidth = Width / 10;
             var unrankedHeight = Skin.PlayUnranked.Height * (unrankedWidth / Skin.PlayUnranked.Width);
-            _renderer.DrawTexture(Skin.PlayUnranked, Width/2 - unrankedWidth/2, Height/10, unrankedWidth, unrankedHeight, new Vector4(1, 1, 1, 1));
+            r.DrawTexture(Skin.PlayUnranked, Width/2 - unrankedWidth/2, Height/10, unrankedWidth, unrankedHeight, new Vector4(1, 1, 1, 1));
         }
 
         if (_isPaused)
         {
-            //_renderer.DrawRectangle(0, 0, Width, Height, new Vector4(0, 0, 0, 0.85f));
+            //r.DrawRectangle(0, 0, Width, Height, new Vector4(0, 0, 0, 0.85f));
         }
         
         // Game cursor
@@ -1382,11 +1393,11 @@ public unsafe class GameView : View
                 var trail = trailSnapshot[idx];
                 size -= 1;
 
-                var alpha = (float)i / trailSnapshot.Length;
-                _renderer.DrawTexture(Skin.CursorTrail,
+                var alpha = (float)Math.Max(trailSnapshot.Length / 1.2f, i) / trailSnapshot.Length;
+                r.DrawTexture(Skin.CursorTrail,
                     trail.Position.X - size / 2,
                     trail.Position.Y - size / 2,
-                    size, size, new Vector4(1, 1, 1, 1) * alpha);
+                    size, size, new Vector4(1, 1, 1, 1));
                 i--;
             }
         }
@@ -1396,13 +1407,13 @@ public unsafe class GameView : View
         size = _baseCircleSize / 2f; // _cursorTexture.Width * 1.5f;
         if (Skin.HasCursorMiddle)
         {
-            _renderer.DrawTexture(Skin.CursorMiddle,
+            r.DrawTexture(Skin.CursorMiddle,
                 _player.Cursor.X - size / 4,
                 _player.Cursor.Y - size / 4,
                 size / 2, size / 2, new Vector4(1, 1, 1, 1));
         }
 
-        _renderer.DrawTexture(Skin.Cursor,
+        r.DrawTexture(Skin.Cursor,
             _player.Cursor.X - size / 2,
             _player.Cursor.Y - size / 2,
             size, size, new Vector4(1, 1, 1, 1));
@@ -1410,15 +1421,15 @@ public unsafe class GameView : View
         
         if (_debugEnabled)
         {
-            _renderer.DrawText(_msdfFont,
+            r.DrawText(_msdfFont,
                 $"Cursor: {SongCursor:F0}ms | TrackPos: {_songTrack?.Position:F0}ms\nSongLength: {_songLength:F0}ms\nSampleTracks: {AudioManager.Instance.SampleTracks.Count}/50",
                 new Vector2(10, 200), Height/45, new Vector4(1, 1, 0, 1));
-            _renderer.FlushText(_msdfFont);
+            r.FlushText(_msdfFont);
         }
         
-        //_renderer.DrawCenteredRect(new Vector2(MouseX, MouseY), 50, 50, new Vector4(1, 0, 1, 1));
+        //r.DrawCenteredRect(new Vector2(MouseX, MouseY), 50, 50, new Vector4(1, 0, 1, 1));
         
-        _renderer.SetScissor(0, 0, (int)Width, (int)Height);
+        r.SetScissor(0, 0, (int)Width, (int)Height);
     }
 
     public override void OnResize(ResizeEventArgs e)
@@ -1447,7 +1458,7 @@ public unsafe class GameView : View
         _startingTimer = WAITINGTIME + _beatmap.AudioLeadIn;
         _musicStarted = false;
 
-        _beatmap.CalculatePrepass(_renderer.Window);
+        _beatmap.CalculatePrepass();
         _player = new Player(_beatmap, this);
         SDL_ShowCursor();
 
@@ -1521,7 +1532,7 @@ public unsafe class GameView : View
         /*
         _sliderFramebuffers.Add(new SliderFramebuffer
         {
-            Framebuffer = new Framebuffer(_renderer, (int)Width, (int)Height),
+            Framebuffer = new Framebuffer(r, (int)Width, (int)Height),
             InUse = true
         });*/
 

@@ -284,7 +284,7 @@ public unsafe class Beatmap
     
     
     
-    public void CalculatePrepass(SDL_Window* window)
+    public void CalculatePrepass()
     {
         var comboCounter = 0;
         var colorCounter = 0;

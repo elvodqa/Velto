@@ -1,4 +1,6 @@
-namespace Velto.Graphics;
+using Velto.Graphics;
+
+namespace Velto.Core;
 
 public struct ResizeEventArgs
 {
@@ -14,6 +16,14 @@ public struct MouseEventArgs(int x, int y)
 
 public abstract class View : IInputReceiver, IDisposable
 {
+    public static T Create<T>(int width, int height)
+        where T : View, new()
+    {
+        var view = new T();
+        view.Framebuffer = new Framebuffer(width, height);
+        return view;
+    }
+    
     public Framebuffer Framebuffer;
     public float X { get; set; }
     public float Y { get; set;  }
@@ -50,16 +60,20 @@ public abstract class View : IInputReceiver, IDisposable
         return mouseX >= X && mouseX <= X + Width &&
                mouseY >= Y && mouseY <= Y + Height;
     }
-
+    
+    public virtual void OnEnter() {}
+    public virtual void OnExit() {}
+    public virtual void OnResize(ResizeEventArgs e) {}
     public virtual void OnMouseEnter() { }
     public virtual void OnMouseLeave() { }
-    public virtual void OnMouseMove(MouseEventArgs e) { }
-    public virtual void OnMouseDown(MouseButton button, MouseEventArgs e) { }
     public virtual void OnMouseUp(MouseButton button, MouseEventArgs e) { }
-    public virtual void OnResize(ResizeEventArgs e) { }
 
+    public virtual void OnMouseDown(MouseButton button, MouseEventArgs e) { }
+
+    public virtual void OnMouseMove(MouseEventArgs e) { }
+    
     public abstract void Update(double dt);
-    public abstract void Draw(double dt);
+    public abstract void Draw(double dt, Renderer r);
 
     public void Dispose()
     {

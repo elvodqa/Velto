@@ -64,8 +64,8 @@ public class InputOverlayView : View
         float easeSecondary = EasingFunctions.Bounce01To0(_progressSecondary);
         _bounceValSecondary = MathHelper.Lerp(_bounceValSecondary, easeSecondary * -20f, 0.25f);
     }
-
-    public override void Draw(double delta)
+    
+    public override void Draw(double dt, Renderer r)
     {
        
         // Vector4 highlightColor = new Vector4(0.6f, 0.6f, 0.6f, 1f);

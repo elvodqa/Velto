@@ -20,16 +20,13 @@ public unsafe class Framebuffer : IDisposable
     }
     public int Handle { get; private set; }
     public int Texture { get; private set; }
-    
-    private Renderer _renderer;
     private int _width;
     private int _height;
 
-    public Framebuffer(Renderer renderer, int width, int height)
+    public Framebuffer(int width, int height)
     {
         _width = width;
         _height = height;
-        _renderer = renderer;
         Handle = GL.GenFramebuffer();
         GL.BindFramebuffer(FramebufferTarget.Framebuffer, Handle);
 
@@ -75,9 +72,9 @@ public unsafe class Framebuffer : IDisposable
         }
 
         //_renderer.FixFramebuffer();
-        GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
-        
-        _renderer.FixFramebuffer();
+        //GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+        if (Renderer.Framebuffer != null) GL.BindFramebuffer(FramebufferTarget.Framebuffer, Renderer.Framebuffer.Handle);
+        else GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
     }
     
     

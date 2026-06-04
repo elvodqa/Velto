@@ -23,8 +23,6 @@ public class SongSelectorView : View
         public bool IsHovered = false;
     }
     
-    private Renderer _renderer;
-
     private float _maxWidth = 600;
     private float _currentWidth = 0;
     private PanelState _state = PanelState.Closed;
@@ -33,14 +31,11 @@ public class SongSelectorView : View
     private const float Duration = 0.3f;
     private float _cursor = 0;
     private List<BeatmapBox> _beatmapBoxes = new();
-    private GameView _gameView;
     private float _totalContentHeight;
     private bool _isMouseHovering = false;
     
-    public SongSelectorView(Renderer renderer, GameView gameview)
+    public SongSelectorView()
     {
-        _gameView = gameview;
-        _renderer = renderer;
         LoadBeatmaps();
     }
    
@@ -96,9 +91,14 @@ public class SongSelectorView : View
             _beatmapBoxes.Clear();
             LoadBeatmaps();
         }
+        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_TAB))
+        {
+            Toggle();
+        }
+        
     }
 
-    public override void Draw(double delta)
+    public override void Draw(double delta, Renderer r)
     {
         if (_currentWidth == 0) return;
 
@@ -107,9 +107,9 @@ public class SongSelectorView : View
             0, _currentWidth, Height
             );
         
-        _renderer.Clear(new(0, 0, 0, 0));
-        _renderer.SetScissor((int)boundingBox.X, (int)boundingBox.Y, (int)boundingBox.Z, (int)boundingBox.W);
-        _renderer.DrawRectangle(boundingBox.X, boundingBox.Y, boundingBox.Z, boundingBox.W, new Vector4(34f/255, 39f/255, 33f/255, 0.95f));
+        r.Clear(new(0, 0, 0, 0));
+        r.SetScissor((int)boundingBox.X, (int)boundingBox.Y, (int)boundingBox.Z, (int)boundingBox.W);
+        r.DrawRectangle(boundingBox.X, boundingBox.Y, boundingBox.Z, boundingBox.W, new Vector4(34f/255, 39f/255, 33f/255, 0.95f));
         
         foreach (var box in _beatmapBoxes)
         {
@@ -119,16 +119,16 @@ public class SongSelectorView : View
                 color = new Vector4(0.6f, 0.6f, 0.6f, 0.2f);
             }
 
-            _renderer.DrawRectangle(box.Position.X, box.Position.Y, box.Size.X, box.Size.Y, color);
-            _renderer.DrawTexture(box.Texture, box.Position.X, box.Position.Y, 230, 150, new Vector4(1, 1, 1, 1));
-            _renderer.DrawText(Fonts.Default, box.Beatmap.ToString(),
+            r.DrawRectangle(box.Position.X, box.Position.Y, box.Size.X, box.Size.Y, color);
+            r.DrawTexture(box.Texture, box.Position.X, box.Position.Y, 230, 150, new Vector4(1, 1, 1, 1));
+            r.DrawText(Fonts.Default, box.Beatmap.ToString(),
                 new Vector2(box.Position.X + 25 + 230, box.Position.Y + 25),
                 box.Size.Y/5, new Vector4(1, 1, 1, 1));
-            _renderer.DrawText(Fonts.Default, $"By: {box.Beatmap.Creator}",
+            r.DrawText(Fonts.Default, $"By: {box.Beatmap.Creator}",
                 new Vector2(box.Position.X + 25 + 230, box.Position.Y + 65),
                 box.Size.Y/5, new Vector4(1, 1, 1, 1));
         }
-        _renderer.FlushText(Fonts.Default);
+        r.FlushText(Fonts.Default);
         
         // draw thumb (https://thorlaksson.com/2025/scrollbars-from-scratch/)
         var l_c = _totalContentHeight;
@@ -138,7 +138,7 @@ public class SongSelectorView : View
         var l_t = l_v * (l_v / l_c); // length of thumb
         var d_t = d * (l_v / l_c); // distance of thumb
 
-        _renderer.DrawRectangle(Width - 30, d_t, 30, l_t, new Vector4(1, 1, 1, 0.6f));
+        r.DrawRectangle(Width - 30, d_t, 30, l_t, new Vector4(1, 1, 1, 0.6f));
     }
     
      
@@ -191,7 +191,8 @@ public class SongSelectorView : View
         if (_state == PanelState.Closed) return;
         foreach (var box in _beatmapBoxes)
         {
-            if (box.IsHovered && button == MouseButton.Left) _gameView.SetBeatmap(box.Beatmap); 
+            if (box.IsHovered && button == MouseButton.Left) 
+                ViewManager.Instance.Get<GameView>().FirstOrDefault()?.SetBeatmap(box.Beatmap); 
         }
     }
 

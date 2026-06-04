@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading;
+using Velto.Core;
 
 namespace Velto;
 
@@ -7,14 +8,18 @@ class Program
 {
     static void Main(string[] args)
     {
-        if (Environment.GetEnvironmentVariable("RENDERDOC_CAPTURE") != null)
+        GameCreateInfo gameInfo = new()
         {
-            Thread.Sleep(1000);
-        }
-        
-        using (GameBase game = new()) 
-        {
-            game.Run();
-        }
+            Title = "Velto",
+            Maximized = false,
+        };
+
+        using Velto game = new(gameInfo);
+        game.Run();
+
+        // using (GameBase game = new()) 
+        // {
+        //     game.Run();
+        // }
     }
 }   

@@ -1,4 +1,4 @@
-namespace Velto.Graphics;
+namespace Velto.Core;
 
 public enum MouseButton
 {

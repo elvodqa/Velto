@@ -12,8 +12,6 @@ public class SettingsView : View
         Closed,
     }
     
-    private Renderer _renderer;
-
     private float _maxWidth = 400;
     private float _currentWidth = 0;
     private PanelState _state = PanelState.Closed;
@@ -25,16 +23,14 @@ public class SettingsView : View
     private bool _isMouseHovering = false;
 
    
-    public SettingsView(Renderer renderer)
+    public SettingsView()
     {
-        _renderer = renderer;
         _font = MSDFFont.Load(Resources.GetPath("Resources/Fonts/arial/arial"));
     }
    
     public override void Update(double delta)
     {
         X = 0;
-        _maxWidth = Math.Max(500 * _renderer.DisplayScale, _renderer.WindowSizeInPixels.X / 4f);
         
         float step = ((float)delta/1000) / Duration;
 
@@ -57,25 +53,27 @@ public class SettingsView : View
         _cursor = Math.Clamp(_cursor, -4000, 0);
     }
 
-    public override void Draw(double delta)
+    public override void Draw(double delta, Renderer r)
     {
+        _maxWidth = Math.Max(500 * r.DisplayScale, r.WindowSizeInPixels.X / 4f);
+        
         if (_currentWidth == 0) return;
-        _renderer.Clear(new(0, 0, 0, 0));
-        _renderer.SetScissor(0, 0, (int)_currentWidth, (int)Height);
-        _renderer.DrawRectangle(0, 0, _currentWidth, Height, new Vector4(74f/255, 79f/255, 33f/255, 1));
+        r.Clear(new(0, 0, 0, 0));
+        r.SetScissor(0, 0, (int)_currentWidth, (int)Height);
+        r.DrawRectangle(0, 0, _currentWidth, Height, new Vector4(74f/255, 79f/255, 33f/255, 1));
         
         int leftPad = 50, rightPad = 50;
         int topPad = 50, bottomPad = 50;
         var contentWidth = _currentWidth - leftPad - rightPad;
         
         var settingsTextSize = contentWidth / 7;
-        _renderer.DrawText(_font, "Settings", new Vector2(leftPad, rightPad), settingsTextSize, new Vector4(1, 1, 1, 1));
-        _renderer.FlushText(_font);
+        r.DrawText(_font, "Settings", new Vector2(leftPad, rightPad), settingsTextSize, new Vector4(1, 1, 1, 1));
+        r.FlushText(_font);
         
         float contentY = settingsTextSize + topPad;
         
-        _renderer.SetScissor(leftPad, (int)(contentY), (int)_currentWidth - leftPad - rightPad, (int)((int)Height - contentY - bottomPad));
-        _renderer.DrawRectangleBorder(
+        r.SetScissor(leftPad, (int)(contentY), (int)_currentWidth - leftPad - rightPad, (int)((int)Height - contentY - bottomPad));
+        r.DrawRectangleBorder(
             leftPad,
             contentY,
             _currentWidth - leftPad - rightPad,
@@ -90,8 +88,8 @@ public class SettingsView : View
         }
         
         
-        _renderer.DrawTextWrapped(_font, textBuffer, new Vector2(leftPad*2, contentY + topPad),  45,contentWidth - rightPad, new Vector4(1, 1, 1, 1));
-        _renderer.FlushText(_font);
+        r.DrawTextWrapped(_font, textBuffer, new Vector2(leftPad*2, contentY + topPad),  45,contentWidth - rightPad, new Vector4(1, 1, 1, 1));
+        r.FlushText(_font);
     }
 
     public override bool HitTest(float mouseX, float mouseY)
