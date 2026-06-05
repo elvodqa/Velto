@@ -10,11 +10,16 @@ using static SDL.SDL3;
 
 namespace Velto.Views;
 
-public unsafe class GameView : View
+public class GameView : View
 {
-    private const int PLAYFIELD_W = 512;
-    private const int PLAYFIELD_H = 384;
-    private const double WAITINGTIME = 3000f;
+    private const int PlayfieldW = 512;
+    private const int PlayfieldH = 384;
+    private const double WaitingTime = 1000f;
+    private const double HitIndicatorMaxLife = 2000f;
+    
+    public double SongCursor;
+    public Skin Skin;
+    
     private double _startingTimer;
 
     private Texture? _backgroundTexture;
@@ -22,6 +27,7 @@ public unsafe class GameView : View
     private float _baseCircleSize;
 
     private Beatmap _beatmap;
+    private IOrderedEnumerable<HitObject> _sortedObjects;
 
     private bool _isPaused;
     
@@ -30,30 +36,26 @@ public unsafe class GameView : View
     
     private string _skinName = "rafis";
 
-    public double SongCursor;
+    
     private double _lastSongCursor;
     private double _songLength;
-    private IOrderedEnumerable<HitObject> _sortedObjects;
+    
 
-    private Vector2 lastCursorPosition = Vector2.Zero;
-    private Shader shader;
-
+    private Vector2 _lastCursorPosition = Vector2.Zero;
+    
     private readonly Queue<TrailInfo> trails = new();
 
     private Player _player;
-    private InputOverlayView _inputOverlayView;
-    public Skin Skin;
-    public bool Hidden;
+    private bool _hidden;
 
     private Track? _songTrack;
     private AudioChannel? _songAudio;
-    private double _audioLock = 0.0f;
-
-    private SliderFramebuffer[] _sliderFramebuffers = new SliderFramebuffer[16];
+    
+    private readonly SliderFramebuffer[] _sliderFramebuffers = new SliderFramebuffer[16];
     private float _prevWidth, _prevHeight;
 
     private bool _debugEnabled = true;
-    private bool _doubleTimeEnabled = false;
+    private bool _doubleTimeEnabled;
 
     // https://osu.ppy.sh/wiki/en/Gameplay/Score/ScoreV1/osu%21
     private float _health = 1.0f;
@@ -61,12 +63,14 @@ public unsafe class GameView : View
     private float _totalScore = 0;
     private float _difficultyMultiplier = 1.0f;
     private float _modMultiplier = 1.0f;
-    private const double HIT_INDICATOR_MAX_LIFE = 2000f;
-    private List<HitIndicator> _hitIndicators = new();
+    private readonly List<HitIndicator> _hitIndicators = new();
 
-    public float MouseX;
-    public float MouseY;
-
+    private float _playfieldWidth, _playfieldHeight;
+    private Vector2 _playfieldTopLeft;
+    
+    private float _mouseX;
+    private float _mouseY;
+    
     public struct SliderFramebuffer
     {
         public Framebuffer Framebuffer;
@@ -74,36 +78,7 @@ public unsafe class GameView : View
         public float Duration;
         public bool InUse;
     }
-
-    public GameView()
-    {
-        Skin = new Skin(Resources.GetPath($"Resources/Textures/{_skinName}"));
-        Fonts.Default = MSDFFont.Load(Resources.GetPath("Resources/Fonts/arial/arial"));
-        
-        //_inputOverlayView = new(r, this, _msdfFont);
-
-        for (int i = 0; i < 16; i++)
-        {
-            _sliderFramebuffers[i] = new()
-            {
-                Framebuffer = new Framebuffer(1280, 720),
-                Duration = 0,
-                Time = 0,
-            };
-        }
-
-        Hidden = false;
-        // SetBeatmap(new Beatmap(Resources.GetPath("Resources/Songs/Wakeshima Kanon/ASCA - Nisemono no Koi ni Sayounara with Wakeshima Kanon (timemon) [Kyou's Extra].osu")));
-        // _player.SetReplay(Replay.ParseReplay(Resources.GetPath("Resources/Replays/kanon.osr")));
-        SetBeatmap(new Beatmap(Resources.GetPath("Resources/Songs/983942 Oomori Seiko - JUSTadICE (TV Size)/Oomori Seiko - JUSTadICE (TV Size) (fieryrage) [Extreme].osu")));
-        _player.SetReplay(Replay.ParseReplay(Resources.GetPath("Resources/Replays/fiery.osr")));
-        //_doubleTimeEnabled = true; _songTrack.Speed = 1.5f;
-        _player.SetState(PlayerState.Replay);
-    }
-
-    float playfieldWidth, playfieldHeight;
-    private Vector2 playfieldTopLeft;
-
+    
     public void ToggleMenu()
     {
         _isPaused = !_isPaused;
@@ -116,14 +91,13 @@ public unsafe class GameView : View
             _songTrack?.Resume();
         }
     }
-    
 
     public override void Update(double delta)
     {
         var previousSongCursor = _lastSongCursor;
         _lastSongCursor = SongCursor;
         
-        if (_prevWidth != Width || _prevHeight != Height)
+        if ((int)_prevWidth != (int)Width || (int)_prevHeight != (int)Height)
         {
             for (int i = 0; i < _sliderFramebuffers.Length; i++)
             {
@@ -152,23 +126,19 @@ public unsafe class GameView : View
                 SongCursor = 0;
             }
         }
-
-        // Use REAL audio position when music is playing
+        
         if (_musicStarted && !_isPaused && _songTrack != null)
         {
-            
             SongCursor = _songTrack.Position;
-            SongCursor += delta;
-            //SongCursor -= 2.66f;
-            
+            //SongCursor += delta;
             SongCursor = Math.Clamp(SongCursor, 0, _songLength);
         }
 
         RectangleF hitbox = new(0, Height - 40, Width, 40);
-        if (Input.IsMouseDown(SDLButton.SDL_BUTTON_LEFT) && hitbox.Contains(MouseX, MouseY) &&
+        if (Input.IsMouseDown(SDLButton.SDL_BUTTON_LEFT) && hitbox.Contains(_mouseX, _mouseY) &&
             _debugEnabled)
         {
-            double targetMs = Util.MapRange(MouseX, 0, Width, 0, (float)_songLength);
+            double targetMs = Util.MapRange(_mouseX, 0, Width, 0, (float)_songLength);
 
             if (_startingTimer >= 0 && !_musicStarted)
             {
@@ -251,7 +221,6 @@ public unsafe class GameView : View
             SongCursor = 0;
             _comboCount = 0;
             _totalScore = 0;
-            //_inputOverlayView.Reset();
             ResetObjectsAfter(0);
         }
 
@@ -263,40 +232,35 @@ public unsafe class GameView : View
                 _hitIndicators.Remove(hitIndicator);
             }
         }
-
         
-        var scale = playfieldWidth / PLAYFIELD_W;
+        // Calculate playfield
+        var scale = _playfieldWidth / PlayfieldW;
         var osuRadius = 54.4f - 4.48f * _beatmap.CircleSize;
         _baseCircleSize = osuRadius * 2f * scale;
-
-        // hitobjects
-        var playfieldAspect = PLAYFIELD_W / (float)PLAYFIELD_H;
-        var windowAspect = Width / (float)Height;
+        
+        var playfieldAspect = PlayfieldW / (float)PlayfieldH;
+        var windowAspect = Width / (Height);
         float playfieldScale = 0.76f;
-
+        
         if (windowAspect > playfieldAspect)
         {
-            // window is wider → height is limiting (letterbox left/right)
-            playfieldHeight = Height * playfieldScale;
-            playfieldWidth = playfieldHeight * playfieldAspect;
+            _playfieldHeight = Height * playfieldScale;
+            _playfieldWidth = _playfieldHeight * playfieldAspect;
         }
         else
         {
-            // window is taller → width is limiting (letterbox top/bottom)
-            playfieldWidth = Width * playfieldScale;
-            playfieldHeight = playfieldWidth / playfieldAspect;
+            _playfieldWidth = Width * playfieldScale;
+            _playfieldHeight = _playfieldWidth / playfieldAspect;
         }
 
-        playfieldTopLeft = new(
-            (Width - playfieldWidth) / 2f,
-            (Height - playfieldHeight) / 2f
+        _playfieldTopLeft = new(
+            (Width - _playfieldWidth) / 2f,
+            (Height - _playfieldHeight) / 2f
         );
-
-
+        
         _sortedObjects = _beatmap.HitObjects
             .OrderByDescending(h => Math.Abs(h.Time - SongCursor));
-
-
+        
         if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_SPACE))
         {
             if (_isPaused)
@@ -307,51 +271,34 @@ public unsafe class GameView : View
             {
                 _songTrack?.Pause();
             }
-
             _isPaused = !_isPaused;
         }
-
-        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_A))
-        {
-            /*_player.Autoplay = !_player.Autoplay;
-            if (_player.Autoplay) SDL_ShowCursor();
-            else SDL_HideCursor();*/
-        }
-
+        
         if (Input.IsKeyDown(SDL_Scancode.SDL_SCANCODE_LCTRL))
         {
             if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_D))
             {
                 _doubleTimeEnabled = !_doubleTimeEnabled;
-                if (_doubleTimeEnabled) _songTrack?.Speed = 1.5f;
-                else _songTrack?.Speed = 1.0f;
+                _songTrack?.Speed = _doubleTimeEnabled ? 1.5f : 1.0f;
             }
 
             if (Math.Abs(Input.WheelY) > 0.01f)
             {
                 _musicVolume += Input.WheelY * 0.01f;
                 _musicVolume = Math.Clamp(_musicVolume, 0, 1);
-                //Bass.ChannelSetAttribute(_musicChannel, ChannelAttribute.Volume, _musicVolume);
                 _songTrack?.Volume = _musicVolume;
+                AudioManager.Instance.SampleVolume = _musicVolume;
             }
             
             if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_S))
             {
                 Skin.Dispose();
-                if (_skinName == "rafis") _skinName = "default";
-                else _skinName = "rafis";
+                _skinName = _skinName == "rafis" ? "default" : "rafis";
                 Skin = new Skin(Resources.GetPath($"Resources/Textures/{_skinName}"));
             }
         }
         
-        // notes
-        // you can click another object after hitting a slider head
-        // TODO:
-        // you can click for too early for a miss
-
-        // Update player just before doing judgement
-        _player.Update(delta, SongCursor, playfieldTopLeft, scale);
-        //_inputOverlayView.Update(delta);
+        _player.Update(delta, SongCursor, _playfieldTopLeft, scale);
         // Handle objects bkz: https://osu.ppy.sh/wiki/en/Gameplay/Judgement/osu%21 
         foreach (var hitObject in _beatmap.HitObjects)
         {
@@ -370,18 +317,16 @@ public unsafe class GameView : View
                         AddResultParticle(hitObject.Position, hitObject.HitResult, SongCursor);
                         AudioManager.Instance.PlaySample(Skin.ComboBreak);
                     }
-        
                     
                     float radiusScreen = osuRadius * scale;
-                    var circlePosition = playfieldTopLeft + circle.Position * scale;
+                    var circlePosition = _playfieldTopLeft + circle.Position * scale;
                     if (Vector2.Distance(circlePosition, playerCursor) <= radiusScreen)
                         if (_player.ActionPrimaryPressed || _player.ActionSecondaryPressed)
                         {
                             // bkz: https://osu.ppy.sh/wiki/en/Gameplay/Judgement/osu%21
-                            //circle.Color = Vector4.Zero;
                             _hitIndicators.Add(new()
                             {
-                                Life = HIT_INDICATOR_MAX_LIFE,
+                                Life = HitIndicatorMaxLife,
                                 Offset = hitObject.Time - SongCursor,
                             });
                             hitObject.HitTime = SongCursor;
@@ -439,8 +384,7 @@ public unsafe class GameView : View
                         slider.WasFollowedAtEnd = slider.IsCurrentlyBeingFollowed;
                     }
 
-                    var sliderCompletion = 0;
-                    
+                    // var sliderCompletion = 0;
                     // if (slider.WasFollowedAtEnd)
                     // {
                     //     _comboCount++;
@@ -455,7 +399,6 @@ public unsafe class GameView : View
                     //     AddResultParticle(slider.GetPositionAt(slider.Time + slider.Duration), HitResult.Miss, _songCursor);
                     //     AudioManager.Instance.PlaySample(Skin.ComboBreak);
                     // }
-
                     slider.JudgementDone = true;
                     //Logger.Instance.Info($"Slider held for {slider.TotalFollowTime}/{slider.Duration}");
                 }
@@ -474,7 +417,7 @@ public unsafe class GameView : View
                 }
                 
                 float radiusHitCircle = osuRadius * scale;
-                var circlePosition = playfieldTopLeft + slider.Position * scale;
+                var circlePosition = _playfieldTopLeft + slider.Position * scale;
                 if (Vector2.Distance(circlePosition, playerCursor) <= radiusHitCircle)
                 {
                     if ((_player.ActionPrimaryPressed || _player.ActionSecondaryPressed) &&
@@ -482,7 +425,7 @@ public unsafe class GameView : View
                     {
                         _hitIndicators.Add(new()
                         {
-                            Life = HIT_INDICATOR_MAX_LIFE,
+                            Life = HitIndicatorMaxLife,
                             Offset = SongCursor - hitObject.Time,
                         });
                         slider.HitTime = SongCursor;
@@ -524,17 +467,14 @@ public unsafe class GameView : View
                     }
                 }
                 
-                
-                
                 var followCirclePos = slider.GetPositionAt(SongCursor);
-                var ballPosition = playfieldTopLeft + followCirclePos * scale;
+                var ballPosition = _playfieldTopLeft + followCirclePos * scale;
                 var radiusFollowCircle = (_baseCircleSize * 2.5f) / 2f;
 
                 bool sliderActive = SongCursor >= slider.Time && SongCursor <= slider.Time + slider.Duration;
                 bool isInFollowRange = sliderActive && 
                                        Vector2.Distance(ballPosition, playerCursor) <= radiusFollowCircle;
                 bool isHolding = _player.ActionPrimaryDown || _player.ActionSecondaryDown;
-
                 bool isFollowingNow = sliderActive && isInFollowRange && isHolding;
 
                 if (sliderActive)
@@ -578,39 +518,34 @@ public unsafe class GameView : View
                 {
                     break;
                 }
-                
             }
-            
-            
-            
         }
-
-
-        // if (lastCursorPosition != Vector2.Zero && Vector2.Distance(_player.Cursor, lastCursorPosition) > 8)
-        //     trails.Enqueue(new TrailInfo
-        //     {
-        //         Position = lastCursorPosition,
-        //         Life = 50
-        //     });
-        float distance = Vector2.Distance(_player.Cursor, lastCursorPosition);
-        if (lastCursorPosition != Vector2.Zero && distance > 8)
-        {
-            int steps = (int)(distance / 6f);
-            for (int i = 1; i <= steps; i++)
+        
+        if (_lastCursorPosition != Vector2.Zero && Vector2.Distance(_player.Cursor, _lastCursorPosition) > 8)
+            trails.Enqueue(new TrailInfo
             {
-                float t = i / (float)steps;
-                Vector2 interpolated = Vector2.Lerp(lastCursorPosition, _player.Cursor, t);
-
-                trails.Enqueue(new TrailInfo
-                {
-                    Position = interpolated,
-                    Life = 45 + (steps - i) * 2 // newer points live longer
-                });
-            }
-        }
-
-        while (trails.Count > 40)
-            trails.Dequeue();
+                Position = _lastCursorPosition,
+                Life = 50
+            });
+        // float distance = Vector2.Distance(_player.Cursor, lastCursorPosition);
+        // if (lastCursorPosition != Vector2.Zero && distance > 8)
+        // {
+        //     int steps = (int)(distance / 6f);
+        //     for (int i = 1; i <= steps; i++)
+        //     {
+        //         float t = i / (float)steps;
+        //         Vector2 interpolated = Vector2.Lerp(lastCursorPosition, _player.Cursor, t);
+        //
+        //         trails.Enqueue(new TrailInfo
+        //         {
+        //             Position = interpolated,
+        //             Life = 45 + (steps - i) * 2 // newer points live longer
+        //         });
+        //     }
+        // }
+        //
+        // while (trails.Count > 40)
+        //     trails.Dequeue();
 
 
         _hitResultParticles.RemoveAll(p => SongCursor - p.StartTime > p.MaxLife);
@@ -619,46 +554,15 @@ public unsafe class GameView : View
         _prevHeight = Height;
     }
     
-    public override void OnMouseMove(MouseEventArgs e)
-    {
-        base.OnMouseMove(e);
-        
-        MouseX = e.X;
-        MouseY = e.Y;
-    }
-
-    void ResetObjectsAfter(double cursorMs)
-    {
-        foreach (var obj in _beatmap.HitObjects)
-        {
-            if (obj.Time >= cursorMs)
-            {
-                obj.HitTime = 0;
-                obj.HitResult = HitResult.None;
-                obj.Failed = false;
-
-                if (obj is Slider s)
-                {
-                    s.WasFollowedAtEnd = false;
-                    s.IsCurrentlyBeingFollowed = false;
-                    s.TotalFollowTime = 0.0;
-                    s.LastFollowUpdate = 0.0;
-                    s.CurrentContinuousFollow = 0.0;
-                    s.LongestContinuousFollow = 0.0;
-                    s.WasFollowingPreviousFrame = false;
-                }
-            }
-        }
-    }
-
-
     public override void Draw(double delta, Renderer r)
     {
         r.Clear(new(0, 0, 0, 1));
-        r.SetScissor(0, 0, (int)Width, (int)Height);
+        r.PushScissor(0, 0, (int)Width, (int)Height);
+        
+        var playfieldScale = _playfieldWidth / PlayfieldW;
 
-        // bg
-        if (Width * ((float)_backgroundTexture.Height / _backgroundTexture.Width) > Height)
+        // Background Texture
+        if (Width * ((float)_backgroundTexture!.Height / _backgroundTexture.Width) > Height)
         {
             // sağ sol bar
             var padding = Width -
@@ -669,111 +573,55 @@ public unsafe class GameView : View
         }
         else
         {
-            // üst alt bar
             var padding = Height - Width * (_backgroundTexture.Height /
                                             (float)_backgroundTexture.Width);
             r.DrawTexture(_backgroundTexture, 0, padding / 2, Width,
                 Width * ((float)_backgroundTexture.Height / _backgroundTexture.Width), new Color4<Rgba>(1, 1, 1, 1));
         }
 
-        // bg dim
+        // Background Dim
         r.DrawRectangle(0, 0, Width, Height, new Color4<Rgba>(0, 0, 0, 0.80f));
-
-
-        // draw playfield
-        /*r.DrawRectangle(
-            playfieldTopLeft.X,
-            playfieldTopLeft.Y,
-            playfieldWidth,
-            playfieldHeight,
-            new Vector4(0, 0, 0, 0.3f)
-        );*/
-
-
-        var scale = playfieldWidth / PLAYFIELD_W;
         
-        var prevHitObject = (HitObject)null;
-        var nextHitObject = (HitObject)null;
-
-        foreach (var obj in _beatmap.HitObjects)
-        {
-            var currTime = SongCursor + 200;
-            
-            if (obj.Time <= currTime)
-            {
-                prevHitObject = obj; // keeps updating until we pass currTime
-            }
-            else
-            {
-                nextHitObject = obj; // first one after currTime
-                break;  
-            }
-        }
-
-        double prevHitObjectTime = 0;
-        double nextHitObjectTime = 0;
-        Vector2 prevHitObjectPos = new();
-        Vector2 nextHitObjectPos = new();
-        if (prevHitObject != null)
-        {
-            prevHitObjectPos = prevHitObject.Position;
-            prevHitObjectTime = prevHitObject.Time;
-        }
-        if (nextHitObject != null)
-        {
-            nextHitObjectPos = nextHitObject.Position;
-            nextHitObjectTime = nextHitObject.Time;
-        }
-
-        nextHitObjectPos = playfieldTopLeft + nextHitObjectPos * scale;
-        prevHitObjectPos = playfieldTopLeft + prevHitObjectPos * scale;
-
-        var diff = nextHitObjectPos - prevHitObjectPos;
-        var degree = Math.Atan2(diff.Y, diff.X);
-        var distance = 100;
+        // Followpoints
         
-        if (!Skin.HasAnimatedFollowPoints)
-        {
-            var direction = new Vector2(
-                (float)Math.Cos(degree),
-                (float)Math.Sin(degree)
-            );
-
-            int count = (int)(diff.Length / distance);
-
-            for (int i = 0; i < count; i++)
-            {
-                var pos = prevHitObjectPos + direction * (i * distance);
-
-                r.DrawTexture(Skin.FollowPoint, pos.X, pos.Y, 100f, 100f, new Color4<Rgba>(1, 1, 1, 1), (float)degree * MathHelper.RadToDeg + 135);
-            }
-        }
+        // var diff = nextHitObjectPos - prevHitObjectPos;
+        // var degree = Math.Atan2(diff.Y, diff.X);
+        // var distance = 100;
+        //
+        // if (!Skin.HasAnimatedFollowPoints)
+        // {
+        //     var direction = new Vector2(
+        //         (float)Math.Cos(degree),
+        //         (float)Math.Sin(degree)
+        //     );
+        //     int count = diff.Length / distance;
+        //     for (int i = 0; i < count; i++)
+        //     {
+        //         var pos = prevHitObjectPos + direction * (i * distance);
+        //         r.DrawTexture(Skin.FollowPoint, pos.X, pos.Y, 100f, 100f, new Color4<Rgba>(1, 1, 1, 1), (float)degree * MathHelper.RadToDeg + 135);
+        //     }
+        // }
         
         foreach (var hitObject in _sortedObjects)
         {
-            var posX = playfieldTopLeft.X + hitObject.Position.X * scale;
-            var posY = playfieldTopLeft.Y + hitObject.Position.Y * scale;
+            var posX = _playfieldTopLeft.X + hitObject.Position.X * playfieldScale;
+            var posY = _playfieldTopLeft.Y + hitObject.Position.Y * playfieldScale;
             var objectCircleSize = _baseCircleSize;
             float fadein;
             float fadeout;
             float drawSize;
-            float approachCircleSize;
             if (hitObject.HitResult == HitResult.None)
             {
                 fadein =
                     Math.Clamp(
-                        Util.MapRange((float)SongCursor, hitObject.Time - _beatmap.Preempt,
-                            hitObject.Time - _beatmap.Preempt / 3,
+                        Util.MapRange((float)SongCursor, (float)hitObject.Time - _beatmap.Preempt,
+                            (float)(hitObject.Time - _beatmap.Preempt / 3),
                             0, 1), 0, 1);
                 fadeout =
                     Math.Clamp(
-                        Util.MapRange((float)SongCursor, hitObject.Time, hitObject.Time + _beatmap.Posttime, 1, 0),
+                        Util.MapRange((float)SongCursor, (float)hitObject.Time, (float)(hitObject.Time + _beatmap.Posttime), 1, 0),
                         0, 1);
                 drawSize = (float)(objectCircleSize + objectCircleSize * (1 - fadeout) * 0.2);
-                approachCircleSize =
-                    Math.Max(
-                        Util.MapRange((float)SongCursor, hitObject.Time - _beatmap.Preempt, hitObject.Time + 0,
-                            drawSize * 4, drawSize), drawSize);
             }
             else
             {
@@ -786,49 +634,288 @@ public unsafe class GameView : View
                         0, 1);
 
                 drawSize = (float)(objectCircleSize + objectCircleSize * (1 - fadeout) * 0.3);
-                approachCircleSize =
-                    Math.Max(
-                        Util.MapRange((float)SongCursor, hitObject.Time - _beatmap.Preempt, hitObject.Time + 0,
-                            drawSize * 4, drawSize), drawSize);
             }
-
-
-            // Gameplay drawing
-            if (hitObject is HitCircle circle)
+            var approachCircleSize = Math.Max(
+                Util.MapRange((float)SongCursor, (float)(hitObject.Time - _beatmap.Preempt), (float)(hitObject.Time + 0),
+                    drawSize * 4, drawSize), drawSize);
+            
+            switch (hitObject)
             {
-                if (hitObject.Time + _startingTimer - (int)SongCursor > -_beatmap.Posttime &&
-                    hitObject.Time + _startingTimer - (int)SongCursor < _beatmap.Preempt)
+                // Gameplay drawing
+                case HitCircle circle:
                 {
-                    //if (hitObject.HitResult != HitResult.None) continue;
-                    if (!Hidden)
+                    if (circle.Time + _beatmap.Posttime > SongCursor &&
+                        circle.Time - _beatmap.Preempt < SongCursor)
+                    {
+                        if (!_hidden)
+                        {
+                            r.DrawTexture(Skin.ApproachCircle,
+                                posX - approachCircleSize / 2,
+                                posY - approachCircleSize / 2,
+                                approachCircleSize,
+                                approachCircleSize, circle.Color with
+                                {
+                                    W = Math.Min(fadein, fadeout)
+                                });
+                        }
+                    
+                        r.DrawTexture(Skin.HitCircle,
+                            posX - drawSize / 2,
+                            posY - drawSize / 2,
+                            drawSize,
+                            drawSize, circle.Color with { W = Math.Min(1, 1) });
+
+                        r.DrawTexture(Skin.HitCircleOverlay,
+                            posX - drawSize / 2,
+                            posY - drawSize / 2,
+                            drawSize,
+                            drawSize, new Color4<Rgba>(1, 1, 1, 1) with { W = Math.Min(fadein, fadeout) });
+
+                        var num = circle.ComboNumber.ToString();
+
+
+                        var digitScale = drawSize / (Skin.NumbersHd ? 256f : 128f);
+
+                        float digitWidthTotal = 0;
+
+                        // first pass: compute total width
+                        foreach (var c in num)
+                        {
+                            var digit = c - '0';
+                            var tex = Skin.DefaultNumbers[digit];
+                            digitWidthTotal += tex.Width * digitScale;
+                        }
+
+                        // start centered
+                        var cursorX = posX - digitWidthTotal / 2;
+
+                        foreach (var c in num)
+                        {
+                            var digit = c - '0';
+                            var tex = Skin.DefaultNumbers[digit];
+
+                            var w = tex.Width * digitScale;
+                            var h = tex.Height * digitScale;
+
+                            r.DrawTexture(
+                                tex,
+                                cursorX,
+                                posY - h / 2,
+                                w,
+                                h,
+                                new Color4<Rgba>(1, 1, 1, 1) with { W = Math.Min(fadein, fadeout) }
+                            );
+
+                            cursorX += w;
+                        }
+                    }
+
+                    break;
+                }
+                case Slider slider when !(SongCursor < slider.Time + slider.Duration + _beatmap.Posttime) ||
+                                        !(SongCursor > slider.Time - _beatmap.Preempt):
+                    continue;
+                case Slider slider:
+                {
+                    slider.Sliding =
+                        SongCursor >= slider.Time &&
+                        SongCursor <= slider.Time + slider.Duration;
+
+                    int fbIndex = AcquireSliderFramebuffer();
+                    var fb = _sliderFramebuffers[fbIndex];
+                    r.BindFramebuffer(fb.Framebuffer);
+                    r.Clear(new(0, 0, 0, 0));
+                    GL.BlendFunc(BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha);
+                    foreach (var point in slider.Points)
+                    {
+                        var scaledX = _playfieldTopLeft.X + point.X * playfieldScale;
+                        var scaledY = _playfieldTopLeft.Y + point.Y * playfieldScale;
+
+                        var segmentSize = objectCircleSize * 0.92f;
+                        r.DrawCircle(
+                            scaledX - segmentSize / 2,
+                            scaledY - segmentSize / 2,
+                            segmentSize,
+                            segmentSize,
+                            new Color4<Rgba>(1, 1, 1, 1));
+                    }
+
+                    foreach (var point in slider.Points)
+                    {
+                        var scaledX = _playfieldTopLeft.X + point.X * playfieldScale;
+                        var scaledY = _playfieldTopLeft.Y + point.Y * playfieldScale;
+                        var segmentSize = objectCircleSize * 0.8f;
+
+                        r.DrawCircle(
+                            scaledX - segmentSize / 2,
+                            scaledY - segmentSize / 2,
+                            segmentSize,
+                            segmentSize,
+                            // hitObject.Color with { W = Math.Min(sliderFadein, sliderFadeout) });
+                            new Color4<Rgba>(0.1f, 0.1f, 0.1f, 1));
+                    }
+
+                    GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+                    r.UnbindFramebuffer(fb.Framebuffer);
+                    ReleaseSliderFramebuffer(fbIndex);
+                
+                    var maxSliderOpacity = 0.8f;
+                    float sliderOpacity;
+                    if (SongCursor > slider.Time - _beatmap.Preempt && SongCursor < slider.Time)
+                    {
+                        sliderOpacity = Util.MapRange((float)SongCursor, (float)(slider.Time - _beatmap.Preempt),
+                            (float)(slider.Time - _beatmap.Preempt / 2), 0, maxSliderOpacity);
+                    }
+                    else if (SongCursor >= slider.Time - _beatmap.Preempt / 2 &&
+                             SongCursor < slider.Time + slider.Duration)
+                    {
+                        sliderOpacity = maxSliderOpacity;
+                    }
+                    else
+                    {
+                        float window = (float)(slider.Time + slider.Duration);
+                        sliderOpacity = Util.MapRange((float)SongCursor, window, window + _beatmap.Posttime,
+                            maxSliderOpacity,
+                            0);
+                    }
+
+                    sliderOpacity = Math.Clamp(sliderOpacity, 0f, maxSliderOpacity);
+                    if (sliderOpacity > 0.9f)
+                    {
+                        throw new Exception("Slider opactiy > maxSliderOpacity. Fix.");
+                    }
+
+                    r.DrawTexture(fb.Framebuffer.Texture, 0, 0, Width, Height,
+                        new Color4<Rgba>(1, 1, 1, 1) { W = sliderOpacity });
+
+                    if (slider.Sliding)
+                    {
+                        var position = slider.GetPositionAt(SongCursor);
+
+                        var scaledX = _playfieldTopLeft.X + position.X * playfieldScale;
+                        var scaledY = _playfieldTopLeft.Y + position.Y * playfieldScale;
+                        var segmentSize = objectCircleSize * 1f;
+
+                        Vector2 prevPos;
+                        if (SongCursor == slider.Time)
+                        {
+                            prevPos = slider.Position;
+                        }
+                        else
+                        {
+                            prevPos = slider.GetPositionAt(SongCursor - 1);
+                        }
+
+                        if (slider.SlideRepeatCount > 1) // sliderepeatcount = actual repeat count + 1
+                        {
+                            for (int i = 0; i < slider.SlideRepeatCount; i++)
+                            {
+                                //if (_songCursor >= slider.Time + slider.Duration - slider.SpanDuration) continue;
+                                if (i - 2 >= slider.SlideRepeatCount) continue;
+                            
+                                var repeatPosition = slider.GetPositionAt(slider.Time + i * slider.SpanDuration);
+                                
+                                var repeatScaledX = _playfieldTopLeft.X + repeatPosition.X * playfieldScale;
+                                var repeatScaledY = _playfieldTopLeft.Y + repeatPosition.Y * playfieldScale;
+                                var repeatDrawSize = objectCircleSize * 1f;
+
+                                var repeatPrevPos = slider.Points[slider.Points.Count - 2];
+                                
+                                Vector2 repeatDirection = repeatPosition - repeatPrevPos;
+                                var repeatRotation = Math.Atan2(repeatDirection.Y, repeatDirection.X) * -MathHelper.RadToDeg +
+                                                     180;
+
+                                r.DrawTexture(Skin.ReverseArrow,
+                                    repeatScaledX - repeatDrawSize / 2,
+                                    repeatScaledY - repeatDrawSize / 2,
+                                    repeatDrawSize,
+                                    repeatDrawSize,
+                                    new Color4<Rgba>(1, 1, 1, 1) with { W = sliderOpacity },
+                                    (float)repeatRotation
+                                );
+                            }
+                        }
+
+                        Vector2 direction = position - prevPos;
+                        var rotation = Math.Atan2(direction.Y, direction.X) * -MathHelper.RadToDeg + 180;
+
+                        if (Skin.HasSliderSpec)
+                        {
+                            r.DrawCircle(
+                                scaledX - segmentSize / 2,
+                                scaledY - segmentSize / 2,
+                                segmentSize,
+                                segmentSize,
+                                hitObject.Color with { W = 1 }, (float)rotation);
+                        }
+
+                        if (Skin.SliderBallAnimated)
+                        {
+                            var ballIndex = Math.Clamp(
+                                (int)Util.MapRange(
+                                    (float)SongCursor,
+                                    (float)slider.Time,
+                                    (float)(slider.Time + slider.Duration),
+                                    0,
+                                    Skin.SliderBalls.Count - 1),
+                                0,
+                                Skin.SliderBalls.Count - 1);
+                            r.DrawTexture(Skin.SliderBalls[ballIndex],
+                                scaledX - segmentSize / 2,
+                                scaledY - segmentSize / 2,
+                                segmentSize,
+                                segmentSize,
+                                new Color4<Rgba>(0, 0, 0, 1) { W = 1 }, (float)rotation);
+                        }
+                        else
+                        {
+                            r.DrawTexture(Skin.SliderBalls.First(),
+                                scaledX - segmentSize / 2,
+                                scaledY - segmentSize / 2,
+                                segmentSize,
+                                segmentSize,
+                                hitObject.Color with { W = 1 });
+                        }
+
+                        segmentSize = objectCircleSize * 2.5f;
+                        r.DrawTexture(Skin.SliderFollowCircle,
+                            scaledX - segmentSize / 2,
+                            scaledY - segmentSize / 2,
+                            segmentSize,
+                            segmentSize,
+                            new Color4<Rgba>(1, 1, 1, 1) with { W = 1 });
+                    }
+
+                    if (!_hidden)
                     {
                         r.DrawTexture(Skin.ApproachCircle,
                             posX - approachCircleSize / 2,
                             posY - approachCircleSize / 2,
                             approachCircleSize,
-                            approachCircleSize, hitObject.Color with
-                            {
-                                W = Math.Min(fadein, fadeout)
-                            });
+                            approachCircleSize, hitObject.Color with { W = Math.Min(fadein, fadeout) });
                     }
-                    
-                    r.DrawTexture(Skin.HitCircle,
+                
+
+                    r.DrawTexture(Skin.SliderStartCircle,
                         posX - drawSize / 2,
                         posY - drawSize / 2,
                         drawSize,
                         drawSize, hitObject.Color with { W = Math.Min(fadein, fadeout) });
 
-                    r.DrawTexture(Skin.HitCircleOverlay,
-                        posX - drawSize / 2,
-                        posY - drawSize / 2,
-                        drawSize,
-                        drawSize, new Color4<Rgba>(1, 1, 1, 1) with { W = Math.Min(fadein, fadeout) });
+
+                    if (!Skin.SliderStartCircleExists)
+                    {
+                        r.DrawTexture(Skin.HitCircleOverlay,
+                            posX - drawSize / 2,
+                            posY - drawSize / 2,
+                            drawSize,
+                            drawSize, new Color4<Rgba>(1, 1, 1, 1) with { W = Math.Min(fadein, fadeout) });
+                    }
+
 
                     var num = hitObject.ComboNumber.ToString();
 
-
                     var digitScale = drawSize / (Skin.NumbersHd ? 256f : 128f);
-
                     float digitWidthTotal = 0;
 
                     // first pass: compute total width
@@ -861,279 +948,30 @@ public unsafe class GameView : View
 
                         cursorX += w;
                     }
-                }
-            }
 
-            if (hitObject is Slider slider)
-            {
-                //var sliderLife = slider.Length / (_beatmap.SliderMultiplier * 100 * _beatmap.Slid);
-                //if (!(slider.Time - (int)_songCursor > - slider.Duration) ||
-                //    !(slider.Time - (int)_songCursor < _beatmap.Preempt)) continue;
-                if (!(SongCursor < slider.Time + slider.Duration + _beatmap.Posttime) ||
-                    !(SongCursor > slider.Time - _beatmap.Preempt)) continue;
-
-                slider.Sliding =
-                    SongCursor >= slider.Time &&
-                    SongCursor <= slider.Time + slider.Duration;
-
-                int fbIndex = AcquireSliderFramebuffer();
-                var fb = _sliderFramebuffers[fbIndex];
-                r.BindFramebuffer(fb.Framebuffer);
-                r.Clear(new(0, 0, 0, 0));
-                GL.BlendFunc(BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha);
-                foreach (var point in slider.Points)
-                {
-                    var scaledX = playfieldTopLeft.X + point.X * scale;
-                    var scaledY = playfieldTopLeft.Y + point.Y * scale;
-
-                    var _drawSize = objectCircleSize * 0.92f;
-                    r.DrawCircle(
-                        scaledX - _drawSize / 2,
-                        scaledY - _drawSize / 2,
-                        _drawSize,
-                        _drawSize,
-                        new Color4<Rgba>(1, 1, 1, 1));
-                }
-
-                foreach (var point in slider.Points)
-                {
-                    var scaledX = playfieldTopLeft.X + point.X * scale;
-                    var scaledY = playfieldTopLeft.Y + point.Y * scale;
-                    var _drawSize = objectCircleSize * 0.8f;
-
-                    r.DrawCircle(
-                        scaledX - _drawSize / 2,
-                        scaledY - _drawSize / 2,
-                        _drawSize,
-                        _drawSize,
-                        // hitObject.Color with { W = Math.Min(sliderFadein, sliderFadeout) });
-                        new Color4<Rgba>(0.1f, 0.1f, 0.1f, 1));
-                }
-
-                GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
-                r.UnbindFramebuffer(fb.Framebuffer);
-                ReleaseSliderFramebuffer(fbIndex);
-
-                r.SetScissor(0, 0, (int)Width, (int)Height);
-
-                var maxSliderOpacity = 0.8f;
-                float sliderOpacity;
-                if (SongCursor > slider.Time - _beatmap.Preempt && SongCursor < slider.Time)
-                {
-                    sliderOpacity = Util.MapRange((float)SongCursor, slider.Time - _beatmap.Preempt,
-                        slider.Time - _beatmap.Preempt / 2, 0, maxSliderOpacity);
-                }
-                else if (SongCursor >= slider.Time - _beatmap.Preempt / 2 &&
-                         SongCursor < slider.Time + slider.Duration)
-                {
-                    sliderOpacity = maxSliderOpacity;
-                }
-                else
-                {
-                    float window = (float)(slider.Time + slider.Duration);
-                    sliderOpacity = Util.MapRange((float)SongCursor, window, window + _beatmap.Posttime,
-                        maxSliderOpacity,
-                        0);
-                }
-
-                sliderOpacity = Math.Clamp(sliderOpacity, 0f, maxSliderOpacity);
-                if (sliderOpacity > 0.9f)
-                {
-                    throw new Exception("Slider opactiy > maxSliderOpacity. Fix.");
-                }
-
-                r.DrawTexture(fb.Framebuffer.Texture, 0, 0, Width, Height,
-                    new Color4<Rgba>(1, 1, 1, 1) { W = sliderOpacity });
-
-                if (slider.Sliding)
-                {
-                    var position = slider.GetPositionAt(SongCursor);
-
-                    var scaledX = playfieldTopLeft.X + position.X * scale;
-                    var scaledY = playfieldTopLeft.Y + position.Y * scale;
-                    var _drawSize = objectCircleSize * 1f;
-
-                    Vector2 prevPos;
-                    if (SongCursor == slider.Time)
-                    {
-                        prevPos = slider.Position;
-                    }
-                    else
-                    {
-                        prevPos = slider.GetPositionAt(SongCursor - 1);
-                    }
-
-                    if (slider.SlideRepeatCount > 1) // sliderepeatcount = actual repeat count + 1
-                    {
-                        for (int i = 0; i < slider.SlideRepeatCount; i++)
-                        {
-                            //if (_songCursor >= slider.Time + slider.Duration - slider.SpanDuration) continue;
-                            if (i - 2 >= slider.SlideRepeatCount) continue;
-                            
-                            var repeatPosition = slider.GetPositionAt(slider.Time + i * slider.SpanDuration);
-                                
-                            var repeatScaledX = playfieldTopLeft.X + repeatPosition.X * scale;
-                            var repeatScaledY = playfieldTopLeft.Y + repeatPosition.Y * scale;
-                            var repeatDrawSize = objectCircleSize * 1f;
-
-                            var repeatPrevPos = slider.Points[slider.Points.Count - 2];
-                                
-                            Vector2 repeatDirection = repeatPosition - repeatPrevPos;
-                            var repeatRotation = Math.Atan2(repeatDirection.Y, repeatDirection.X) * -MathHelper.RadToDeg +
-                                                 180;
-
-                            r.DrawTexture(Skin.ReverseArrow,
-                                repeatScaledX - repeatDrawSize / 2,
-                                repeatScaledY - repeatDrawSize / 2,
-                                repeatDrawSize,
-                                repeatDrawSize,
-                                new Color4<Rgba>(1, 1, 1, 1) with { W = sliderOpacity },
-                                (float)repeatRotation
-                            );
-                        }
-                    }
-
-                    Vector2 direction = position - prevPos;
-                    var rotation = Math.Atan2(direction.Y, direction.X) * -MathHelper.RadToDeg + 180;
-
-                    if (Skin.HasSliderSpec)
-                    {
-                        r.DrawCircle(
-                            scaledX - _drawSize / 2,
-                            scaledY - _drawSize / 2,
-                            _drawSize,
-                            _drawSize,
-                            hitObject.Color with { W = 1 }, (float)rotation);
-                    }
-
-                    if (Skin.SliderBallAnimated)
-                    {
-                        var ballIndex = Math.Clamp(
-                            (int)Util.MapRange(
-                                (float)SongCursor,
-                                (float)slider.Time,
-                                (float)(slider.Time + slider.Duration),
-                                0,
-                                Skin.SliderBalls.Count - 1),
-                            0,
-                            Skin.SliderBalls.Count - 1);
-                        r.DrawTexture(Skin.SliderBalls[ballIndex],
-                            scaledX - _drawSize / 2,
-                            scaledY - _drawSize / 2,
-                            _drawSize,
-                            _drawSize,
-                            new Color4<Rgba>(0, 0, 0, 1) { W = 1 }, (float)rotation);
-                    }
-                    else
-                    {
-                        r.DrawTexture(Skin.SliderBalls.First(),
-                            scaledX - _drawSize / 2,
-                            scaledY - _drawSize / 2,
-                            _drawSize,
-                            _drawSize,
-                            hitObject.Color with { W = 1 });
-                    }
-
-                    _drawSize = objectCircleSize * 2.5f;
-                    r.DrawTexture(Skin.SliderFollowCircle,
-                        scaledX - _drawSize / 2,
-                        scaledY - _drawSize / 2,
-                        _drawSize,
-                        _drawSize,
-                        new Color4<Rgba>(1, 1, 1, 1) with { W = 1 });
-                }
-
-                if (!Hidden)
-                {
-                    r.DrawTexture(Skin.ApproachCircle,
-                        posX - approachCircleSize / 2,
-                        posY - approachCircleSize / 2,
-                        approachCircleSize,
-                        approachCircleSize, hitObject.Color with { W = Math.Min(fadein, fadeout) });
-                }
-                
-
-                r.DrawTexture(Skin.SliderStartCircle,
-                    posX - drawSize / 2,
-                    posY - drawSize / 2,
-                    drawSize,
-                    drawSize, hitObject.Color with { W = Math.Min(fadein, fadeout) });
-
-
-                if (!Skin.SliderStartCircleExists)
-                {
-                    r.DrawTexture(Skin.HitCircleOverlay,
-                        posX - drawSize / 2,
-                        posY - drawSize / 2,
-                        drawSize,
-                        drawSize, new Color4<Rgba>(1, 1, 1, 1) with { W = Math.Min(fadein, fadeout) });
-                }
-
-
-                var num = hitObject.ComboNumber.ToString();
-
-                var digitScale = drawSize / (Skin.NumbersHd ? 256f : 128f);
-                float digitWidthTotal = 0;
-
-                // first pass: compute total width
-                foreach (var c in num)
-                {
-                    var digit = c - '0';
-                    var tex = Skin.DefaultNumbers[digit];
-                    digitWidthTotal += tex.Width * digitScale;
-                }
-
-                // start centered
-                var cursorX = posX - digitWidthTotal / 2;
-
-                foreach (var c in num)
-                {
-                    var digit = c - '0';
-                    var tex = Skin.DefaultNumbers[digit];
-
-                    var w = tex.Width * digitScale;
-                    var h = tex.Height * digitScale;
-
-                    r.DrawTexture(
-                        tex,
-                        cursorX,
-                        posY - h / 2,
-                        w,
-                        h,
-                        new Color4<Rgba>(1, 1, 1, 1) with { W = Math.Min(fadein, fadeout) }
-                    );
-
-                    cursorX += w;
+                    break;
                 }
             }
         }
 
         foreach (var particle in _hitResultParticles.ToList())
         {
-            float age = (float)(SongCursor - particle.StartTime);
+            var age = (float)(SongCursor - particle.StartTime);
             if (age < 0 || age > particle.MaxLife)
             {
                 _hitResultParticles.Remove(particle);
                 continue;
             }
 
-            float t = age / particle.MaxLife; // 0.0 → 1.0
+            var t = age / particle.MaxLife; // 0.0 → 1.0
 
             // --- Scale Animation ---
-            float _scale;
-            if (age < 120f)
-            {
-                // Quick shrink from big → normal
-                _scale = MathHelper.Lerp(1.55f, 1.0f, age / 120f);
-            }
-            else
-            {
-                _scale = 1.0f;
-            }
-
+            // Quick shrink from big → normal
+            var scale = age < 120f ? MathHelper.Lerp(1.55f, 1.0f, age / 120f) : 1.0f;
+            
             // --- Fade & Movement ---
             float alpha;
-            float yOffset = 0f;
+            const float yOffset = 0f;
 
             if (age < 380f)
             {
@@ -1141,7 +979,7 @@ public unsafe class GameView : View
             }
             else
             {
-                float fadeT = (age - 380f) / (particle.MaxLife - 380f);
+                var fadeT = (age - 380f) / (particle.MaxLife - 380f);
                 alpha = MathHelper.Lerp(1f, 0f, fadeT);
                 //yOffset = fadeT * -45f; // move up ~45 pixels
             }
@@ -1155,10 +993,10 @@ public unsafe class GameView : View
             };
 
             float baseSize = _baseCircleSize * 1.1f; // slightly bigger than circle
-            float w = baseSize * _scale;
+            float w = baseSize * scale;
             float h = texture.Height * (w / texture.Width);
 
-            Vector2 drawPos = playfieldTopLeft + particle.Position * scale;
+            Vector2 drawPos = _playfieldTopLeft + particle.Position * playfieldScale;
             drawPos.Y += yOffset;
 
             r.DrawCenteredTexture(texture, drawPos, w, h,
@@ -1305,14 +1143,12 @@ public unsafe class GameView : View
             r.DrawTexture(Skin.ModNightcore, Width - Width / 20 - 50 - Width / 40, Height / 8, Width / 20,
                 Width / 20, new Color4<Rgba>(1, 1, 1, 1));
         }
-        if (Hidden)
+        if (_hidden)
         {
             r.DrawTexture(Skin.ModHidden, Width - Width / 20 - 50 - Width / 40 - 50 - Width / 40, Height / 8, Width / 20,
                 Width / 20, new Color4<Rgba>(1, 1, 1, 1));
         }
-
-        //_inputOverlayView.Draw(delta);
-
+        
         // Draw timing window
         var timingWindowWidth = Width / 7;
         var timingWindowHeight = timingWindowWidth / 25;
@@ -1352,10 +1188,10 @@ public unsafe class GameView : View
             var cursorX = Util.MapRange((float)indicator.Offset, -range, range, timingWindowX,
                 timingWindowX + timingWindowWidth);
             r.DrawRectangle(cursorX, timingWindowY - timingWindowHeight, 3, timingWindowHeight * 2,
-                new Color4<Rgba>(1, 1, 1, (float)(indicator.Life / HIT_INDICATOR_MAX_LIFE)));
+                new Color4<Rgba>(1, 1, 1, (float)(indicator.Life / HitIndicatorMaxLife)));
         }
         
-        // watermark unranked
+        // Unranked text
         if (_player.State == PlayerState.Autoplay || _player.State == PlayerState.Replay)
         {
             var unrankedWidth = Width / 10;
@@ -1381,7 +1217,7 @@ public unsafe class GameView : View
 
         var trailSnapshot = trails.ToArray();
         var size = _baseCircleSize / 2f;
-        lastCursorPosition = new(_player.Cursor.X, _player.Cursor.Y);
+        _lastCursorPosition = new(_player.Cursor.X, _player.Cursor.Y);
 
         if (trailSnapshot.Length > 0)
         {
@@ -1425,16 +1261,76 @@ public unsafe class GameView : View
             r.FlushText(Fonts.Default);
         }
         
-        //r.DrawCenteredRect(new Vector2(MouseX, MouseY), 50, 50, new Vector4(1, 0, 1, 1));
-        
-        r.SetScissor(0, 0, (int)Width, (int)Height);
+        r.PopScissor();
     }
 
+    public override void OnMouseMove(MouseEventArgs e)
+    {
+        base.OnMouseMove(e);
+        
+        _mouseX = e.X;
+        _mouseY = e.Y;
+    }
+    
     public override void OnResize(ResizeEventArgs e)
     {
         base.OnResize(e);
         Width = e.Width;
         Height = e.Height;
+    }
+
+    public override void OnEnter()
+    {
+        base.OnEnter();
+        Skin = new Skin(Resources.GetPath($"Resources/Textures/{_skinName}"));
+
+        for (int i = 0; i < 16; i++)
+        {
+            _sliderFramebuffers[i] = new()
+            {
+                Framebuffer = new Framebuffer(1280, 720),
+                Duration = 0,
+                Time = 0,
+            };
+        }
+
+        _hidden = false;
+        // SetBeatmap(new Beatmap(Resources.GetPath("Resources/Songs/Wakeshima Kanon/ASCA - Nisemono no Koi ni Sayounara with Wakeshima Kanon (timemon) [Kyou's Extra].osu")));
+        // _player.SetReplay(Replay.ParseReplay(Resources.GetPath("Resources/Replays/kanon.osr")));
+        SetBeatmap(new Beatmap(Resources.GetPath("Resources/Songs/983942 Oomori Seiko - JUSTadICE (TV Size)/Oomori Seiko - JUSTadICE (TV Size) (fieryrage) [Extreme].osu")));
+        _player?.SetReplay(Replay.ParseReplay(Resources.GetPath("Resources/Replays/fiery.osr")));
+        _player?.SetState(PlayerState.Replay);
+        //_doubleTimeEnabled = true; _songTrack.Speed = 1.5f;
+    }
+
+    public override void OnExit()
+    {
+        Dispose();
+        base.OnExit();
+    }
+    
+    void ResetObjectsAfter(double cursorMs)
+    {
+        foreach (var obj in _beatmap.HitObjects)
+        {
+            if (obj.Time >= cursorMs)
+            {
+                obj.HitTime = 0;
+                obj.HitResult = HitResult.None;
+                obj.Failed = false;
+
+                if (obj is Slider s)
+                {
+                    s.WasFollowedAtEnd = false;
+                    s.IsCurrentlyBeingFollowed = false;
+                    s.TotalFollowTime = 0.0;
+                    s.LastFollowUpdate = 0.0;
+                    s.CurrentContinuousFollow = 0.0;
+                    s.LongestContinuousFollow = 0.0;
+                    s.WasFollowingPreviousFrame = false;
+                }
+            }
+        }
     }
 
     public void SetBeatmap(Beatmap beatmap)
@@ -1453,15 +1349,13 @@ public unsafe class GameView : View
         SongCursor = 0;
         _songTrack.Speed = 1.00f;
 
-        _startingTimer = WAITINGTIME + _beatmap.AudioLeadIn;
+        _startingTimer = WaitingTime + _beatmap.AudioLeadIn;
         _musicStarted = false;
 
         _beatmap.CalculatePrepass();
         _player = new Player(_beatmap, this);
         SDL_ShowCursor();
-
-        //_inputOverlayView.SetPlayer(_player);
-        //_inputOverlayView.Reset();
+        
         ResetObjectsAfter(0);
 
         _sortedObjects = _beatmap.HitObjects
@@ -1471,9 +1365,8 @@ public unsafe class GameView : View
         _backgroundTexture = new Texture(Path.Combine(_beatmap.Folder, _beatmap.BackgroundFile));
 
         //Difficulty multiplier = Round((HP Drain + Circle Size + Overall Difficulty + Clamp(Hit object count / Drain time in seconds * 8, 0, 16)) / 38 * 5)
-
         var objs = _beatmap.HitObjects.OrderBy(t => t.Time);
-        var drainTime = Math.Abs(objs.First().Time - objs.Last().Time) / 1000f;
+        var drainTime = objs.Any() ? Math.Abs(objs.First().Time - objs.Last().Time) / 1000f : 0;
         _difficultyMultiplier = (float)Math.Round((_beatmap.HPDrainRate + _beatmap.CircleSize +
                                                    _beatmap.OverallDifficulty
                                                    + Math.Clamp(_beatmap.HitObjects.Count / drainTime * 8, 0, 16)) /
@@ -1484,7 +1377,7 @@ public unsafe class GameView : View
 
         Logger.Instance.Info($"Beatmap set to {beatmap}");
     }
-
+    
     public void Dispose()
     {
         _backgroundTexture?.Dispose();
@@ -1533,7 +1426,6 @@ public unsafe class GameView : View
             Framebuffer = new Framebuffer(r, (int)Width, (int)Height),
             InUse = true
         });*/
-
         return newIndex;
     }
 
@@ -1546,20 +1438,20 @@ public unsafe class GameView : View
         _sliderFramebuffers[index] = fb;
     }
 
-    public class HitResultParticle
+    private class HitResultParticle
     {
         public Vector2 Position;
         public HitResult Result;
         public double StartTime; // When the hit happened
-        public float MaxLife = 620f; // Total lifetime in ms (osu! ~600-650)
+        public float MaxLife = 620f; // Total lifetime in ms
 
-        // Current state (for smoother animation)
+        // Current state
         public float CurrentScale = 1.4f;
         public float CurrentAlpha = 1f;
         public Vector2 CurrentOffset = Vector2.Zero;
     }
 
-    public class HitIndicator
+    private class HitIndicator
     {
         public double Offset;
         public double Life;
