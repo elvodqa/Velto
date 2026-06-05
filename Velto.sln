@@ -2,6 +2,8 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Velto", "Velto\Velto.csproj", "{733EE2E4-E811-4B04-8019-26FA87722386}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Velto.Game", "Velto.Game\Velto.Game.csproj", "{8ED178B9-E78B-41F0-B5F8-55898ED86374}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -12,5 +14,9 @@ Global
 		{733EE2E4-E811-4B04-8019-26FA87722386}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{733EE2E4-E811-4B04-8019-26FA87722386}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{733EE2E4-E811-4B04-8019-26FA87722386}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8ED178B9-E78B-41F0-B5F8-55898ED86374}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8ED178B9-E78B-41F0-B5F8-55898ED86374}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8ED178B9-E78B-41F0-B5F8-55898ED86374}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8ED178B9-E78B-41F0-B5F8-55898ED86374}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
