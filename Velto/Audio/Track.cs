@@ -65,6 +65,23 @@ public unsafe class Track : IDisposable
         }
     }
     
+    /// <summary>
+    /// This replaces any previously-set remaining loops. A value of 1 will loop to the start of playback one time.
+    /// Zero will not loop at all. A value of -1 requests infinite loops. If the input is not seekable and num_loops isn't zero,
+    /// this function will report success but the track will stop at the point it should loop.
+    /// </summary>
+    public int Loops
+    {
+        set
+        {
+            MIX_SetTrackLoops(Handle, value);
+        }
+        get
+        {
+            return MIX_GetTrackLoops(Handle);
+        }
+    }
+    
     public bool Paused => MIX_TrackPaused(Handle);
     public bool Playing => MIX_TrackPlaying(Handle);
 

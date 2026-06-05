@@ -120,7 +120,7 @@ public class SongSelectorView : View
             }
 
             r.DrawRectangle(box.Position.X, box.Position.Y, box.Size.X, box.Size.Y, color);
-            //r.DrawTexture(box.Texture, box.Position.X, box.Position.Y, 230, 150, new Color4<Rgba>(1, 1, 1, 1));
+            r.DrawTexture(box.Texture, box.Position.X, box.Position.Y, 230, 150, new Color4<Rgba>(1, 1, 1, 1));
             r.DrawText(Fonts.Default, box.Beatmap.ToString(),
                 new Vector2(box.Position.X + 25 + 230, box.Position.Y + 25),
                 box.Size.Y/5, new Color4<Rgba>(1, 1, 1, 1));
@@ -172,7 +172,7 @@ public class SongSelectorView : View
                 {
                     var box = new BeatmapBox();
                     box.Beatmap = new Beatmap(file);
-                    //box.Texture = new Texture(Path.Combine(box.Beatmap.Folder,  box.Beatmap.BackgroundFile));
+                    box.Texture = new Texture(Path.Combine(box.Beatmap.Folder,  box.Beatmap.BackgroundFile));
                     _beatmapBoxes.Add(box);
                 }
             }

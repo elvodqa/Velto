@@ -158,7 +158,7 @@ public class Player
             
             if (obj is Slider slider && 
                 _songCursor >= slider.Time && 
-                _songCursor <= slider.Time + slider.Duration - 100)
+                _songCursor <= slider.Time + slider.Duration)
             {
                 currentIndex = i;
                 current = obj;
@@ -175,7 +175,7 @@ public class Player
         // Sliding. TODO: stop sliding if there is another hit object approaching
         if (current is Slider activeSlider &&
             _songCursor >= activeSlider.Time &&
-            _songCursor <= activeSlider.Time + activeSlider.Duration - 100)
+            _songCursor <= activeSlider.Time + activeSlider.Duration)
         {
             // look ahead
             HitObject? next = null;

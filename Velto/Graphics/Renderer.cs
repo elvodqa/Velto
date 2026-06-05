@@ -205,8 +205,9 @@ public unsafe class Renderer : IDisposable
             H = Math.Max(0, y2 - y1)
         };
     }
-    
-    
+
+    public void PushScissor(int x, int y, int w, int h) => PushScissor(new ScissorRect(x, y, w, h));
+    public void PushScissor(float x, float y, float w, float h) => PushScissor(new ScissorRect(x, y, w, h));
     
     public void PushScissor(ScissorRect r)
     {

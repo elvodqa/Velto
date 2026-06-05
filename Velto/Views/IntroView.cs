@@ -7,7 +7,7 @@ namespace Velto.Views;
 public class IntroView : View
 {
     private Texture _backgroundTexture;
-    
+    private float _circleRadius;
     
     public override void Update(double dt)
     {
@@ -35,10 +35,11 @@ public class IntroView : View
                 Width * ((float)_backgroundTexture.Height / _backgroundTexture.Width), new Color4<Rgba>(1, 1, 1, 1));
         }
 
-        var outerCircleRadius = Height / 3;
-        var innerCircleRadius = Height / 3.5f;
+        var relativeSize = Math.Min(Height, Width);
+        _circleRadius = relativeSize / 3;
+        var innerCircleRadius = relativeSize / 3.5f;
         
-        r.DrawCircle(Width/2 - outerCircleRadius, Height/2 - outerCircleRadius, outerCircleRadius*2, outerCircleRadius*2, Color4.White);
+        r.DrawCircle(Width/2 - _circleRadius, Height/2 - _circleRadius, _circleRadius*2, _circleRadius*2, Color4.White);
         r.DrawCircle(Width/2 - innerCircleRadius, Height/2 - innerCircleRadius, innerCircleRadius*2, innerCircleRadius*2, Color4.Hotpink);
         
         r.PopScissor();
@@ -65,9 +66,8 @@ public class IntroView : View
     public override void OnMouseDown(MouseButton button, MouseEventArgs e)
     {
         base.OnMouseDown(button, e);
-        var outerCircleRadius = Height / 3;
 
-        if (Vector2.Distance(new Vector2(e.X, e.Y), new Vector2(Width / 2, Height / 2)) < outerCircleRadius)
+        if (Vector2.Distance(new Vector2(e.X, e.Y), new Vector2(Width / 2, Height / 2)) < _circleRadius)
         {
             ViewManager.Instance.SetTree([
                 Create<GameView>(),

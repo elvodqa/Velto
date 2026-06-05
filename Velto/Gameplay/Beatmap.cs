@@ -174,10 +174,12 @@ public unsafe class Beatmap
 
                 if (isCircle)
                 {
-                    HitCircle hitCircle = new();
-                    hitCircle.NewCombo = isNewCombo;
-                    hitCircle.Time = time;
-                    hitCircle.Position = new Vector2(x, y);
+                    var hitCircle = new HitCircle
+                    {
+                        NewCombo = isNewCombo,
+                        Time = time,
+                        Position = new Vector2(x, y)
+                    };
 
                     HitObjects.Add(hitCircle);
                 }

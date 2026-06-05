@@ -32,7 +32,7 @@ public abstract class HitObject
     public HitResult HitResult = HitResult.None;
     public double HitTime = -1;
     public Vector2 Position { get; set; }
-    public int Time { get; set; }
+    public double Time { get; set; }
     public bool NewCombo { get; set; } = false;
     public Color4<Rgba> Color { get; set; }
     
