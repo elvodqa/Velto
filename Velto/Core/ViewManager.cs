@@ -38,11 +38,6 @@ public class ViewManager
         return null;
     }
     
-    public ViewManager()
-    {
-        
-    }
-    
     public void ResizeCallback(int width, int height)
     {
         var size = Renderer.WindowSizeInPixels;
@@ -78,6 +73,8 @@ public class ViewManager
         
         
         var top = GetTopView(Input.MouseX, Input.MouseY);
+        if (_transitions.Any(t => t.From == top)) top = null;
+        
         // Mouse move
         IInputReceiver target = _captured ?? top;
         if (target != null)
@@ -92,7 +89,6 @@ public class ViewManager
             });
         }
         
-
         if (top != null)
         {
             _captured = top;
@@ -140,6 +136,7 @@ public class ViewManager
         
         foreach (var view in _views)
         {
+            if (_transitions.Any(t => t.From == view)) continue;
             view.Update(delta);
         }
     }

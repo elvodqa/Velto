@@ -8,7 +8,7 @@ using Velto.Graphics;
 
 namespace Velto.Views;
 
-public class SongSelectView : View
+public class SongSelectView : View, IDisposable
 {
     private const float BoxHeight = 300;
     private float BoxWidth = 300;
@@ -17,14 +17,11 @@ public class SongSelectView : View
     private Texture _menuBackground;
     private Texture _menuButtonBackground;
     private AudioChannel _menuClickAudio;
+    private AudioChannel _menuBackAudio;
         
     public override void Update(double dt)
     {
         BoxWidth = Width / 1.5f;
-        foreach (var beatmapMeta in _beatmapMetas)
-        {
-            beatmapMeta.IsHovered = false;
-        }
 
         if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_UP))
         {
@@ -37,7 +34,8 @@ public class SongSelectView : View
             AudioManager.Instance.PlaySample(_menuClickAudio);
         }
 
-        //_cursor += Math.Sign(Input.WheelY) * Math.Clamp(Input.WheelY * 20, 0, 1);
+        _cursor += (int)Math.Clamp(Input.WheelY * 20, -1, 1);
+        
         _cursor = Math.Clamp(_cursor, 0, _beatmapMetas.Count - 1);
         
         for (int i = 0; i < _beatmapMetas.Count; i++)
@@ -58,6 +56,12 @@ public class SongSelectView : View
             game.SetBeatmap(_beatmapMetas[_cursor].Beatmap);
             game.Player.SetState(PlayerState.Autoplay);
             ViewManager.Instance.Transition(this, game, 1000);
+        }
+        
+        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_ESCAPE))
+        {
+            AudioManager.Instance.PlaySample(_menuBackAudio);
+            ViewManager.Instance.Transition(this, Create<IntroView>(), 1000);
         }
     }
 
@@ -129,14 +133,31 @@ public class SongSelectView : View
         _menuBackground = new Texture(Resources.GetPath("Resources/Textures/default/menu-background@2x.png"));
         _menuButtonBackground = new Texture(Resources.GetPath("Resources/Textures/default/menu-button-background@2x.png"));
         _menuClickAudio = AudioManager.Instance.LoadAudio(Resources.GetPath("Resources/Textures/default/menuclick.wav"));
-        
+        _menuBackAudio = AudioManager.Instance.LoadAudio(Resources.GetPath("Resources/Textures/default/menuback.wav"));
     }
 
     public override void OnExit()
     {
         base.OnExit();
-        _menuBackground.Dispose();
-        _menuClickAudio.Dispose();
+        Dispose();
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _menuBackground.Dispose();
+            _menuButtonBackground.Dispose();
+            _menuClickAudio.Dispose();
+            _menuBackAudio.Dispose();
+        }
+    }
+
+    public new void Dispose()
+    {
+        Dispose(true);
+        base.Dispose();
+        GC.SuppressFinalize(this);
     }
 
     public override void OnMouseDown(MouseButton button, MouseEventArgs e)
@@ -153,10 +174,12 @@ public class SongSelectView : View
         base.OnMouseMove(e);
         foreach (var box in _beatmapMetas)
         {
+            var wasHovering = box.IsHovered;
             box.IsHovered = false;
             RectangleF collision = new(box.Position.X, box.Position.Y, box.Size.X, box.Size.Y);
             if (collision.Contains(Input.MouseX, Input.MouseY))
             {
+                if (!wasHovering) AudioManager.Instance.PlaySample(_menuClickAudio);
                 box.IsHovered = true;
             }
         }
