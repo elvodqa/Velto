@@ -10,7 +10,7 @@ using static SDL.SDL3;
 
 namespace Velto.Views;
 
-public class GameView : View
+public class GameView : View, IDisposable
 {
     private const int PlayfieldW = 512;
     private const int PlayfieldH = 384;
@@ -45,7 +45,7 @@ public class GameView : View
     
     private readonly Queue<TrailInfo> trails = new();
 
-    private Player _player;
+    public Player Player;
     private bool _hidden;
 
     private Track? _songTrack;
@@ -159,18 +159,18 @@ public class GameView : View
 
         if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_F2))
         {
-            _player.SetState(PlayerState.Player);
+            Player.SetState(PlayerState.Player);
         }
         if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_F3))
         {
-            _player.SetState(PlayerState.Autoplay);
+            Player.SetState(PlayerState.Autoplay);
         }
 
         if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_F4))
         {
             SetBeatmap(new Beatmap(Resources.GetPath("Resources/Songs/983942 Oomori Seiko - JUSTadICE (TV Size)/Oomori Seiko - JUSTadICE (TV Size) (fieryrage) [Extreme].osu")));
-            _player.SetReplay(Replay.ParseReplay(Resources.GetPath("Resources/Replays/fiery.osr")));
-            _player.SetState(PlayerState.Replay);
+            Player.SetReplay(Replay.ParseReplay(Resources.GetPath("Resources/Replays/fiery.osr")));
+            Player.SetState(PlayerState.Replay);
         }
 
         if (Input.IsKeyDown(SDL_Scancode.SDL_SCANCODE_LSHIFT))
@@ -211,7 +211,9 @@ public class GameView : View
         
         if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_ESCAPE))
         {
-            ToggleMenu();
+            //ToggleMenu();
+            _isPaused = true;
+            ViewManager.Instance.Transition(this, Create<SongSelectView>(), 1000);
         }
 
         if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_GRAVE))
@@ -222,6 +224,7 @@ public class GameView : View
             _comboCount = 0;
             _totalScore = 0;
             ResetObjectsAfter(0);
+            //ViewManager.Instance.Transition(this, this, 1000);
         }
 
         foreach (var hitIndicator in _hitIndicators.ToList())
@@ -298,7 +301,7 @@ public class GameView : View
             }
         }
         
-        _player.Update(delta, SongCursor, _playfieldTopLeft, scale);
+        Player.Update(delta, SongCursor, _playfieldTopLeft, scale);
         // Handle objects bkz: https://osu.ppy.sh/wiki/en/Gameplay/Judgement/osu%21 
         foreach (var hitObject in _beatmap.HitObjects)
         {
@@ -306,7 +309,7 @@ public class GameView : View
             
             if (hitObject is HitCircle circle)
             {
-                var playerCursor = _player.Cursor;
+                var playerCursor = Player.Cursor;
                 if (hitObject.HitResult == HitResult.None)
                 {
                     if (SongCursor - 150 >= circle.Time)
@@ -321,7 +324,7 @@ public class GameView : View
                     float radiusScreen = osuRadius * scale;
                     var circlePosition = _playfieldTopLeft + circle.Position * scale;
                     if (Vector2.Distance(circlePosition, playerCursor) <= radiusScreen)
-                        if (_player.ActionPrimaryPressed || _player.ActionSecondaryPressed)
+                        if (Player.ActionPrimaryPressed || Player.ActionSecondaryPressed)
                         {
                             // bkz: https://osu.ppy.sh/wiki/en/Gameplay/Judgement/osu%21
                             _hitIndicators.Add(new()
@@ -368,7 +371,7 @@ public class GameView : View
                         }
 
                     // Noteblock
-                    if (_player.ActionPrimaryPressed || _player.ActionSecondaryPressed)
+                    if (Player.ActionPrimaryPressed || Player.ActionSecondaryPressed)
                     {
                         break;
                     }
@@ -406,7 +409,7 @@ public class GameView : View
                 if (SongCursor > slider.Time + slider.Duration)
                     continue; // already judged
                 
-                var playerCursor = _player.Cursor;
+                var playerCursor = Player.Cursor;
                 
                 if (SongCursor - 150 >= slider.Time && slider.HitResult == HitResult.None)
                 {
@@ -420,7 +423,7 @@ public class GameView : View
                 var circlePosition = _playfieldTopLeft + slider.Position * scale;
                 if (Vector2.Distance(circlePosition, playerCursor) <= radiusHitCircle)
                 {
-                    if ((_player.ActionPrimaryPressed || _player.ActionSecondaryPressed) &&
+                    if ((Player.ActionPrimaryPressed || Player.ActionSecondaryPressed) &&
                         slider.HitResult == HitResult.None)
                     {
                         _hitIndicators.Add(new()
@@ -474,7 +477,7 @@ public class GameView : View
                 bool sliderActive = SongCursor >= slider.Time && SongCursor <= slider.Time + slider.Duration;
                 bool isInFollowRange = sliderActive && 
                                        Vector2.Distance(ballPosition, playerCursor) <= radiusFollowCircle;
-                bool isHolding = _player.ActionPrimaryDown || _player.ActionSecondaryDown;
+                bool isHolding = Player.ActionPrimaryDown || Player.ActionSecondaryDown;
                 bool isFollowingNow = sliderActive && isInFollowRange && isHolding;
 
                 if (sliderActive)
@@ -514,38 +517,38 @@ public class GameView : View
                     // You can add logic here for slider ticks
                 }
 
-                if (_player.ActionPrimaryPressed || _player.ActionSecondaryPressed)
+                if (Player.ActionPrimaryPressed || Player.ActionSecondaryPressed)
                 {
                     break;
                 }
             }
         }
         
-        if (_lastCursorPosition != Vector2.Zero && Vector2.Distance(_player.Cursor, _lastCursorPosition) > 8)
-            trails.Enqueue(new TrailInfo
-            {
-                Position = _lastCursorPosition,
-                Life = 50
-            });
-        // float distance = Vector2.Distance(_player.Cursor, lastCursorPosition);
-        // if (lastCursorPosition != Vector2.Zero && distance > 8)
-        // {
-        //     int steps = (int)(distance / 6f);
-        //     for (int i = 1; i <= steps; i++)
+        // if (_lastCursorPosition != Vector2.Zero && Vector2.Distance(Player.Cursor, _lastCursorPosition) > 8)
+        //     trails.Enqueue(new TrailInfo
         //     {
-        //         float t = i / (float)steps;
-        //         Vector2 interpolated = Vector2.Lerp(lastCursorPosition, _player.Cursor, t);
-        //
-        //         trails.Enqueue(new TrailInfo
-        //         {
-        //             Position = interpolated,
-        //             Life = 45 + (steps - i) * 2 // newer points live longer
-        //         });
-        //     }
-        // }
-        //
-        // while (trails.Count > 40)
-        //     trails.Dequeue();
+        //         Position = _lastCursorPosition,
+        //         Life = 50
+        //     });
+        float distance = Vector2.Distance(Player.Cursor, _lastCursorPosition);
+        if (_lastCursorPosition != Vector2.Zero && distance > 8)
+        {
+            int steps = (int)(distance / 6f);
+            for (int i = 1; i <= steps; i++)
+            {
+                float t = i / (float)steps;
+                Vector2 interpolated = Vector2.Lerp(_lastCursorPosition, Player.Cursor, t);
+        
+                trails.Enqueue(new TrailInfo
+                {
+                    Position = interpolated,
+                    Life = 45 + (steps - i) * 2 // newer points live longer
+                });
+            }
+        }
+        
+        while (trails.Count > 40)
+            trails.Dequeue();
 
 
         _hitResultParticles.RemoveAll(p => SongCursor - p.StartTime > p.MaxLife);
@@ -1132,7 +1135,7 @@ public class GameView : View
         }
 
         // TODO: add actual stacking for mod icons
-        if (_player.State == PlayerState.Autoplay)
+        if (Player.State == PlayerState.Autoplay)
         {
             r.DrawTexture(Skin.ModAutoplay, Width - Width / 20 - 50, Height / 8, Width / 20, Width / 20,
                 new Color4<Rgba>(1, 1, 1, 1));
@@ -1192,7 +1195,7 @@ public class GameView : View
         }
         
         // Unranked text
-        if (_player.State == PlayerState.Autoplay || _player.State == PlayerState.Replay)
+        if (Player.State == PlayerState.Autoplay || Player.State == PlayerState.Replay)
         {
             var unrankedWidth = Width / 10;
             var unrankedHeight = Skin.PlayUnranked.Height * (unrankedWidth / Skin.PlayUnranked.Width);
@@ -1217,7 +1220,7 @@ public class GameView : View
 
         var trailSnapshot = trails.ToArray();
         var size = _baseCircleSize / 2f;
-        _lastCursorPosition = new(_player.Cursor.X, _player.Cursor.Y);
+        _lastCursorPosition = new(Player.Cursor.X, Player.Cursor.Y);
 
         if (trailSnapshot.Length > 0)
         {
@@ -1242,14 +1245,14 @@ public class GameView : View
         if (Skin.HasCursorMiddle)
         {
             r.DrawTexture(Skin.CursorMiddle,
-                _player.Cursor.X - size / 4,
-                _player.Cursor.Y - size / 4,
+                Player.Cursor.X - size / 4,
+                Player.Cursor.Y - size / 4,
                 size / 2, size / 2, new Color4<Rgba>(1, 1, 1, 1));
         }
 
         r.DrawTexture(Skin.Cursor,
-            _player.Cursor.X - size / 2,
-            _player.Cursor.Y - size / 2,
+            Player.Cursor.X - size / 2,
+            Player.Cursor.Y - size / 2,
             size, size, new Color4<Rgba>(1, 1, 1, 1));
         
         
@@ -1297,9 +1300,9 @@ public class GameView : View
         _hidden = false;
         // SetBeatmap(new Beatmap(Resources.GetPath("Resources/Songs/Wakeshima Kanon/ASCA - Nisemono no Koi ni Sayounara with Wakeshima Kanon (timemon) [Kyou's Extra].osu")));
         // _player.SetReplay(Replay.ParseReplay(Resources.GetPath("Resources/Replays/kanon.osr")));
-        SetBeatmap(new Beatmap(Resources.GetPath("Resources/Songs/983942 Oomori Seiko - JUSTadICE (TV Size)/Oomori Seiko - JUSTadICE (TV Size) (fieryrage) [Extreme].osu")));
-        _player?.SetReplay(Replay.ParseReplay(Resources.GetPath("Resources/Replays/fiery.osr")));
-        _player?.SetState(PlayerState.Replay);
+        //SetBeatmap(new Beatmap(Resources.GetPath("Resources/Songs/983942 Oomori Seiko - JUSTadICE (TV Size)/Oomori Seiko - JUSTadICE (TV Size) (fieryrage) [Extreme].osu")));
+        //Player?.SetReplay(Replay.ParseReplay(Resources.GetPath("Resources/Replays/fiery.osr")));
+        //Player?.SetState(PlayerState.Replay);
         //_doubleTimeEnabled = true; _songTrack.Speed = 1.5f;
     }
 
@@ -1353,7 +1356,7 @@ public class GameView : View
         _musicStarted = false;
 
         _beatmap.CalculatePrepass();
-        _player = new Player(_beatmap, this);
+        Player = new Player(_beatmap, this);
         SDL_ShowCursor();
         
         ResetObjectsAfter(0);
@@ -1378,10 +1381,22 @@ public class GameView : View
         Logger.Instance.Info($"Beatmap set to {beatmap}");
     }
     
-    public void Dispose()
+    public new void Dispose()
     {
-        _backgroundTexture?.Dispose();
-        Skin.Dispose();
+        Dispose(true);
+        base.Dispose();
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            Skin.Dispose();
+            _backgroundTexture?.Dispose();
+            _songTrack?.Dispose();
+            _songAudio?.Dispose();
+        }
     }
 
     public class TrailInfo

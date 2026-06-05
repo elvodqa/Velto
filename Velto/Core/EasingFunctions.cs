@@ -157,4 +157,12 @@ public static class EasingFunctions
 
 		return EaseOutBounce((1f - t) * 2f);
 	}
+	
+	public static float EaseSineUpDown(float t)
+	{
+		// Optional clamp to keep input safe
+		t = Math.Clamp(t, 0f, 1f);
+
+		return MathF.Sin(MathF.PI * t);
+	}
 }

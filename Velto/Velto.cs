@@ -14,8 +14,8 @@ public class Velto : Game
         base.Load();
         
         ViewManager.Instance.SetTree([
-            //View.Create<GameView>((int)WindowSizeInPixels.X, (int)WindowSizeInPixels.Y),
-            //View.Create<SongSelectorView>((int)WindowSizeInPixels.X, (int)WindowSizeInPixels.Y),
+            // View.Create<GameView>((int)WindowSizeInPixels.X, (int)WindowSizeInPixels.Y),
+            // View.Create<SongSelectorView>((int)WindowSizeInPixels.X, (int)WindowSizeInPixels.Y),
             View.Create<IntroView>((int)WindowSizeInPixels.X, (int)WindowSizeInPixels.Y),
         ]);
     }

@@ -14,7 +14,7 @@ public class SongSelectorView : View
         Open,
         Closed,
     }
-    public class BeatmapBox
+    private class BeatmapBox
     {
         public Texture Texture;
         public Beatmap Beatmap;

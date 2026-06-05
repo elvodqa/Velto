@@ -100,7 +100,7 @@ public unsafe class Renderer : IDisposable
 
     public float DisplayScale => SDL_GetWindowDisplayScale(_window);
 
-    private readonly Texture _whiteTexture;
+    public static Texture WhiteTexture;
     private readonly Texture _circleTexture;
 
     private static SDL_Window* _window;
@@ -124,7 +124,7 @@ public unsafe class Renderer : IDisposable
 
         GL.PixelStorei(PixelStoreParameter.UnpackAlignment, 1);
 
-        _whiteTexture = new Texture(Resources.GetPath("Resources/Textures/white.png"));
+        WhiteTexture = new Texture(Resources.GetPath("Resources/Textures/white.png"));
         _circleTexture = new Texture(Resources.GetPath("Resources/Textures/circle.png"));
 
         _fontShader = new Shader("text");
@@ -431,7 +431,7 @@ public unsafe class Renderer : IDisposable
     }
 
     public void DrawTexture(Texture texture, float x, float y, float width, float height, Color4<Rgba> color,
-        float rotation = 0)
+        float rotation = 0, bool blur = false)
 
     {
         DrawCallCount++;
@@ -469,6 +469,16 @@ public unsafe class Renderer : IDisposable
         _spriteShader.SetMatrix4("model", model);
         _spriteShader.SetMatrix4("view", Matrix4.Identity);
         _spriteShader.SetMatrix4("projection", projection);
+        _spriteShader.SetInt("blur", blur ? 1 : 0);
+
+        if (Framebuffer != null)
+        {
+            _spriteShader.SetVector2("resolution", new Vector2(Framebuffer.Width, Framebuffer.Height));
+        }
+        else
+        {
+            _spriteShader.SetVector2("resolution", new Vector2(WindowSizeInPixels.X, WindowSizeInPixels.Y));
+        }
 
         _spriteVao.Bind();
 
@@ -529,7 +539,7 @@ public unsafe class Renderer : IDisposable
     public void DrawRectangle(float x, float y, float width, float height, Color4<Rgba> color,
         float rotation = 0)
     {
-        DrawTexture(_whiteTexture, x, y, width, height, color, rotation);
+        DrawTexture(WhiteTexture, x, y, width, height, color, rotation);
     }
 
     public void DrawCircle(float x, float y, float width, float height, Color4<Rgba> color,
@@ -806,7 +816,7 @@ public unsafe class Renderer : IDisposable
         _quadVertexBuffer.Dispose();
         _quadIndexBuffer.Dispose();
         _spriteVao.Dispose();
-        _whiteTexture.Dispose();
+        WhiteTexture.Dispose();
         _spriteShader.Dispose();
         _fontShader.Dispose();
     }

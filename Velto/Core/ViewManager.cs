@@ -6,12 +6,26 @@ namespace Velto.Core;
 
 public class ViewManager
 {
+    private class TransitionState
+    {
+        public View To;
+        public View From;
+        public Func<float, float> EasingFunc;
+        public float Length;
+        
+        // Info for update
+        public float Timer;
+    }
+    
     public static ViewManager Instance { get; } = new();
     public Renderer Renderer;
     
     private readonly List<View> _views = new();
     private IInputReceiver _hovered;
     private IInputReceiver _captured;
+
+    private List<TransitionState> _transitions = new();
+    
     
     private View? GetTopView(float x, float y)
     {
@@ -44,6 +58,25 @@ public class ViewManager
 
     public void Update(double delta)
     {
+        foreach (var transition in _transitions.ToList())
+        {
+            transition.Timer += (float)delta;
+            if (transition.Timer >= transition.Length / 2)
+            {
+                int index = _views.IndexOf(transition.From);
+                if (index != -1)
+                {
+                    transition.From.OnExit();
+                    _views[index] = transition.To;
+                }
+            }
+            if (transition.Timer >= transition.Length)
+            {
+                _transitions.Remove(transition);
+            }
+        }
+        
+        
         var top = GetTopView(Input.MouseX, Input.MouseY);
         // Mouse move
         IInputReceiver target = _captured ?? top;
@@ -128,8 +161,30 @@ public class ViewManager
         foreach (var view in _views)
         {
             Renderer.DrawTexture(view.Framebuffer.Texture, view.X, view.Y,view.Width, view.Height, new Color4<Rgba>(1, 1, 1, 1));
+            foreach (var transition in _transitions)
+            {
+                if (view == transition.From || view == transition.To)
+                {
+                    var alpha = EasingFunctions.EaseSineUpDown(transition.Timer / transition.Length); //transition.EasingFunc(transition.Timer / transition.Length);
+                    Renderer.DrawRectangle(view.X, view.Y,view.Width, view.Height, 
+                        Color4.Black with { W = alpha });
+                }
+            }
         }
         Renderer.PopScissor();
+    }
+
+    public void Transition(View from, View to, float length = 500, Func<float, float>? easingFunc = null)
+    {
+        var transition = new TransitionState()
+        {
+            From = from,
+            To = to,
+            Length = length,
+            EasingFunc = easingFunc ??= EasingFunctions.Linear,
+        };
+        transition.To.OnEnter();
+        _transitions.Add(transition);
     }
 
     public void SetTree(params View[] views)
