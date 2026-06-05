@@ -11,18 +11,22 @@ An osu! player written with my ass, featuring yahay505.
 ## Controls
 
 ### General
-| Key | Action |
-|------|---------|
-| `Space` / `Esc` | Pause |
-| `Left Arrow` / `Right Arrow` | Seek ±1 second |
-| `Shift` + `Left/Right Arrow` | Change song speed |
-| `Click + Drag` Timeline | Seek through the song |
-| `Tab` | Open song select |
+| Key | Action                         |
+|------|--------------------------------|
+| `Space` / `Esc` | Pause                          |
+| `Left Arrow` / `Right Arrow` | Seek ±1 second                 |
+| `Shift` + `Left/Right Arrow` | Change song speed              |
+| `Click + Drag` Timeline | Seek through the song          |
+| `Tab` | Open song select (not anymore) |
 
 ### Debug
-| Key | Action |
-|------|---------|
+| Key  | Action                                |
+|------|---------------------------------------|
 | `F1` | Toggle timeline and debug information |
+| `F2` | Switch to freeplay                    |
+| `F3` | Switch to autoplay                    |
+| `F3` | Load the replay demo                  |
+
 
 ### Extras
 | Key | Action |
