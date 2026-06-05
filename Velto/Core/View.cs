@@ -16,21 +16,29 @@ public struct MouseEventArgs(int x, int y)
 
 public abstract class View : IInputReceiver, IDisposable
 {
-    public static T Create<T>(int width, int height)
-        where T : View, new()
+    protected IGameContext Context { get; }
+
+    protected View(IGameContext context)
     {
-        var view = new T();
-        view.Framebuffer = new Framebuffer(width, height);
-        return view;
-    }
+        Context = context;
+        Framebuffer = new Framebuffer((int)Renderer.WindowSizeInPixels.X, (int)Renderer.WindowSizeInPixels.Y);
+    } 
     
-    public static T Create<T>()
-        where T : View, new()
-    {
-        var view = new T();
-        view.Framebuffer = new Framebuffer((int)Renderer.WindowSizeInPixels.X, (int)Renderer.WindowSizeInPixels.Y);
-        return view;
-    }
+    // public static T Create<T>(int width, int height)
+    //     where T : View<TContext>, new()
+    // {
+    //     var view = new T();
+    //     view.Framebuffer = new Framebuffer(width, height);
+    //     return view;
+    // }
+    //
+    // public static T Create<T>()
+    //     where T : View<TContext>, new()
+    // {
+    //     var view = new T();
+    //     view.Framebuffer = ;
+    //     return view;
+    // }
     
     public Framebuffer Framebuffer;
     public float X { get; set; }

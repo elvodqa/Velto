@@ -14,11 +14,15 @@ public class SongSelectView : View, IDisposable
     private float BoxWidth = 300;
     private List<BeatmapMeta> _beatmapMetas = new();
     private int _cursor = 0;
-    private Texture _menuBackground;
-    private Texture _menuButtonBackground;
-    private AudioChannel _menuClickAudio;
-    private AudioChannel _menuBackAudio;
-        
+  
+    private OsuContext _context;
+    private Dictionary<string, Texture> _textureCache = new();
+    
+    public SongSelectView(OsuContext context) : base(context)
+    {
+        _context = context;
+    }
+
     public override void Update(double dt)
     {
         BoxWidth = Width / 1.5f;
@@ -26,12 +30,12 @@ public class SongSelectView : View, IDisposable
         if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_UP))
         {
             _cursor -= 1;
-            AudioManager.Instance.PlaySample(_menuClickAudio);
+            AudioManager.Instance.PlaySample(_context.Skin.MenuClick);
         }
         if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_DOWN))
         {
             _cursor += 1;
-            AudioManager.Instance.PlaySample(_menuClickAudio);
+            AudioManager.Instance.PlaySample(_context.Skin.MenuClick);
         }
 
         _cursor += (int)Math.Clamp(Input.WheelY * 20, -1, 1);
@@ -51,8 +55,8 @@ public class SongSelectView : View, IDisposable
 
         if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_RETURN))
         {
-            AudioManager.Instance.PlaySample(_menuClickAudio);
-            var game = Create<GameView>();
+            AudioManager.Instance.PlaySample(_context.Skin.MenuClick);
+            var game = new GameView(_context);
             game.SetBeatmap(_beatmapMetas[_cursor].Beatmap);
             game.Player.SetState(PlayerState.Autoplay);
             ViewManager.Instance.Transition(this, game, 1000);
@@ -60,15 +64,15 @@ public class SongSelectView : View, IDisposable
         
         if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_ESCAPE))
         {
-            AudioManager.Instance.PlaySample(_menuBackAudio);
-            ViewManager.Instance.Transition(this, Create<IntroView>(), 1000);
+            AudioManager.Instance.PlaySample(_context.Skin.MenuBack);
+            ViewManager.Instance.Transition(this, new IntroView(_context), 1000);
         }
     }
 
     public override void Draw(double dt, Renderer r)
     {
         r.PushScissor(0, 0, Width, Height);
-        r.DrawTexture(_menuBackground, 0, 0, Width, Height, Color4.White);
+        r.DrawTexture(_context.Skin.MenuBackground, 0, 0, Width, Height, Color4.White);
         
         for (int i = 0; i < _cursor; i++)
         {
@@ -91,7 +95,7 @@ public class SongSelectView : View, IDisposable
             ? Color4.Deeppink
             : Color4.Darkorange;
 
-        r.DrawTexture(_menuButtonBackground,
+        r.DrawTexture(_context.Skin.MenuButtonBackground,
             box.Position.X,
             box.Position.Y,
             box.Size.X,
@@ -100,8 +104,8 @@ public class SongSelectView : View, IDisposable
         );
 
         var thumbWidth = BoxHeight * 1.5f;
-        
-        var thumb = Renderer.WhiteTexture;
+
+        var thumb = _textureCache[box.Path];
         r.DrawTexture(
             thumb,
             box.Position.X,
@@ -130,10 +134,6 @@ public class SongSelectView : View, IDisposable
         {
             meta.LoadTexture();
         }
-        _menuBackground = new Texture(Resources.GetPath("Resources/Textures/default/menu-background@2x.png"));
-        _menuButtonBackground = new Texture(Resources.GetPath("Resources/Textures/default/menu-button-background@2x.png"));
-        _menuClickAudio = AudioManager.Instance.LoadAudio(Resources.GetPath("Resources/Textures/default/menuclick.wav"));
-        _menuBackAudio = AudioManager.Instance.LoadAudio(Resources.GetPath("Resources/Textures/default/menuback.wav"));
     }
 
     public override void OnExit()
@@ -146,10 +146,10 @@ public class SongSelectView : View, IDisposable
     {
         if (disposing)
         {
-            _menuBackground.Dispose();
-            _menuButtonBackground.Dispose();
-            _menuClickAudio.Dispose();
-            _menuBackAudio.Dispose();
+            foreach (var texture in _textureCache)
+            {
+                texture.Value.Dispose();
+            }
         }
     }
 
@@ -159,7 +159,7 @@ public class SongSelectView : View, IDisposable
         base.Dispose();
         GC.SuppressFinalize(this);
     }
-
+    
     public override void OnMouseDown(MouseButton button, MouseEventArgs e)
     {
         base.OnMouseDown(button, e);
@@ -179,7 +179,7 @@ public class SongSelectView : View, IDisposable
             RectangleF collision = new(box.Position.X, box.Position.Y, box.Size.X, box.Size.Y);
             if (collision.Contains(Input.MouseX, Input.MouseY))
             {
-                if (!wasHovering) AudioManager.Instance.PlaySample(_menuClickAudio);
+                if (!wasHovering) AudioManager.Instance.PlaySample(_context.Skin.MenuClick);
                 box.IsHovered = true;
             }
         }
@@ -204,6 +204,13 @@ public class SongSelectView : View, IDisposable
                 {
                     var box = new BeatmapMeta();
                     box.Beatmap = new Beatmap(file);
+                    box.Path = Path.Combine(box.Beatmap.Folder, box.Beatmap.BackgroundFile);
+
+                    if (!_textureCache.ContainsKey(box.Path))
+                    {
+                        _textureCache[box.Path] = new Texture(box.Path);
+                    }
+                    
                     _beatmapMetas.Add(box);
                 }
             }
@@ -215,6 +222,7 @@ public class SongSelectView : View, IDisposable
         public Beatmap Beatmap;
         public Vector2 Position;
         public Vector2 Size;
+        public string Path;
         public bool IsHovered = false;
 
         public void LoadTexture()

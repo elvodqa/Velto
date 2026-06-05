@@ -19,7 +19,6 @@ public class GameView : View, IDisposable
     private const double HitIndicatorMaxLife = 2000f;
     
     public double SongCursor;
-    public Skin Skin;
     
     private double _startingTimer;
 
@@ -79,7 +78,14 @@ public class GameView : View, IDisposable
         public float Duration;
         public bool InUse;
     }
-    
+
+    private OsuContext _context;
+
+    public GameView(OsuContext context) : base(context)
+    {
+        _context = context;
+    }
+
     public void ToggleMenu()
     {
         _isPaused = !_isPaused;
@@ -214,7 +220,7 @@ public class GameView : View, IDisposable
         {
             //ToggleMenu();
             _isPaused = true;
-            ViewManager.Instance.Transition(this, Create<SongSelectView>(), 1000);
+            ViewManager.Instance.Transition(this, new SongSelectView(_context), 1000);
         }
 
         if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_GRAVE))
@@ -293,13 +299,6 @@ public class GameView : View, IDisposable
                 _songTrack?.Volume = _musicVolume;
                 AudioManager.Instance.SampleVolume = _musicVolume;
             }
-            
-            if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_S))
-            {
-                Skin.Dispose();
-                _skinName = _skinName == "rafis" ? "default" : "rafis";
-                Skin = new Skin(Resources.GetPath($"Resources/Textures/{_skinName}"));
-            }
         }
         
         Player.Update(delta, SongCursor, _playfieldTopLeft, scale);
@@ -319,7 +318,7 @@ public class GameView : View, IDisposable
                         hitObject.HitResult = HitResult.Miss;
                         hitObject.Failed = true;
                         AddResultParticle(hitObject.Position, hitObject.HitResult, SongCursor);
-                        AudioManager.Instance.PlaySample(Skin.ComboBreak);
+                        AudioManager.Instance.PlaySample(_context.Skin.ComboBreak);
                     }
                     
                     float radiusScreen = osuRadius * scale;
@@ -363,12 +362,12 @@ public class GameView : View, IDisposable
                             {
                                 _comboCount = 0;
                                 hitObject.HitResult = HitResult.Miss;
-                                AudioManager.Instance.PlaySample(Skin.ComboBreak);
+                                AudioManager.Instance.PlaySample(_context.Skin.ComboBreak);
                             }
 
                             circle.HitTime = SongCursor;
                             AddResultParticle(hitObject.Position, hitObject.HitResult, SongCursor);
-                            AudioManager.Instance.PlaySample(Skin.Normal.HitNormal);
+                            AudioManager.Instance.PlaySample(_context.Skin.Normal.HitNormal);
                         }
 
                     // Noteblock
@@ -395,13 +394,13 @@ public class GameView : View, IDisposable
                     //     var score = 300 * (1 + (Math.Max(_comboCount - 1, 0) * _difficultyMultiplier * _modMultiplier / 25));
                     //     _totalScore += score;
                     //     AddResultParticle(slider.GetPositionAt(slider.Time + slider.Duration), HitResult.Good, _songCursor);
-                    //     AudioManager.Instance.PlaySample(Skin.Normal.HitNormal);
+                    //     AudioManager.Instance.PlaySample(_context.Skin.Normal.HitNormal);
                     // }
                     // else
                     // {
                     //     _comboCount = 0;
                     //     AddResultParticle(slider.GetPositionAt(slider.Time + slider.Duration), HitResult.Miss, _songCursor);
-                    //     AudioManager.Instance.PlaySample(Skin.ComboBreak);
+                    //     AudioManager.Instance.PlaySample(_context.Skin.ComboBreak);
                     // }
                     slider.JudgementDone = true;
                     //Logger.Instance.Info($"Slider held for {slider.TotalFollowTime}/{slider.Duration}");
@@ -415,7 +414,7 @@ public class GameView : View, IDisposable
                 if (SongCursor - 150 >= slider.Time && slider.HitResult == HitResult.None)
                 {
                     _comboCount = 0;
-                    AudioManager.Instance.PlaySample(Skin.ComboBreak);
+                    AudioManager.Instance.PlaySample(_context.Skin.ComboBreak);
                     hitObject.HitResult = HitResult.Miss;
                     AddResultParticle(hitObject.Position, hitObject.HitResult, SongCursor);
                 }
@@ -462,12 +461,12 @@ public class GameView : View, IDisposable
                         {
                             hitObject.HitResult = HitResult.Miss;
                             _comboCount = 0;
-                            AudioManager.Instance.PlaySample(Skin.ComboBreak);
+                            AudioManager.Instance.PlaySample(_context.Skin.ComboBreak);
                         }
 
                         slider.HitTime = SongCursor;
                         AddResultParticle(hitObject.Position, hitObject.HitResult, SongCursor);
-                        AudioManager.Instance.PlaySample(Skin.Normal.HitNormal);
+                        AudioManager.Instance.PlaySample(_context.Skin.Normal.HitNormal);
                     }
                 }
                 
@@ -592,7 +591,7 @@ public class GameView : View, IDisposable
         // var degree = Math.Atan2(diff.Y, diff.X);
         // var distance = 100;
         //
-        // if (!Skin.HasAnimatedFollowPoints)
+        // if (!_context.Skin.HasAnimatedFollowPoints)
         // {
         //     var direction = new Vector2(
         //         (float)Math.Cos(degree),
@@ -602,7 +601,7 @@ public class GameView : View, IDisposable
         //     for (int i = 0; i < count; i++)
         //     {
         //         var pos = prevHitObjectPos + direction * (i * distance);
-        //         r.DrawTexture(Skin.FollowPoint, pos.X, pos.Y, 100f, 100f, new Color4<Rgba>(1, 1, 1, 1), (float)degree * MathHelper.RadToDeg + 135);
+        //         r.DrawTexture(_context.Skin.FollowPoint, pos.X, pos.Y, 100f, 100f, new Color4<Rgba>(1, 1, 1, 1), (float)degree * MathHelper.RadToDeg + 135);
         //     }
         // }
         
@@ -653,7 +652,7 @@ public class GameView : View, IDisposable
                     {
                         if (!_hidden)
                         {
-                            r.DrawTexture(Skin.ApproachCircle,
+                            r.DrawTexture(_context.Skin.ApproachCircle,
                                 posX - approachCircleSize / 2,
                                 posY - approachCircleSize / 2,
                                 approachCircleSize,
@@ -663,13 +662,13 @@ public class GameView : View, IDisposable
                                 });
                         }
                     
-                        r.DrawTexture(Skin.HitCircle,
+                        r.DrawTexture(_context.Skin.HitCircle,
                             posX - drawSize / 2,
                             posY - drawSize / 2,
                             drawSize,
                             drawSize, circle.Color with { W = Math.Min(1, 1) });
 
-                        r.DrawTexture(Skin.HitCircleOverlay,
+                        r.DrawTexture(_context.Skin.HitCircleOverlay,
                             posX - drawSize / 2,
                             posY - drawSize / 2,
                             drawSize,
@@ -678,7 +677,7 @@ public class GameView : View, IDisposable
                         var num = circle.ComboNumber.ToString();
 
 
-                        var digitScale = drawSize / (Skin.NumbersHd ? 256f : 128f);
+                        var digitScale = drawSize / (_context.Skin.NumbersHd ? 256f : 128f);
 
                         float digitWidthTotal = 0;
 
@@ -686,7 +685,7 @@ public class GameView : View, IDisposable
                         foreach (var c in num)
                         {
                             var digit = c - '0';
-                            var tex = Skin.DefaultNumbers[digit];
+                            var tex = _context.Skin.DefaultNumbers[digit];
                             digitWidthTotal += tex.Width * digitScale;
                         }
 
@@ -696,7 +695,7 @@ public class GameView : View, IDisposable
                         foreach (var c in num)
                         {
                             var digit = c - '0';
-                            var tex = Skin.DefaultNumbers[digit];
+                            var tex = _context.Skin.DefaultNumbers[digit];
 
                             var w = tex.Width * digitScale;
                             var h = tex.Height * digitScale;
@@ -829,7 +828,7 @@ public class GameView : View, IDisposable
                                 var repeatRotation = Math.Atan2(repeatDirection.Y, repeatDirection.X) * -MathHelper.RadToDeg +
                                                      180;
 
-                                r.DrawTexture(Skin.ReverseArrow,
+                                r.DrawTexture(_context.Skin.ReverseArrow,
                                     repeatScaledX - repeatDrawSize / 2,
                                     repeatScaledY - repeatDrawSize / 2,
                                     repeatDrawSize,
@@ -843,7 +842,7 @@ public class GameView : View, IDisposable
                         Vector2 direction = position - prevPos;
                         var rotation = Math.Atan2(direction.Y, direction.X) * -MathHelper.RadToDeg + 180;
 
-                        if (Skin.HasSliderSpec)
+                        if (_context.Skin.HasSliderSpec)
                         {
                             r.DrawCircle(
                                 scaledX - segmentSize / 2,
@@ -853,7 +852,7 @@ public class GameView : View, IDisposable
                                 hitObject.Color with { W = 1 }, (float)rotation);
                         }
 
-                        if (Skin.SliderBallAnimated)
+                        if (_context.Skin.SliderBallAnimated)
                         {
                             var ballIndex = Math.Clamp(
                                 (int)Util.MapRange(
@@ -861,10 +860,10 @@ public class GameView : View, IDisposable
                                     (float)slider.Time,
                                     (float)(slider.Time + slider.Duration),
                                     0,
-                                    Skin.SliderBalls.Count - 1),
+                                    _context.Skin.SliderBalls.Count - 1),
                                 0,
-                                Skin.SliderBalls.Count - 1);
-                            r.DrawTexture(Skin.SliderBalls[ballIndex],
+                                _context.Skin.SliderBalls.Count - 1);
+                            r.DrawTexture(_context.Skin.SliderBalls[ballIndex],
                                 scaledX - segmentSize / 2,
                                 scaledY - segmentSize / 2,
                                 segmentSize,
@@ -873,7 +872,7 @@ public class GameView : View, IDisposable
                         }
                         else
                         {
-                            r.DrawTexture(Skin.SliderBalls.First(),
+                            r.DrawTexture(_context.Skin.SliderBalls.First(),
                                 scaledX - segmentSize / 2,
                                 scaledY - segmentSize / 2,
                                 segmentSize,
@@ -882,7 +881,7 @@ public class GameView : View, IDisposable
                         }
 
                         segmentSize = objectCircleSize * 2.5f;
-                        r.DrawTexture(Skin.SliderFollowCircle,
+                        r.DrawTexture(_context.Skin.SliderFollowCircle,
                             scaledX - segmentSize / 2,
                             scaledY - segmentSize / 2,
                             segmentSize,
@@ -892,7 +891,7 @@ public class GameView : View, IDisposable
 
                     if (!_hidden)
                     {
-                        r.DrawTexture(Skin.ApproachCircle,
+                        r.DrawTexture(_context.Skin.ApproachCircle,
                             posX - approachCircleSize / 2,
                             posY - approachCircleSize / 2,
                             approachCircleSize,
@@ -900,16 +899,16 @@ public class GameView : View, IDisposable
                     }
                 
 
-                    r.DrawTexture(Skin.SliderStartCircle,
+                    r.DrawTexture(_context.Skin.SliderStartCircle,
                         posX - drawSize / 2,
                         posY - drawSize / 2,
                         drawSize,
                         drawSize, hitObject.Color with { W = Math.Min(fadein, fadeout) });
 
 
-                    if (!Skin.SliderStartCircleExists)
+                    if (!_context.Skin.SliderStartCircleExists)
                     {
-                        r.DrawTexture(Skin.HitCircleOverlay,
+                        r.DrawTexture(_context.Skin.HitCircleOverlay,
                             posX - drawSize / 2,
                             posY - drawSize / 2,
                             drawSize,
@@ -919,14 +918,14 @@ public class GameView : View, IDisposable
 
                     var num = hitObject.ComboNumber.ToString();
 
-                    var digitScale = drawSize / (Skin.NumbersHd ? 256f : 128f);
+                    var digitScale = drawSize / (_context.Skin.NumbersHd ? 256f : 128f);
                     float digitWidthTotal = 0;
 
                     // first pass: compute total width
                     foreach (var c in num)
                     {
                         var digit = c - '0';
-                        var tex = Skin.DefaultNumbers[digit];
+                        var tex = _context.Skin.DefaultNumbers[digit];
                         digitWidthTotal += tex.Width * digitScale;
                     }
 
@@ -936,7 +935,7 @@ public class GameView : View, IDisposable
                     foreach (var c in num)
                     {
                         var digit = c - '0';
-                        var tex = Skin.DefaultNumbers[digit];
+                        var tex = _context.Skin.DefaultNumbers[digit];
 
                         var w = tex.Width * digitScale;
                         var h = tex.Height * digitScale;
@@ -990,10 +989,10 @@ public class GameView : View, IDisposable
 
             var texture = particle.Result switch
             {
-                HitResult.Good => Skin.Hit300,
-                HitResult.Ok => Skin.Hit100,
-                HitResult.Meh => Skin.Hit50,
-                _ => Skin.Hit0, // miss
+                HitResult.Good => _context.Skin.Hit300,
+                HitResult.Ok => _context.Skin.Hit100,
+                HitResult.Meh => _context.Skin.Hit50,
+                _ => _context.Skin.Hit0, // miss
             };
 
             float baseSize = _baseCircleSize * 1.1f; // slightly bigger than circle
@@ -1013,19 +1012,19 @@ public class GameView : View, IDisposable
 
         var scoreboardBgWidth = Width / 2.5f;
 
-        var bgScale = scoreboardBgWidth / Skin.ScorebarBg.Width;
-        var scoreboardBgHeight = Skin.ScorebarBg.Height * bgScale;
+        var bgScale = scoreboardBgWidth / _context.Skin.ScorebarBg.Width;
+        var scoreboardBgHeight = _context.Skin.ScorebarBg.Height * bgScale;
 
-        r.DrawTexture(Skin.ScorebarBg, 0, 0, scoreboardBgWidth, scoreboardBgHeight, new Color4<Rgba>(1, 1, 1, 1));
+        r.DrawTexture(_context.Skin.ScorebarBg, 0, 0, scoreboardBgWidth, scoreboardBgHeight, new Color4<Rgba>(1, 1, 1, 1));
 
 
         var scoreboardColourWidth = Width / 2.5f;
 
-        var colourScale = scoreboardColourWidth / Skin.ScorebarColour.Width;
-        var scoreboardColourHeight = Skin.ScorebarColour.Height * colourScale;
+        var colourScale = scoreboardColourWidth / _context.Skin.ScorebarColour.Width;
+        var scoreboardColourHeight = _context.Skin.ScorebarColour.Height * colourScale;
 
         r.SetScissor(20, 22, (int)(20 + scoreboardColourWidth * _health), (int)scoreboardColourHeight);
-        r.DrawTexture(Skin.ScorebarColour, 20, 22, scoreboardColourWidth / 1f, scoreboardColourHeight / 1f,
+        r.DrawTexture(_context.Skin.ScorebarColour, 20, 22, scoreboardColourWidth / 1f, scoreboardColourHeight / 1f,
             new Color4<Rgba>(1, 1, 1, 1));
         r.SetScissor(0, 0, (int)Width, (int)Height);
 
@@ -1033,14 +1032,14 @@ public class GameView : View, IDisposable
         // Draw combo count
         var comboNum = _comboCount.ToString();
 
-        var comboDigitScale = Height / 15 / Skin.ScoreNumbers[0].Height;
+        var comboDigitScale = Height / 15 / _context.Skin.ScoreNumbers[0].Height;
         float comboTotalWidth = 0;
 
         // first pass: compute total width
         foreach (var c in comboNum)
         {
             var digit = c - '0';
-            var tex = Skin.ScoreNumbers[digit];
+            var tex = _context.Skin.ScoreNumbers[digit];
             comboTotalWidth += tex.Width * comboDigitScale;
         }
 
@@ -1049,7 +1048,7 @@ public class GameView : View, IDisposable
         foreach (var c in comboNum)
         {
             var digit = c - '0';
-            var tex = Skin.ScoreNumbers[digit];
+            var tex = _context.Skin.ScoreNumbers[digit];
 
             var w = tex.Width * comboDigitScale;
             var h = tex.Height * comboDigitScale;
@@ -1067,14 +1066,14 @@ public class GameView : View, IDisposable
         }
 
         // TODO: Fix the way combo x's position/scale is calculated. its def wrong i think
-        var comboxXScale = Height / 20 / Skin.ScoreX.Height;
+        var comboxXScale = Height / 20 / _context.Skin.ScoreX.Height;
 
         r.DrawTexture(
-            Skin.ScoreX,
+            _context.Skin.ScoreX,
             comboCursorX,
-            Height - Skin.ScoreX.Height * comboxXScale - 30,
-            Skin.ScoreX.Width * comboxXScale,
-            Skin.ScoreX.Height * comboxXScale,
+            Height - _context.Skin.ScoreX.Height * comboxXScale - 30,
+            _context.Skin.ScoreX.Width * comboxXScale,
+            _context.Skin.ScoreX.Height * comboxXScale,
             new Color4<Rgba>(1, 1, 1, 1)
         );
 
@@ -1082,14 +1081,14 @@ public class GameView : View, IDisposable
         // Draw score
         var scoreNum = ((int)_totalScore).ToString();
 
-        var scoreDigitScale = Height / 15 / Skin.ScoreNumbers[0].Height; //400 / (Skin.NumbersHd ? 256f : 128f);
+        var scoreDigitScale = Height / 15 / _context.Skin.ScoreNumbers[0].Height; //400 / (_context.Skin.NumbersHd ? 256f : 128f);
         float scoreTotalWidth = 0;
 
         // first pass: compute total width
         foreach (var c in scoreNum)
         {
             var digit = c - '0';
-            var tex = Skin.ScoreNumbers[digit];
+            var tex = _context.Skin.ScoreNumbers[digit];
             scoreTotalWidth += tex.Width * scoreDigitScale;
         }
 
@@ -1098,7 +1097,7 @@ public class GameView : View, IDisposable
         foreach (var c in scoreNum)
         {
             var digit = c - '0';
-            var tex = Skin.ScoreNumbers[digit];
+            var tex = _context.Skin.ScoreNumbers[digit];
 
             var w = tex.Width * scoreDigitScale;
             var h = tex.Height * scoreDigitScale;
@@ -1138,18 +1137,18 @@ public class GameView : View, IDisposable
         // TODO: add actual stacking for mod icons
         if (Player.State == PlayerState.Autoplay)
         {
-            r.DrawTexture(Skin.ModAutoplay, Width - Width / 20 - 50, Height / 8, Width / 20, Width / 20,
+            r.DrawTexture(_context.Skin.ModAutoplay, Width - Width / 20 - 50, Height / 8, Width / 20, Width / 20,
                 new Color4<Rgba>(1, 1, 1, 1));
         }
 
         if (_doubleTimeEnabled)
         {
-            r.DrawTexture(Skin.ModNightcore, Width - Width / 20 - 50 - Width / 40, Height / 8, Width / 20,
+            r.DrawTexture(_context.Skin.ModNightcore, Width - Width / 20 - 50 - Width / 40, Height / 8, Width / 20,
                 Width / 20, new Color4<Rgba>(1, 1, 1, 1));
         }
         if (_hidden)
         {
-            r.DrawTexture(Skin.ModHidden, Width - Width / 20 - 50 - Width / 40 - 50 - Width / 40, Height / 8, Width / 20,
+            r.DrawTexture(_context.Skin.ModHidden, Width - Width / 20 - 50 - Width / 40 - 50 - Width / 40, Height / 8, Width / 20,
                 Width / 20, new Color4<Rgba>(1, 1, 1, 1));
         }
         
@@ -1199,8 +1198,8 @@ public class GameView : View, IDisposable
         if (Player.State == PlayerState.Autoplay || Player.State == PlayerState.Replay)
         {
             var unrankedWidth = Width / 10;
-            var unrankedHeight = Skin.PlayUnranked.Height * (unrankedWidth / Skin.PlayUnranked.Width);
-            r.DrawTexture(Skin.PlayUnranked, Width/2 - unrankedWidth/2, Height/10, unrankedWidth, unrankedHeight, new Color4<Rgba>(1, 1, 1, 1));
+            var unrankedHeight = _context.Skin.PlayUnranked.Height * (unrankedWidth / _context.Skin.PlayUnranked.Width);
+            r.DrawTexture(_context.Skin.PlayUnranked, Width/2 - unrankedWidth/2, Height/10, unrankedWidth, unrankedHeight, new Color4<Rgba>(1, 1, 1, 1));
         }
 
         if (_isPaused)
@@ -1232,7 +1231,7 @@ public class GameView : View, IDisposable
                 size -= 1;
 
                 var alpha = (float)Math.Max(trailSnapshot.Length / 1.2f, i) / trailSnapshot.Length;
-                r.DrawTexture(Skin.CursorTrail,
+                r.DrawTexture(_context.Skin.CursorTrail,
                     trail.Position.X - size / 2,
                     trail.Position.Y - size / 2,
                     size, size, new Color4<Rgba>(1, 1, 1, 1));
@@ -1243,15 +1242,15 @@ public class GameView : View, IDisposable
 
         // draw cursor
         size = _baseCircleSize / 2f; // _cursorTexture.Width * 1.5f;
-        if (Skin.HasCursorMiddle)
+        if (_context.Skin.HasCursorMiddle)
         {
-            r.DrawTexture(Skin.CursorMiddle,
+            r.DrawTexture(_context.Skin.CursorMiddle,
                 Player.Cursor.X - size / 4,
                 Player.Cursor.Y - size / 4,
                 size / 2, size / 2, new Color4<Rgba>(1, 1, 1, 1));
         }
 
-        r.DrawTexture(Skin.Cursor,
+        r.DrawTexture(_context.Skin.Cursor,
             Player.Cursor.X - size / 2,
             Player.Cursor.Y - size / 2,
             size, size, new Color4<Rgba>(1, 1, 1, 1));
@@ -1286,8 +1285,7 @@ public class GameView : View, IDisposable
     public override void OnEnter()
     {
         base.OnEnter();
-        Skin = new Skin(Resources.GetPath($"Resources/Textures/{_skinName}"));
-
+        
         for (int i = 0; i < 16; i++)
         {
             _sliderFramebuffers[i] = new()
@@ -1393,7 +1391,6 @@ public class GameView : View, IDisposable
     {
         if (disposing)
         {
-            Skin.Dispose();
             _backgroundTexture?.Dispose();
             _songTrack?.Dispose();
             _songAudio?.Dispose();

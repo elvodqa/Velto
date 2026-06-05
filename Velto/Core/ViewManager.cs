@@ -26,7 +26,6 @@ public class ViewManager
 
     private List<TransitionState> _transitions = new();
     
-    
     private View? GetTopView(float x, float y)
     {
         for (int i = _views.Count - 1; i >= 0; i--)

@@ -10,7 +10,13 @@ public class IntroView : View
     private Texture _backgroundTexture;
     private float _circleRadius;
     private AudioChannel _menuHitAudio;
+    private OsuContext _context;
     
+    public IntroView(OsuContext context) : base(context)
+    {
+        _context = context;
+    }
+
     public override void Update(double dt)
     {
     }
@@ -79,7 +85,7 @@ public class IntroView : View
                 Create<SongSelectorView>(),
             ]);*/
             AudioManager.Instance.PlaySample(_menuHitAudio);
-            ViewManager.Instance.Transition(this, Create<SongSelectView>(),1000, EasingFunctions.InCirc);
+            ViewManager.Instance.Transition(this, new SongSelectView(_context),1000, EasingFunctions.InCirc);
         }
     }
 

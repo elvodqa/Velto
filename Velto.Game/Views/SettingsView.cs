@@ -23,7 +23,7 @@ public class SettingsView : View
     private bool _isMouseHovering = false;
 
    
-    public SettingsView()
+    public SettingsView(OsuContext ctx) : base(ctx)
     {
         _font = MSDFFont.Load(Resources.GetPath("Resources/Fonts/arial/arial"));
     }

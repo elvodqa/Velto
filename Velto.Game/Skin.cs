@@ -54,6 +54,11 @@ public class Skin : IDisposable
     public Texture PlayUnranked { get; private set; }
     public Texture FollowPoint { get; private set; }
     public List<Texture> FollowPoints { get; private set; } = new();
+    
+    public Texture MenuBackground { get; private set; }
+    public Texture MenuButtonBackground { get; private set; }
+    public AudioChannel MenuClick { get; private set;  }
+    public AudioChannel MenuBack { get; private set;  }
 
     public SampleSet Normal { get; private set; }
     public SampleSet Soft { get; private set; }
@@ -97,8 +102,11 @@ public class Skin : IDisposable
         ScorebarColour = GetElementTexture("scorebar-colour", "scorebar-colour");
         ScoreX = GetElementTexture("score-x", "score-x");
         ScorePercent = GetElementTexture("score-percent", "score-percent");
-        
+
         PlayUnranked = GetElementTexture("play-unranked", "play-unranked");
+
+        MenuBackground = GetElementTexture("menu-background", "menu-background");
+        MenuButtonBackground = GetElementTexture("menu-button-background", "menu-button-background");
         
         for (var i = 0; i < 10; i++)
             ScoreNumbers[i] = GetElementTexture($"score-{i}", $"score-{i}");
@@ -159,6 +167,8 @@ public class Skin : IDisposable
         Soft = new SampleSet(Folder, SampleSet.SampleSetType.Soft);
         Drum = new SampleSet(Folder, SampleSet.SampleSetType.Drum);
         ComboBreak = GetSample("combobreak");
+        MenuClick = GetSample("menuclick");
+        MenuBack = GetSample("menuback");
     }
 
     private Vector4 ParseColor(string str)
@@ -268,6 +278,11 @@ public class Skin : IDisposable
         ModHidden?.Dispose();
         PlayUnranked?.Dispose();
         FollowPoint?.Dispose();
+        
+        MenuBackground.Dispose();
+        MenuButtonBackground.Dispose();
+        MenuBack.Dispose();
+        MenuClick.Dispose();
 
         InputOverlayBackground?.Dispose();
         InputOverlayKey?.Dispose();

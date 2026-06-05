@@ -34,7 +34,7 @@ public class SongSelectorView : View
     private float _totalContentHeight;
     private bool _isMouseHovering = false;
     
-    public SongSelectorView()
+    public SongSelectorView(OsuContext ctx) : base(ctx)
     {
         LoadBeatmaps();
     }
