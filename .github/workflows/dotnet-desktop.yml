@@ -28,14 +28,14 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Restore
-        run: dotnet restore Velto/Velto.csproj
+        run: dotnet restore Velto.Game/Velto.csproj
 
       - name: Build
-        run: dotnet build Velto/Velto.csproj --configuration Release --no-restore
+        run: dotnet build Velto.Game/Velto.csproj --configuration Release --no-restore
 
       - name: Publish
         run: >
-          dotnet publish Velto/Velto.csproj
+          dotnet publish Velto.Game/Velto.csproj
           -c Release
           -r ${{ matrix.rid }}
           --self-contained true

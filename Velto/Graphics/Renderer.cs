@@ -19,6 +19,7 @@ public struct ScissorRect
         W = w;
         H = h;
     }
+
     public ScissorRect(float x, float y, float w, float h)
     {
         X = (int)x;
@@ -62,7 +63,7 @@ public unsafe class Renderer : IDisposable
         0, 2, 1, // first triangle
         1, 2, 3 // second triangle
     ];
-    
+
     public static Vector2 WindowSizeInPixels
     {
         get
@@ -72,13 +73,13 @@ public unsafe class Renderer : IDisposable
             return new Vector2(w, h);
         }
     }
-    
+
     private readonly BufferObject<uint> _quadIndexBuffer;
     private readonly BufferObject<float> _quadVertexBuffer;
 
     private readonly Shader _spriteShader;
     private readonly VertexArrayObject<float, uint> _spriteVao;
-    
+
     Stack<ScissorRect> _scissors = new();
 
     private readonly float[] _vertices =
@@ -188,6 +189,7 @@ public unsafe class Renderer : IDisposable
 
         GL.BindVertexArray(0);
     }
+
     ScissorRect Intersect(ScissorRect a, ScissorRect b)
     {
         int x1 = Math.Max(a.X, b.X);
@@ -206,7 +208,7 @@ public unsafe class Renderer : IDisposable
 
     public void PushScissor(int x, int y, int w, int h) => PushScissor(new ScissorRect(x, y, w, h));
     public void PushScissor(float x, float y, float w, float h) => PushScissor(new ScissorRect(x, y, w, h));
-    
+
     public void PushScissor(ScissorRect r)
     {
         if (_scissors.Count > 0)
@@ -214,13 +216,14 @@ public unsafe class Renderer : IDisposable
             ScissorRect rect;
             if (_scissors.Count == 0)
             {
-                rect = new ScissorRect(0, 0, 
+                rect = new ScissorRect(0, 0,
                     (int)WindowSizeInPixels.X, (int)WindowSizeInPixels.Y);
             }
             else
             {
-                rect = _scissors.Peek(); 
+                rect = _scissors.Peek();
             }
+
             var p = rect;
 
             int x1 = Math.Max(p.X, r.X);
@@ -240,20 +243,21 @@ public unsafe class Renderer : IDisposable
         _scissors.Push(r);
         SetScissor(r);
     }
-    
+
     public void PopScissor()
     {
         _scissors.Pop();
         ScissorRect rect;
         if (_scissors.Count == 0)
         {
-            rect = new ScissorRect(0, 0, 
+            rect = new ScissorRect(0, 0,
                 (int)WindowSizeInPixels.X, (int)WindowSizeInPixels.Y);
         }
         else
         {
-            rect = _scissors.Peek(); 
+            rect = _scissors.Peek();
         }
+
         SetScissor(rect);
     }
 
@@ -297,7 +301,7 @@ public unsafe class Renderer : IDisposable
             GL.Viewport(0, 0, Framebuffer.Width, Framebuffer.Height);
         }
     }
-    
+
     public void SetScissor(int x, int y, int w, int h)
     {
         var rect = new ScissorRect(x, y, w, h);
@@ -345,7 +349,7 @@ public unsafe class Renderer : IDisposable
         {
             GL.Viewport(0, 0, Framebuffer.Width, Framebuffer.Height);
         }
-        
+
         GL.Enable(EnableCap.Blend);
         GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 
@@ -378,7 +382,7 @@ public unsafe class Renderer : IDisposable
             rotation
         );
     }
-    
+
     public void DrawTexture(int texture, float x, float y, float width, float height, Color4<Rgba> color,
         float rotation = 0)
     {
@@ -731,7 +735,8 @@ public unsafe class Renderer : IDisposable
         }
     }
 
-    private void DrawGlyph(MSDFFont.Glyph glyph, Vector2 position, Vector2 size, Color4<Rgba> color, float distanceRange)
+    private void DrawGlyph(MSDFFont.Glyph glyph, Vector2 position, Vector2 size, Color4<Rgba> color,
+        float distanceRange)
     {
         var model = Matrix4.CreateScale(size.X, size.Y, 1f) * Matrix4.CreateTranslation(position.X, position.Y, 0f);
         _fontCalls.Add(new FontCall
@@ -739,6 +744,163 @@ public unsafe class Renderer : IDisposable
             Model = model, Color = color, UV = new Vector4(glyph.U0, glyph.V0, glyph.U1, glyph.V1), GlyphSize = size,
             DistanceRange = distanceRange
         });
+    }
+
+    public Vector2 MeasureText(MSDFFont font, string text, float pixelLineHeight)
+    {
+        float scale = pixelLineHeight / (font.LineHeight * font.EmSize);
+
+        float x = 0f;
+        float maxX = 0f;
+        float lineHeight = font.LineHeight * font.EmSize * scale;
+
+        uint prev = 0;
+
+        foreach (var c in text)
+        {
+            if (c == '\n')
+            {
+                maxX = MathF.Max(maxX, x);
+                x = 0f;
+                prev = 0;
+                continue;
+            }
+
+            if (!font.Glyphs.TryGetValue(c, out var glyph))
+                continue;
+
+            float kern = prev != 0 ? font.GetKerning(prev, c) * scale : 0f;
+
+            x += glyph.XAdvance * font.EmSize * scale + kern;
+            prev = c;
+        }
+
+        maxX = MathF.Max(maxX, x);
+
+        return new Vector2(maxX, lineHeight + (text.Count(c => c == '\n') * lineHeight));
+    }
+
+    public Vector2 MeasureTextWrapped(
+        MSDFFont font,
+        string text,
+        float pixelLineHeight,
+        float maxWidth)
+    {
+        float scale = pixelLineHeight / (font.LineHeight * font.EmSize);
+
+        float startX = 0f;
+        float x = 0f;
+        float maxX = 0f;
+
+        float lineHeight = font.LineHeight * font.EmSize * scale;
+        float widthLimit = maxWidth;
+
+        int lineCount = 1;
+
+        uint prev = 0;
+        int i = 0;
+
+        while (i < text.Length)
+        {
+            if (text[i] == '\n')
+            {
+                maxX = MathF.Max(maxX, x);
+                x = 0f;
+                prev = 0;
+                lineCount++;
+                i++;
+                continue;
+            }
+
+            int wordStart = i;
+            float wordWidth = 0f;
+            uint tempPrev = prev;
+
+            while (i < text.Length && text[i] != ' ' && text[i] != '\n')
+            {
+                char c = text[i];
+
+                if (font.Glyphs.TryGetValue(c, out var glyph))
+                {
+                    float kern = tempPrev != 0 ? font.GetKerning(tempPrev, c) * scale : 0f;
+                    wordWidth += glyph.XAdvance * font.EmSize * scale + kern;
+                    tempPrev = c;
+                }
+
+                i++;
+            }
+
+            if (x > 0f && x + wordWidth > widthLimit)
+            {
+                maxX = MathF.Max(maxX, x);
+                x = 0f;
+                lineCount++;
+                prev = 0;
+            }
+
+            for (int j = wordStart; j < i; j++)
+            {
+                char c = text[j];
+
+                if (!font.Glyphs.TryGetValue(c, out var glyph))
+                    continue;
+
+                float kern = prev != 0 ? font.GetKerning(prev, c) * scale : 0f;
+
+                x += glyph.XAdvance * font.EmSize * scale + kern;
+                prev = c;
+            }
+
+            if (i < text.Length && text[i] == ' ')
+            {
+                if (font.Glyphs.TryGetValue(' ', out var sg))
+                    x += sg.XAdvance * font.EmSize * scale;
+
+                i++;
+                prev = 0;
+            }
+        }
+
+        maxX = MathF.Max(maxX, x);
+
+        float height = lineCount * lineHeight;
+
+        return new Vector2(maxX, height);
+    }
+    
+    public void DrawTextCentered(
+        MSDFFont font,
+        string text,
+        Vector2 center,
+        float pixelLineHeight,
+        Color4<Rgba> color)
+    {
+        Vector2 size = MeasureText(font, text, pixelLineHeight);
+
+        Vector2 topLeft = new Vector2(
+            center.X - size.X * 0.5f,
+            center.Y - size.Y * 0.5f
+        );
+
+        DrawText(font, text, topLeft, pixelLineHeight, color);
+    }
+    
+    public void DrawTextWrappedCentered(
+        MSDFFont font,
+        string text,
+        Vector2 center,
+        float pixelLineHeight,
+        float maxWidth,
+        Color4<Rgba> color)
+    {
+        Vector2 size = MeasureTextWrapped(font, text, pixelLineHeight, maxWidth);
+
+        Vector2 topLeft = new Vector2(
+            center.X - size.X * 0.5f,
+            center.Y - size.Y * 0.5f
+        );
+
+        DrawTextWrapped(font, text, topLeft, pixelLineHeight, maxWidth, color);
     }
 
     public void FlushText(MSDFFont font)

@@ -38,7 +38,7 @@ public class SongSelectView : View, IDisposable
             AudioManager.Instance.PlaySample(_context.Skin.MenuClick);
         }
 
-        _cursor += (int)Math.Clamp(Input.WheelY * 20, -1, 1);
+        _cursor -= (int)Math.Clamp(Input.WheelY * 20, -1, 1);
         
         _cursor = Math.Clamp(_cursor, 0, _beatmapMetas.Count - 1);
         
@@ -55,17 +55,13 @@ public class SongSelectView : View, IDisposable
 
         if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_RETURN))
         {
-            AudioManager.Instance.PlaySample(_context.Skin.MenuClick);
-            var game = new GameView(_context);
-            game.SetBeatmap(_beatmapMetas[_cursor].Beatmap);
-            game.Player.SetState(PlayerState.Autoplay);
-            ViewManager.Instance.Transition(this, game, 1000);
+            PlayBeatmap(_beatmapMetas[_cursor].Beatmap);
         }
         
         if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_ESCAPE))
         {
             AudioManager.Instance.PlaySample(_context.Skin.MenuBack);
-            ViewManager.Instance.Transition(this, new IntroView(_context), 1000);
+            ViewManager.Instance.Transition(this, new IntroView(_context), 200);
         }
     }
 
@@ -105,7 +101,7 @@ public class SongSelectView : View, IDisposable
 
         var thumbWidth = BoxHeight * 1.5f;
 
-        var thumb = _textureCache[box.Path];
+        var thumb = Renderer.WhiteTexture; // _textureCache[box.Path];
         r.DrawTexture(
             thumb,
             box.Position.X,
@@ -117,13 +113,22 @@ public class SongSelectView : View, IDisposable
         
         // draw text
         r.DrawText(Fonts.Default, box.Beatmap.ToString(),
-            new Vector2(box.Position.X + 100 + thumbWidth, box.Position.Y + 25),
-            box.Size.Y/3, new Color4<Rgba>(1, 1, 1, 1));
+            new Vector2(box.Position.X + 200 + thumbWidth, box.Position.Y + 80),
+            box.Size.Y/5f, new Color4<Rgba>(1, 1, 1, 1));
         r.DrawText(Fonts.Default, $"By: {box.Beatmap.Creator}",
-            new Vector2(box.Position.X + 100 + thumbWidth, box.Position.Y + 65),
-            box.Size.Y/3, new Color4<Rgba>(1, 1, 1, 1));
+            new Vector2(box.Position.X + 200 + thumbWidth, box.Position.Y + 150),
+            box.Size.Y/5f, new Color4<Rgba>(1, 1, 1, 1));
         
         r.FlushText(Fonts.Default);
+    }
+
+    private void PlayBeatmap(Beatmap beatmap)
+    {
+        AudioManager.Instance.PlaySample(_context.Skin.MenuClick);
+        var game = new GameView(_context);
+        game.SetBeatmap(beatmap);
+        game.Player.SetState(PlayerState.Autoplay);
+        ViewManager.Instance.Transition(this, game, 200);
     }
 
     public override void OnEnter()
@@ -163,9 +168,14 @@ public class SongSelectView : View, IDisposable
     public override void OnMouseDown(MouseButton button, MouseEventArgs e)
     {
         base.OnMouseDown(button, e);
-        foreach (var beatmapMeta in _beatmapMetas)
+
+        if (button == MouseButton.Left)
         {
-            if (beatmapMeta.IsHovered) return;
+            var meta = _beatmapMetas.FirstOrDefault(m => m.IsHovered);
+            if (meta != null)
+            {
+                PlayBeatmap(meta.Beatmap);
+            }
         }
     }
 
@@ -208,7 +218,7 @@ public class SongSelectView : View, IDisposable
 
                     if (!_textureCache.ContainsKey(box.Path))
                     {
-                        _textureCache[box.Path] = new Texture(box.Path);
+                        //_textureCache[box.Path] = new Texture(box.Path);
                     }
                     
                     _beatmapMetas.Add(box);

@@ -1,3 +1,4 @@
+using Velto.Audio;
 using Velto.Core;
 using Velto.Game.Views;
 
@@ -18,7 +19,8 @@ public class GameBase : Core.Game
         
         _context = new OsuContext()
         {
-            Skin = new Skin(Resources.GetPath($"Resources/Textures/rafis"))
+            Skin = new Skin(Resources.GetPath($"Resources/Textures/rafis")),
+            SystemTrack = AudioManager.Instance.CreateTrack(),
         };
         
         ViewManager.Instance.SetTree([

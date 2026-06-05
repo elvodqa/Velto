@@ -59,6 +59,7 @@ public class Skin : IDisposable
     public Texture MenuButtonBackground { get; private set; }
     public AudioChannel MenuClick { get; private set;  }
     public AudioChannel MenuBack { get; private set;  }
+    public AudioChannel PauseRetryClick { get; private set; }
 
     public SampleSet Normal { get; private set; }
     public SampleSet Soft { get; private set; }
@@ -169,6 +170,7 @@ public class Skin : IDisposable
         ComboBreak = GetSample("combobreak");
         MenuClick = GetSample("menuclick");
         MenuBack = GetSample("menuback");
+        PauseRetryClick = GetSample("pause-retry-click");
     }
 
     private Vector4 ParseColor(string str)
@@ -283,6 +285,7 @@ public class Skin : IDisposable
         MenuButtonBackground.Dispose();
         MenuBack.Dispose();
         MenuClick.Dispose();
+        PauseRetryClick.Dispose();
 
         InputOverlayBackground?.Dispose();
         InputOverlayKey?.Dispose();

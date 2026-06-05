@@ -220,18 +220,25 @@ public class GameView : View, IDisposable
         {
             //ToggleMenu();
             _isPaused = true;
-            ViewManager.Instance.Transition(this, new SongSelectView(_context), 1000);
+            ViewManager.Instance.Transition(this, new SongSelectView(_context), 200);
         }
 
         if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_GRAVE))
         {
-            _songTrack?.Position = 0;
-            _songTrack?.Play();
-            SongCursor = 0;
-            _comboCount = 0;
-            _totalScore = 0;
-            ResetObjectsAfter(0);
+            // _songTrack?.Position = 0;
+            // _songTrack?.Play();
+            // SongCursor = 0;
+            // _comboCount = 0;
+            // _totalScore = 0;
+            // ResetObjectsAfter(0);
             //ViewManager.Instance.Transition(this, this, 1000);
+            var game = new GameView(_context);
+            game.SetBeatmap(_beatmap);
+            game.Player.SetState(PlayerState.Autoplay);
+            _context.SystemTrack.Audio = _context.Skin.PauseRetryClick;
+            _context.SystemTrack.Play();
+            ViewManager.Instance.Transition(this, game, 200);
+            return;
         }
 
         foreach (var hitIndicator in _hitIndicators.ToList())
@@ -312,7 +319,7 @@ public class GameView : View, IDisposable
                 var playerCursor = Player.Cursor;
                 if (hitObject.HitResult == HitResult.None)
                 {
-                    if (SongCursor - 150 >= circle.Time)
+                    if (SongCursor -  (200 - 10 * _beatmap.OverallDifficulty) >= circle.Time)
                     {
                         _comboCount = 0;
                         hitObject.HitResult = HitResult.Miss;
