@@ -12,7 +12,7 @@ using static SDL.SDL3;
 
 namespace Velto.Game.Views;
 
-public class GameView : View, IDisposable
+public class GameScreen : Screen, IDisposable
 {
     private const int PlayfieldW = 512;
     private const int PlayfieldH = 384;
@@ -78,7 +78,7 @@ public class GameView : View, IDisposable
     private OsuContext _context;
     private StopwatchClock clock;
 
-    public GameView(OsuContext context) : base(context)
+    public GameScreen(OsuContext context) : base(context)
     {
         _context = context;
         clock = new(false);
@@ -224,7 +224,7 @@ public class GameView : View, IDisposable
         {
             //ToggleMenu();
             _isPaused = true;
-            ViewManager.Instance.Transition(this, new SongSelectView(_context), 200);
+            Transition(new SongSelectScreen(_context), 200);
         }
 
         if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_GRAVE))
@@ -236,12 +236,12 @@ public class GameView : View, IDisposable
             // _totalScore = 0;
             // ResetObjectsAfter(0);
             //ViewManager.Instance.Transition(this, this, 1000);
-            var game = new GameView(_context);
+            var game = new GameScreen(_context);
             game.SetBeatmap(_beatmap);
             game.Player.SetState(PlayerState.Autoplay);
             _context.SystemTrack.Audio = _context.Skin.PauseRetryClick;
             _context.SystemTrack.Play();
-            ViewManager.Instance.Transition(this, game, 200);
+            Transition(game, 200);
             return;
         }
 

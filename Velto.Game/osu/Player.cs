@@ -28,7 +28,7 @@ public class Player
     public bool Dance { get; set; } = false;
 
     private readonly Beatmap _beatmap;
-    private readonly GameView _gameView;
+    private readonly GameScreen _gameScreen;
 
     // Replay fields
     private int _replayFrameIndex = 0;
@@ -45,10 +45,10 @@ public class Player
     private bool _prevPrimary;
     private bool _prevSecondary;
 
-    public Player(Beatmap beatmap, GameView view)
+    public Player(Beatmap beatmap, GameScreen screen)
     {
         _beatmap = beatmap;
-        _gameView = view;
+        _gameScreen = screen;
 
         if (_beatmap.HitObjects.Count > 0)
             _autoplayCursor = _beatmap.HitObjects[0].Position;
@@ -309,10 +309,10 @@ public class Player
         switch (State)
         {
             case PlayerState.Player:
-                if (_gameView == null) return Vector2.Zero;
+                if (_gameScreen == null) return Vector2.Zero;
 
-                float mx = Math.Clamp(Input.MouseX, 0, 0 + _gameView.Width);
-                float my = Math.Clamp(Input.MouseY, 0, 0 + _gameView.Height);
+                float mx = Math.Clamp(Input.MouseX, 0, 0 + _gameScreen.Width);
+                float my = Math.Clamp(Input.MouseY, 0, 0 + _gameScreen.Height);
                 return new Vector2(mx - 0, my - 0);
 
             case PlayerState.Autoplay:

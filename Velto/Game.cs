@@ -106,12 +106,17 @@ public unsafe class Game : IDisposable
         SDL_AddEventWatch(&EventWatch, _eventWatchUserdata);
         
         Fonts.Default = MSDFFont.Load(Resources.GetPath("Resources/Fonts/arial/arial"));
-        ViewManager.Instance.Renderer = _renderer;
+        ScreenManager.Instance.Renderer = _renderer;
 
         framedClock = new();
     }
     
     public virtual void Load() { }
+
+    public void SetScreen(Screen screen)
+    {
+        ScreenManager.Instance.SetTree([screen]);
+    }
 
     public void Run()
     {
@@ -153,7 +158,7 @@ public unsafe class Game : IDisposable
                         break;
                     case (uint)SDL_EventType.SDL_EVENT_WINDOW_RESIZED:
                         var size = Renderer.WindowSizeInPixels;
-                        ViewManager.Instance.ResizeCallback(ev.window.data1, ev.window.data2);
+                        ScreenManager.Instance.ResizeCallback(ev.window.data1, ev.window.data2);
                         Logger.Instance.Info($"Window Resized: {ev.window.data1} x {ev.window.data2}");
                         break;
                 }
@@ -177,15 +182,15 @@ public unsafe class Game : IDisposable
         
         _renderer.BeginFrame();
         
-        ViewManager.Instance.Update(delta);
-        ViewManager.Instance.Draw(delta, _renderer);
-        ViewManager.Instance.Present(delta);
+        ScreenManager.Instance.Update(delta);
+        ScreenManager.Instance.Draw(delta, _renderer);
+        ScreenManager.Instance.Present(delta);
 
         if (_debugInfo)
         {
             _renderer.DrawText(Fonts.Default, $"FPS: {framedClock.FramesPerSecond} [{framedClock.AverageFrameTime.ToString("00.00")}ms]" +
                                               $" | DrawCallCount: {_renderer.DrawCallCount:000000}\n" +
-                                              $"Top: {ViewManager.Instance.Top}", 
+                                              $"Top: {ScreenManager.Instance.Top}", 
                 new (5, 5), Renderer.WindowSizeInPixels.Y / 45, new Color4<Rgba>(1, 1, 1, 1));
         
             _renderer.FlushText(Fonts.Default);
@@ -234,7 +239,7 @@ public unsafe class Game : IDisposable
             type == SDL_EventType.SDL_EVENT_WINDOW_RESIZED)
         {
             var size = Renderer.WindowSizeInPixels;
-            ViewManager.Instance.ResizeCallback((int)size.X, (int)size.Y);
+            ScreenManager.Instance.ResizeCallback((int)size.X, (int)size.Y);
             game.RenderFromEventWatch();
         }
 

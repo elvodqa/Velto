@@ -6,13 +6,13 @@ using Velto.Graphics;
 
 namespace Velto.Game.Views;
 
-public class IntroView : View
+public class IntroScreen : Screen
 {
     private float _circleRadius;
     private AudioChannel _menuHitAudio;
     private OsuContext _context;
     
-    public IntroView(OsuContext context) : base(context)
+    public IntroScreen(OsuContext context) : base(context)
     {
         _context = context;
     }
@@ -41,7 +41,7 @@ public class IntroView : View
                     Create<SongSelectorView>(),
                 ]);*/
                 AudioManager.Instance.PlaySample(_menuHitAudio);
-                ViewManager.Instance.Transition(this, new SongSelectView(_context),200);
+                Transition(new SongSelectScreen(_context),1000);
             }
         }
 

@@ -8,7 +8,7 @@ using Velto.Graphics;
 
 namespace Velto.Game.Views;
 
-public class SongSelectView : View, IDisposable
+public class SongSelectScreen : Screen, IDisposable
 {
     private const float BoxHeight = 300;
     private float BoxWidth = 300;
@@ -18,7 +18,7 @@ public class SongSelectView : View, IDisposable
     private OsuContext _context;
     private Dictionary<string, Texture> _textureCache = new();
     
-    public SongSelectView(OsuContext context) : base(context)
+    public SongSelectScreen(OsuContext context) : base(context)
     {
         _context = context;
     }
@@ -73,7 +73,7 @@ public class SongSelectView : View, IDisposable
         if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_ESCAPE))
         {
             AudioManager.Instance.PlaySample(_context.Skin.MenuBack);
-            ViewManager.Instance.Transition(this, new IntroView(_context), 200);
+            Transition(new IntroScreen(_context), 200);
         }
 
         if (Input.IsMouseJustPressed(SDLButton.SDL_BUTTON_LEFT))
@@ -146,10 +146,10 @@ public class SongSelectView : View, IDisposable
     private void PlayBeatmap(Beatmap beatmap)
     {
         AudioManager.Instance.PlaySample(_context.Skin.MenuClick);
-        var game = new GameView(_context);
+        var game = new GameScreen(_context);
         game.SetBeatmap(beatmap);
         game.Player.SetState(PlayerState.Autoplay);
-        ViewManager.Instance.Transition(this, game, 200);
+        Transition(game, 200);
     }
 
     public override void OnEnter()

@@ -4,25 +4,27 @@ using Velto.Graphics;
 
 namespace Velto.Core;
 
-public class ViewManager
+internal class ScreenManager
 {
     private class TransitionState
     {
-        public View To;
-        public View From;
-        public Func<float, float> EasingFunc;
+        public Screen To;
+        public Screen From;
         public float Length;
+        
+        public Func<float, float> DisappearFunc;
+        public Func<float, float> AppearFunc;
         
         // Info for update
         public float Timer;
     }
     
-    public static ViewManager Instance { get; } = new();
+    public static ScreenManager Instance { get; } = new();
     public Renderer Renderer;
     
-    private readonly List<View> _views = new();
-    private View _hovered;
-    private View _captured;
+    private readonly List<Screen> _views = new();
+    private Screen _hovered;
+    private Screen _captured;
 
     private List<TransitionState> _transitions = new();
     
@@ -87,29 +89,65 @@ public class ViewManager
             {
                 if (view == transition.From || view == transition.To)
                 {
-                    var alpha = EasingFunctions.EaseSineUpDown(transition.Timer / transition.Length); //transition.EasingFunc(transition.Timer / transition.Length);
-                    Renderer.DrawRectangle(0, 0,view.Width, view.Height, 
-                        Color4.Black with { W = alpha });
+                    if (transition.Timer < transition.Length / 2)
+                    {
+                        var t = Math.Clamp(
+                            transition.Timer / (transition.Length / 2),
+                            0,
+                            1
+                        );
+                        var alpha = transition.DisappearFunc(t);
+                        Renderer.DrawRectangle(0, 0,view.Width, view.Height, 
+                            Color4.Black with { W = alpha });
+                    }
+                    if (transition.Timer >= transition.Length / 2)
+                    {
+                        var t = (transition.Timer - ((transition.Length / 2))) / (transition.Length / 2);
+                        var alpha = transition.AppearFunc(t); //transition.EasingFunc(transition.Timer / transition.Length);
+                        Renderer.DrawRectangle(0, 0,view.Width, view.Height, 
+                            Color4.Black with { W = 1-alpha });
+                    }
                 }
             }
         }
         Renderer.PopScissor();
     }
+    
+    // public void Present(double delta)
+    // {
+    //     Renderer.PushScissor(new ScissorRect(0, 0, (int)Renderer.WindowSizeInPixels.X, (int)Renderer.WindowSizeInPixels.Y));
+    //     Renderer.Clear(new(0, 0, 0, 1));
+    //     foreach (var view in _views)
+    //     {
+    //         Renderer.DrawTexture(view.Framebuffer.Texture, 0, 0, view.Width, view.Height, new Color4<Rgba>(1, 1, 1, 1));
+    //         foreach (var transition in _transitions)
+    //         {
+    //             if (view == transition.From || view == transition.To)
+    //             {
+    //                 var alpha = EasingFunctions.EaseSineUpDown(transition.Timer / transition.Length); //transition.EasingFunc(transition.Timer / transition.Length);
+    //                 Renderer.DrawRectangle(0, 0,view.Width, view.Height, 
+    //                     Color4.Black with { W = alpha });
+    //             }
+    //         }
+    //     }
+    //     Renderer.PopScissor();
+    // }
 
-    public void Transition(View from, View to, float length = 500, Func<float, float>? easingFunc = null)
+    public void Transition(Screen from, Screen to, float length = 500, Func<float, float>? disappearFunc = null, Func<float, float>? appearFunc = null)
     {
         var transition = new TransitionState()
         {
             From = from,
             To = to,
             Length = length,
-            EasingFunc = easingFunc ??= EasingFunctions.Linear,
+            DisappearFunc = disappearFunc ??= EasingFunctions.Linear,
+            AppearFunc = appearFunc ??= EasingFunctions.Linear,
         };
         transition.To.OnEnter();
         _transitions.Add(transition);
     }
 
-    public void SetTree(params View[] views)
+    public void SetTree(params Screen[] views)
     {
         foreach (var view in _views)
         {
@@ -129,7 +167,7 @@ public class ViewManager
         return _views.OfType<T>().ToList();
     }
 
-    public View? Top => _views.Count == 0 ? null : _views[^1];
+    public Screen? Top => _views.Count == 0 ? null : _views[^1];
 }
 
 // public class ViewManager

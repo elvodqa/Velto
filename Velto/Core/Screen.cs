@@ -8,37 +8,15 @@ public struct ResizeEventArgs
     public int Height;
 }
 
-public struct MouseEventArgs(int x, int y)
-{
-    public int X = x;
-    public int Y = y;
-}
-
-public abstract class View : IDisposable
+public abstract class Screen : IDisposable
 {
     protected IGameContext Context { get; }
 
-    protected View(IGameContext context)
+    protected Screen(IGameContext context)
     {
         Context = context;
         Framebuffer = new Framebuffer((int)Renderer.WindowSizeInPixels.X, (int)Renderer.WindowSizeInPixels.Y);
     } 
-    
-    // public static T Create<T>(int width, int height)
-    //     where T : View<TContext>, new()
-    // {
-    //     var view = new T();
-    //     view.Framebuffer = new Framebuffer(width, height);
-    //     return view;
-    // }
-    //
-    // public static T Create<T>()
-    //     where T : View<TContext>, new()
-    // {
-    //     var view = new T();
-    //     view.Framebuffer = ;
-    //     return view;
-    // }
     
     public Framebuffer Framebuffer;
     public bool Enabled { get; set; } = true;
@@ -74,6 +52,12 @@ public abstract class View : IDisposable
     public virtual void OnResize(ResizeEventArgs e) {}
     public abstract void Update(double dt);
     public abstract void Draw(double dt, Renderer r);
+    
+    public void Transition(Screen to, float length = 500, 
+        Func<float, float>? disappearFunc = null, Func<float, float>? appearFunc = null)
+    {
+        ScreenManager.Instance.Transition(this, to, length, disappearFunc, appearFunc);
+    }
 
     public void Dispose()
     {

@@ -23,8 +23,6 @@ public class GameBase : Core.Game
             SystemTrack = AudioManager.Instance.CreateTrack(),
         };
         
-        ViewManager.Instance.SetTree([
-            new IntroView(_context),
-        ]);
+        SetScreen(new IntroScreen(_context));
     }
 }

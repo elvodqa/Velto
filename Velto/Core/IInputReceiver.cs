@@ -8,6 +8,12 @@ public enum MouseButton
     Middle,
 }
 
+public struct MouseEventArgs(int x, int y)
+{
+    public int X = x;
+    public int Y = y;
+}
+
 public interface IInputReceiver
 {
     float X { get; }
