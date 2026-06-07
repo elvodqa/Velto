@@ -190,7 +190,7 @@ public unsafe class Game : IDisposable
         {
             _renderer.DrawText(Fonts.Default, $"FPS: {framedClock.FramesPerSecond} [{framedClock.AverageFrameTime.ToString("00.00")}ms]" +
                                               $" | DrawCallCount: {_renderer.DrawCallCount:000000}\n" +
-                                              $"Top: {ScreenManager.Instance.Top}", 
+                                              $"Screen: {ScreenManager.Instance.Top}", 
                 new (5, 5), Renderer.WindowSizeInPixels.Y / 45, new Color4<Rgba>(1, 1, 1, 1));
         
             _renderer.FlushText(Fonts.Default);

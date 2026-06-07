@@ -113,26 +113,6 @@ internal class ScreenManager
         Renderer.PopScissor();
     }
     
-    // public void Present(double delta)
-    // {
-    //     Renderer.PushScissor(new ScissorRect(0, 0, (int)Renderer.WindowSizeInPixels.X, (int)Renderer.WindowSizeInPixels.Y));
-    //     Renderer.Clear(new(0, 0, 0, 1));
-    //     foreach (var view in _views)
-    //     {
-    //         Renderer.DrawTexture(view.Framebuffer.Texture, 0, 0, view.Width, view.Height, new Color4<Rgba>(1, 1, 1, 1));
-    //         foreach (var transition in _transitions)
-    //         {
-    //             if (view == transition.From || view == transition.To)
-    //             {
-    //                 var alpha = EasingFunctions.EaseSineUpDown(transition.Timer / transition.Length); //transition.EasingFunc(transition.Timer / transition.Length);
-    //                 Renderer.DrawRectangle(0, 0,view.Width, view.Height, 
-    //                     Color4.Black with { W = alpha });
-    //             }
-    //         }
-    //     }
-    //     Renderer.PopScissor();
-    // }
-
     public void Transition(Screen from, Screen to, float length = 500, Func<float, float>? disappearFunc = null, Func<float, float>? appearFunc = null)
     {
         var transition = new TransitionState()

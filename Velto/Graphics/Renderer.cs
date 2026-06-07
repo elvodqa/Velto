@@ -625,8 +625,6 @@ public unsafe class Renderer : IDisposable
             x += glyph.XAdvance * font.EmSize * scale + kern;
             prev = c;
         }
-
-        // ... (projection logic unchanged)
     }
 
     public void DrawTextWrapped(

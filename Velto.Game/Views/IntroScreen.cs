@@ -41,7 +41,7 @@ public class IntroScreen : Screen
                     Create<SongSelectorView>(),
                 ]);*/
                 AudioManager.Instance.PlaySample(_menuHitAudio);
-                Transition(new SongSelectScreen(_context),1000);
+                Transition(new SongSelectScreen(_context),250);
             }
         }
 
