@@ -1,59 +1,51 @@
 using OpenTK.Graphics.OpenGL;
 using StbImageSharp;
 
-namespace Velto.Graphics;
+namespace Velto.Graphics.OpenGL;
 
-public enum WrapMode
+public unsafe class OpenGLTexture : ITexture
 {
-    Repeat,
-    MirroredRepeat,
-    ClampToEdge,
-    ClampToBorder
-}
-
-public enum FilterMode
-{
-    Nearest,
-    Linear
-}
-
-public unsafe class Texture : IDisposable
-{
-    private readonly FilterMode _filterMode;
-    private readonly ImageResult _result;
-    private readonly WrapMode _wrapMode;
-
+    public int Width { get; private set; }
+    public int Height { get; private set; }
+    
+    public TextureFilteringMode FilteringMode { get; }
+    public TextureWrapMode WrapMode { get; }
+    
     public string Path;
     public int Handle;
-
-    public Texture(string path, FilterMode filterMode = FilterMode.Linear, WrapMode wrapMode = WrapMode.Repeat,
+    
+    private readonly TextureFilteringMode _filterMode;
+    private readonly TextureWrapMode _wrapMode;
+        
+    public OpenGLTexture(string path, TextureFilteringMode filterMode = TextureFilteringMode.Linear, 
+        TextureWrapMode wrapMode = TextureWrapMode.Repeat,
         bool generateMipmaps = true)
     {
         Path = path;
         _filterMode = filterMode;
         _wrapMode = wrapMode;
         StbImage.stbi_set_flip_vertically_on_load(1);
-        _result = ImageResult.FromMemory(File.ReadAllBytes(path), ColorComponents.RedGreenBlueAlpha);
+        var result = ImageResult.FromMemory(File.ReadAllBytes(path), ColorComponents.RedGreenBlueAlpha);
 
-        Width = _result.Width;
-        Height = _result.Height;
+        Width = result.Width;
+        Height = result.Height;
 
         Handle = GL.GenTexture();
         GL.ActiveTexture(TextureUnit.Texture0);
         GL.BindTexture(TextureTarget.Texture2D, Handle);
 
-        fixed (byte* ptr = _result.Data)
+        fixed (byte* ptr = result.Data)
         {
-            var format = _result.Comp == ColorComponents.RedGreenBlueAlpha
+            var format = result.Comp == ColorComponents.RedGreenBlueAlpha
                 ? PixelFormat.Rgba
                 : PixelFormat.Rgb;
 
-            var internalFormat = _result.Comp == ColorComponents.RedGreenBlueAlpha
+            var internalFormat = result.Comp == ColorComponents.RedGreenBlueAlpha
                 ? InternalFormat.Rgba
                 : InternalFormat.Rgb;
 
             GL.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba,
-                _result.Width, _result.Height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, ptr);
+                result.Width, result.Height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, ptr);
         }
 
         GL.BindTexture(TextureTarget.Texture2D, Handle);
@@ -66,20 +58,20 @@ public unsafe class Texture : IDisposable
         // Filter
         if (generateMipmaps)
         {
-            var mipmapFilter = _filterMode == FilterMode.Linear
+            var mipmapFilter = _filterMode == TextureFilteringMode.Linear
                 ? TextureMinFilter.LinearMipmapLinear
                 : TextureMinFilter.NearestMipmapNearest;
             GL.TexParameteri(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)mipmapFilter);
         }
         else
         {
-            var filter = _filterMode == FilterMode.Linear
+            var filter = _filterMode == TextureFilteringMode.Linear
                 ? TextureMinFilter.Linear
                 : TextureMinFilter.Nearest;
             GL.TexParameteri(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)filter);
         }
 
-        var magFilter = _filterMode == FilterMode.Linear
+        var magFilter = _filterMode == TextureFilteringMode.Linear
             ? TextureMagFilter.Linear
             : TextureMagFilter.Nearest;
         GL.TexParameteri(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)magFilter);
@@ -89,24 +81,19 @@ public unsafe class Texture : IDisposable
 
         GL.BindTexture(TextureTarget.Texture2D, 0);
     }
-
-    public int Width { get; }
-
-    public int Height { get; }
-
+    
     public void Dispose()
     {
         GL.DeleteTexture(Handle);
     }
 
-    private static OpenTK.Graphics.OpenGL.TextureWrapMode ToGL(WrapMode mode)
+    private static OpenTK.Graphics.OpenGL.TextureWrapMode ToGL(TextureWrapMode mode)
     {
         return mode switch
         {
-            WrapMode.Repeat => OpenTK.Graphics.OpenGL.TextureWrapMode.Repeat,
-            WrapMode.MirroredRepeat => OpenTK.Graphics.OpenGL.TextureWrapMode.MirroredRepeat,
-            WrapMode.ClampToEdge => OpenTK.Graphics.OpenGL.TextureWrapMode.ClampToEdge,
-            WrapMode.ClampToBorder => OpenTK.Graphics.OpenGL.TextureWrapMode.ClampToBorder,
+            TextureWrapMode.Repeat => OpenTK.Graphics.OpenGL.TextureWrapMode.Repeat,
+            TextureWrapMode.ClampToEdge => OpenTK.Graphics.OpenGL.TextureWrapMode.ClampToEdge,
+            TextureWrapMode.ClampToBorder => OpenTK.Graphics.OpenGL.TextureWrapMode.ClampToBorder,
             _ => OpenTK.Graphics.OpenGL.TextureWrapMode.Repeat
         };
     }
