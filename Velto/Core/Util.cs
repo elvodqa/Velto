@@ -6,9 +6,6 @@ namespace Velto.Core;
 
 public class Util
 {
-    public static float MapRange(float input, float input_L, float input_H, float out_L, float out_H) =>
-        out_L + ((input - input_L) / (input_H - input_L)) * (out_H - out_L);
-
     /// <summary>
     /// Reads a stream of bytes from an .osr file representing a string.
     /// Follows: https://osu.ppy.sh/wiki/en/Client/File_formats/osr_%28file_format%29

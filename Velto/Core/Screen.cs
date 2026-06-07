@@ -51,7 +51,7 @@ public abstract class Screen : IDisposable
     public virtual void OnExit() {}
     public virtual void OnResize(ResizeEventArgs e) {}
     public abstract void Update(double dt);
-    public abstract void Draw(double dt, Renderer r);
+    public abstract void Draw(Renderer r);
     
     public void Transition(Screen to, float length = 500, 
         Func<float, float>? disappearFunc = null, Func<float, float>? appearFunc = null)

@@ -68,17 +68,17 @@ internal class ScreenManager
         }
     }
     
-    public void Draw(double delta, Renderer r)
+    public void Draw(Renderer r)
     {
         foreach (var view in _views)
         {
             Renderer.BindFramebuffer(view.Framebuffer);
-            view.Draw(delta, r);
+            view.Draw(r);
             Renderer.UnbindFramebuffer(view.Framebuffer);   
         }
     }
 
-    public void Present(double delta)
+    public void Present()
     {
         Renderer.PushScissor(new ScissorRect(0, 0, (int)Renderer.WindowSizeInPixels.X, (int)Renderer.WindowSizeInPixels.Y));
         Renderer.Clear(new(0, 0, 0, 1));

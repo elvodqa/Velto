@@ -146,7 +146,7 @@ public class GameScreen : Screen, IDisposable
         if (Input.IsMouseDown(SDLButton.SDL_BUTTON_LEFT) && hitbox.Contains(Input.MouseX, Input.MouseY) &&
             _debugEnabled)
         {
-            double targetMs = Util.MapRange(Input.MouseX, 0, Width, 0, (float)_songLength);
+            double targetMs = Interpolation.Map(Input.MouseX, 0, Width, 0, (float)_songLength);
 
             if (_startingTimer >= 0 && !_musicStarted)
             {
@@ -569,9 +569,18 @@ public class GameScreen : Screen, IDisposable
 
         _prevWidth = Width;
         _prevHeight = Height;
+        
+        var trailCount = trails.Count;
+        for (var t = 0; t < trailCount; t++)
+        {
+            var trail = trails.Dequeue();
+            trail.Life -= (float)delta;
+            if (trail.Life > 0)
+                trails.Enqueue(trail);
+        }
     }
     
-    public override void Draw(double delta, Renderer r)
+    public override void Draw(Renderer r)
     {
         r.Clear(new(0, 0, 0, 1));
         r.PushScissor(0, 0, (int)Width, (int)Height);
@@ -631,12 +640,12 @@ public class GameScreen : Screen, IDisposable
             {
                 fadein =
                     Math.Clamp(
-                        Util.MapRange((float)clock.CurrentTime, (float)hitObject.Time - _beatmap.Preempt,
+                        Interpolation.Map((float)clock.CurrentTime, (float)hitObject.Time - _beatmap.Preempt,
                             (float)(hitObject.Time - _beatmap.Preempt / 3),
                             0, 1), 0, 1);
                 fadeout =
                     Math.Clamp(
-                        Util.MapRange((float)clock.CurrentTime, (float)hitObject.Time, (float)(hitObject.Time + _beatmap.Posttime), 1, 0),
+                        Interpolation.Map((float)clock.CurrentTime, (float)hitObject.Time, (float)(hitObject.Time + _beatmap.Posttime), 1, 0),
                         0, 1);
                 drawSize = (float)(objectCircleSize + objectCircleSize * (1 - fadeout) * 0.2);
             }
@@ -646,14 +655,14 @@ public class GameScreen : Screen, IDisposable
 
                 fadeout =
                     Math.Clamp(
-                        Util.MapRange((float)clock.CurrentTime, (float)hitObject.HitTime,
+                        Interpolation.Map((float)clock.CurrentTime, (float)hitObject.HitTime,
                             (float)(hitObject.HitTime + _beatmap.Posttime), 1, 0),
                         0, 1);
 
                 drawSize = (float)(objectCircleSize + objectCircleSize * (1 - fadeout) * 0.3);
             }
             var approachCircleSize = Math.Max(
-                Util.MapRange((float)clock.CurrentTime, (float)(hitObject.Time - _beatmap.Preempt), (float)(hitObject.Time + 0),
+                Interpolation.Map((float)clock.CurrentTime, (float)(hitObject.Time - _beatmap.Preempt), (float)(hitObject.Time + 0),
                     drawSize * 4, drawSize), drawSize);
             
             switch (hitObject)
@@ -780,7 +789,7 @@ public class GameScreen : Screen, IDisposable
                     float sliderOpacity;
                     if (clock.CurrentTime > slider.Time - _beatmap.Preempt && clock.CurrentTime < slider.Time)
                     {
-                        sliderOpacity = Util.MapRange((float)clock.CurrentTime, (float)(slider.Time - _beatmap.Preempt),
+                        sliderOpacity = Interpolation.Map((float)clock.CurrentTime, (float)(slider.Time - _beatmap.Preempt),
                             (float)(slider.Time - _beatmap.Preempt / 2), 0, maxSliderOpacity);
                     }
                     else if (clock.CurrentTime >= slider.Time - _beatmap.Preempt / 2 &&
@@ -791,7 +800,7 @@ public class GameScreen : Screen, IDisposable
                     else
                     {
                         float window = (float)(slider.Time + slider.Duration);
-                        sliderOpacity = Util.MapRange((float)clock.CurrentTime, window, window + _beatmap.Posttime,
+                        sliderOpacity = Interpolation.Map((float)clock.CurrentTime, window, window + _beatmap.Posttime,
                             maxSliderOpacity,
                             0);
                     }
@@ -869,7 +878,7 @@ public class GameScreen : Screen, IDisposable
                         if (_context.Skin.SliderBallAnimated)
                         {
                             var ballIndex = Math.Clamp(
-                                (int)Util.MapRange(
+                                (int)Interpolation.Map(
                                     (float)clock.CurrentTime,
                                     (float)slider.Time,
                                     (float)(slider.Time + slider.Duration),
@@ -1134,14 +1143,14 @@ public class GameScreen : Screen, IDisposable
         // draw volume control
         /*r.DrawRectangle(0, (float)Height / 2 - 150, 40, 300, new Vector4(0.1f, 0.1f, 0.1f, 1));
 
-        var length = Util.MapRange(_musicVolume, 0, 1, 0, 300);
+        var length = Interpolation.Map(_musicVolume, 0, 1, 0, 300);
         r.DrawRectangle(10, (float)Height / 2 - 150, 20, length, yellow);*/
 
 
         // timeline
         if (_debugEnabled)
         {
-            var songPointer = Util.MapRange((float)clock.CurrentTime, 0, (float)_songLength, 0, Width);
+            var songPointer = Interpolation.Map((float)clock.CurrentTime, 0, (float)_songLength, 0, Width);
             r.DrawRectangle(0, Height - 20, songPointer, 20, yellow);
             var cursorSize = new Vector2(30, 60);
             r.DrawRectangle(songPointer - cursorSize.X / 2, Height - cursorSize.Y, cursorSize.X, cursorSize.Y,
@@ -1202,7 +1211,7 @@ public class GameScreen : Screen, IDisposable
         foreach (var indicator in _hitIndicators)
         {
             var range = 200 - 10 * _beatmap.OverallDifficulty;
-            var cursorX = Util.MapRange((float)indicator.Offset, -range, range, timingWindowX,
+            var cursorX = Interpolation.Map((float)indicator.Offset, -range, range, timingWindowX,
                 timingWindowX + timingWindowWidth);
             r.DrawRectangle(cursorX, timingWindowY - timingWindowHeight, 3, timingWindowHeight * 2,
                 new Color4<Rgba>(1, 1, 1, (float)(indicator.Life / HitIndicatorMaxLife)));
@@ -1223,14 +1232,7 @@ public class GameScreen : Screen, IDisposable
         
         // Game cursor
         // Update trail lifetimes first so the draw loop can use a stable count (prevents 1-frame alpha spikes).
-        var trailCount = trails.Count;
-        for (var t = 0; t < trailCount; t++)
-        {
-            var trail = trails.Dequeue();
-            trail.Life -= (float)delta;
-            if (trail.Life > 0)
-                trails.Enqueue(trail);
-        }
+        
 
         var trailSnapshot = trails.ToArray();
         var size = _baseCircleSize / 2f;

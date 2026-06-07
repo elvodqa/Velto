@@ -86,7 +86,7 @@ public class SongSelectScreen : Screen, IDisposable
         }
     }
 
-    public override void Draw(double dt, Renderer r)
+    public override void Draw(Renderer r)
     {
         r.PushScissor(0, 0, Width, Height);
         r.DrawTexture(_context.Skin.MenuBackground, 0, 0, Width, Height, Color4.White);

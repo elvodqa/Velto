@@ -47,7 +47,7 @@ public class IntroScreen : Screen
 
     }
 
-    public override void Draw(double dt, Renderer r)
+    public override void Draw(Renderer r)
     {
         r.PushScissor(new ScissorRect(0, 0, Width, Height));
         r.Clear(Color4.Snow);
@@ -60,7 +60,7 @@ public class IntroScreen : Screen
         r.DrawCircle(Width/2 - _circleRadius, Height/2 - _circleRadius, _circleRadius*2, _circleRadius*2, Color4.White);
         r.DrawCircle(Width/2 - innerCircleRadius, Height/2 - innerCircleRadius, innerCircleRadius*2, innerCircleRadius*2, Color4.Hotpink);
         
-        r.DrawTextWrappedCentered(Fonts.Default, "VICIOUS DIH", 
+        r.DrawTextWrappedCentered(Fonts.Default, "Velto!", 
             new(Width/2, Height/2), _circleRadius/2, _circleRadius * 1.90F, Color4.White);
         r.FlushText(Fonts.Default);
         r.PopScissor();

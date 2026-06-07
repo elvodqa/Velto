@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using OpenTK;
 using OpenTK.Graphics;
@@ -42,7 +43,8 @@ public unsafe class Game : IDisposable
     private int _frameCount = 0;
     private double _fps = 0;
     private bool _debugInfo = true;
-    private FramedClock framedClock;
+    private FramedClock updateClock;
+    private FramedClock drawClock;
 
     public Vector2 WindowSizeInPixels => Renderer.WindowSizeInPixels;
     
@@ -108,7 +110,8 @@ public unsafe class Game : IDisposable
         Fonts.Default = MSDFFont.Load(Resources.GetPath("Resources/Fonts/arial/arial"));
         ScreenManager.Instance.Renderer = _renderer;
 
-        framedClock = new();
+        updateClock = new();
+        drawClock = new FramedClock();
     }
     
     public virtual void Load() { }
@@ -131,6 +134,7 @@ public unsafe class Game : IDisposable
         
         Input.GetKeyboardState();
         Input.UpdateMouse(_window);
+        
         while (_running)
         {
             Input.FixScrollback();
@@ -167,36 +171,51 @@ public unsafe class Game : IDisposable
 
             if (Input.IsKeyboardJustReleased(SDL_Scancode.SDL_SCANCODE_F12)) _debugInfo = !_debugInfo;
             
-            Loop(framedClock.ElapsedFrameTime);
+            Loop(updateClock.ElapsedFrameTime);
             
             
             SDL_GL_SwapWindow(_window);
         }
     }
 
+    
     public void Loop(double delta)
     {
         AudioManager.Instance.Update(delta);
+        
+        var inputStart = Stopwatch.GetTimestamp();
         Input.GetKeyboardState();
         Input.UpdateMouse(_window);
+        var inputEnd = Stopwatch.GetTimestamp();
         
-        _renderer.BeginFrame();
-        
+        var updateStart = Stopwatch.GetTimestamp();
         ScreenManager.Instance.Update(delta);
-        ScreenManager.Instance.Draw(delta, _renderer);
-        ScreenManager.Instance.Present(delta);
+        var updateEnd = Stopwatch.GetTimestamp();
+        
+        var drawBegin = Stopwatch.GetTimestamp();
+        _renderer.BeginFrame();
+        ScreenManager.Instance.Draw(_renderer);
+        ScreenManager.Instance.Present();
+        var draweEnd = Stopwatch.GetTimestamp();
 
+
+        var input = (double)(inputEnd - inputStart) * 1000f / Stopwatch.Frequency;
+        var update = (double)(inputEnd - inputStart) * 1000f / Stopwatch.Frequency;
+        var draw = (double)(inputEnd - inputStart) * 1000f / Stopwatch.Frequency;
+        
         if (_debugInfo)
         {
-            _renderer.DrawText(Fonts.Default, $"FPS: {framedClock.FramesPerSecond} [{framedClock.AverageFrameTime.ToString("00.00")}ms]" +
+            _renderer.DrawText(Fonts.Default, $"FPS: {updateClock.FramesPerSecond} [{updateClock.AverageFrameTime.ToString("00.00")}ms]" +
                                               $" | DrawCallCount: {_renderer.DrawCallCount:000000}\n" +
-                                              $"Screen: {ScreenManager.Instance.Top}", 
+                                              $"Screen: {ScreenManager.Instance.Top}\n"
+                +$"Input {input.ToString("00.0000")}ms | Update {update.ToString("00.0000")}ms | Draw {draw.ToString("00.0000")}ms", 
                 new (5, 5), Renderer.WindowSizeInPixels.Y / 45, new Color4<Rgba>(1, 1, 1, 1));
         
             _renderer.FlushText(Fonts.Default);
         }
         
-        framedClock.ProcessFrame();
+       
+        updateClock.ProcessFrame();
     }
     
     private void RenderFromEventWatch()
