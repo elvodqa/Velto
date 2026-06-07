@@ -4,6 +4,7 @@ using OpenTK.Mathematics;
 using SDL;
 using Velto.Audio;
 using Velto.Core;
+using Velto.Core.Timing;
 using Velto.Game;
 using Velto.Game.osu;
 using Velto.Graphics;
@@ -17,8 +18,6 @@ public class GameView : View, IDisposable
     private const int PlayfieldH = 384;
     private const double WaitingTime = 1000f;
     private const double HitIndicatorMaxLife = 2000f;
-    
-    public double SongCursor;
     
     private double _startingTimer;
 
@@ -37,7 +36,7 @@ public class GameView : View, IDisposable
     private string _skinName = "rafis";
 
     
-    private double _lastSongCursor;
+    private double _lastCurrentTime;
     private double _songLength;
     
 
@@ -67,10 +66,7 @@ public class GameView : View, IDisposable
 
     private float _playfieldWidth, _playfieldHeight;
     private Vector2 _playfieldTopLeft;
-    
-    private float _mouseX;
-    private float _mouseY;
-    
+
     public struct SliderFramebuffer
     {
         public Framebuffer Framebuffer;
@@ -80,10 +76,12 @@ public class GameView : View, IDisposable
     }
 
     private OsuContext _context;
+    private StopwatchClock clock;
 
     public GameView(OsuContext context) : base(context)
     {
         _context = context;
+        clock = new(false);
     }
 
     public void ToggleMenu()
@@ -101,8 +99,7 @@ public class GameView : View, IDisposable
 
     public override void Update(double delta)
     {
-        var previousSongCursor = _lastSongCursor;
-        _lastSongCursor = SongCursor;
+        _lastCurrentTime = clock.CurrentTime;
         
         if ((int)_prevWidth != (int)Width || (int)_prevHeight != (int)Height)
         {
@@ -116,12 +113,12 @@ public class GameView : View, IDisposable
 
         if (_startingTimer > 0)
         {
-            if (SongCursor != 0)
+            if (clock.CurrentTime != 0)
             {
                 // Something move the cursor
                 _musicStarted = true;
                 _songTrack?.Play();
-                _songTrack?.Position = SongCursor;
+                _songTrack?.Position = clock.CurrentTime;
             }
 
             _startingTimer -= delta;
@@ -130,22 +127,26 @@ public class GameView : View, IDisposable
             {
                 _musicStarted = true;
                 _songTrack?.Play();
-                SongCursor = 0;
+                clock.Seek(0);
+                clock.Start();
             }
         }
         
         if (_musicStarted && !_isPaused && _songTrack != null)
         {
-            SongCursor = _songTrack.Position;
-            //SongCursor += delta;
-            SongCursor = Math.Clamp(SongCursor, 0, _songLength);
+            //clock.CurrentTime = _songTrack.Position;
+            //clock.CurrentTime += delta;
+
+            clock.Rate = 1.5f;
+            _songTrack.Speed = 1.5f;
+            //_songTrack.Position = clock.CurrentTime;
         }
 
         RectangleF hitbox = new(0, Height - 40, Width, 40);
-        if (Input.IsMouseDown(SDLButton.SDL_BUTTON_LEFT) && hitbox.Contains(_mouseX, _mouseY) &&
+        if (Input.IsMouseDown(SDLButton.SDL_BUTTON_LEFT) && hitbox.Contains(Input.MouseX, Input.MouseY) &&
             _debugEnabled)
         {
-            double targetMs = Util.MapRange(_mouseX, 0, Width, 0, (float)_songLength);
+            double targetMs = Util.MapRange(Input.MouseX, 0, Width, 0, (float)_songLength);
 
             if (_startingTimer >= 0 && !_musicStarted)
             {
@@ -157,8 +158,9 @@ public class GameView : View, IDisposable
             bool wasPlaying = _songTrack!.Playing;
             _songTrack.Pause();
             _songTrack.Position = targetMs;
-            SongCursor = targetMs;
-            ResetObjectsAfter(SongCursor);
+            //clock.CurrentTime = targetMs;
+            clock.Seek(targetMs);
+            ResetObjectsAfter(clock.CurrentTime);
 
             if (wasPlaying)
                 _songTrack.Resume();
@@ -196,18 +198,20 @@ public class GameView : View, IDisposable
         {
             if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_LEFT))
             {
-                SongCursor -= 1000;
-                _songTrack?.Position = SongCursor;
+                //clock.CurrentTime -= 1000;
+                clock.Seek(clock.CurrentTime - 1000);
+                _songTrack?.Position = clock.CurrentTime;
 
-                ResetObjectsAfter(SongCursor);
+                ResetObjectsAfter(clock.CurrentTime);
             }
 
             if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_RIGHT))
             {
-                SongCursor += 1000;
-                _songTrack?.Position = SongCursor;
+                //clock.CurrentTime += 1000;
+                clock.Seek(clock.CurrentTime + 1000);
+                _songTrack?.Position = clock.CurrentTime;
 
-                ResetObjectsAfter(SongCursor);
+                ResetObjectsAfter(clock.CurrentTime);
             }
         }
 
@@ -227,7 +231,7 @@ public class GameView : View, IDisposable
         {
             // _songTrack?.Position = 0;
             // _songTrack?.Play();
-            // SongCursor = 0;
+            // clock.CurrentTime = 0;
             // _comboCount = 0;
             // _totalScore = 0;
             // ResetObjectsAfter(0);
@@ -276,16 +280,19 @@ public class GameView : View, IDisposable
         );
         
         _sortedObjects = _beatmap.HitObjects
-            .OrderByDescending(h => Math.Abs(h.Time - SongCursor));
+            .OrderByDescending(h => Math.Abs(h.Time - clock.CurrentTime));
         
         if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_SPACE))
         {
             if (_isPaused)
             {
                 _songTrack?.Resume();
+                clock.Start();
+                _songTrack.Position = clock.CurrentTime;
             }
             else
             {
+                clock.Stop();
                 _songTrack?.Pause();
             }
             _isPaused = !_isPaused;
@@ -308,23 +315,23 @@ public class GameView : View, IDisposable
             }
         }
         
-        Player.Update(delta, SongCursor, _playfieldTopLeft, scale);
+        Player.Update(delta, clock.CurrentTime, _playfieldTopLeft, scale);
         // Handle objects bkz: https://osu.ppy.sh/wiki/en/Gameplay/Judgement/osu%21 
         foreach (var hitObject in _beatmap.HitObjects)
         {
-            if (hitObject.Time > SongCursor + _beatmap.Preempt) continue;
+            if (hitObject.Time > clock.CurrentTime + _beatmap.Preempt) continue;
             
             if (hitObject is HitCircle circle)
             {
                 var playerCursor = Player.Cursor;
                 if (hitObject.HitResult == HitResult.None)
                 {
-                    if (SongCursor -  (200 - 10 * _beatmap.OverallDifficulty) >= circle.Time)
+                    if (clock.CurrentTime -  (200 - 10 * _beatmap.OverallDifficulty) >= circle.Time)
                     {
                         _comboCount = 0;
                         hitObject.HitResult = HitResult.Miss;
                         hitObject.Failed = true;
-                        AddResultParticle(hitObject.Position, hitObject.HitResult, SongCursor);
+                        AddResultParticle(hitObject.Position, hitObject.HitResult, clock.CurrentTime);
                         AudioManager.Instance.PlaySample(_context.Skin.ComboBreak);
                     }
                     
@@ -337,10 +344,10 @@ public class GameView : View, IDisposable
                             _hitIndicators.Add(new()
                             {
                                 Life = HitIndicatorMaxLife,
-                                Offset = hitObject.Time - SongCursor,
+                                Offset = hitObject.Time - clock.CurrentTime,
                             });
-                            hitObject.HitTime = SongCursor;
-                            var difference = Math.Abs(SongCursor - hitObject.Time);
+                            hitObject.HitTime = clock.CurrentTime;
+                            var difference = Math.Abs(clock.CurrentTime - hitObject.Time);
                             if (difference <= 80 - 6 * _beatmap.OverallDifficulty) // 300
                             {
                                 _comboCount++;
@@ -372,8 +379,8 @@ public class GameView : View, IDisposable
                                 AudioManager.Instance.PlaySample(_context.Skin.ComboBreak);
                             }
 
-                            circle.HitTime = SongCursor;
-                            AddResultParticle(hitObject.Position, hitObject.HitResult, SongCursor);
+                            circle.HitTime = clock.CurrentTime;
+                            AddResultParticle(hitObject.Position, hitObject.HitResult, clock.CurrentTime);
                             AudioManager.Instance.PlaySample(_context.Skin.Normal.HitNormal);
                         }
 
@@ -387,7 +394,7 @@ public class GameView : View, IDisposable
             // https://github.com/ppy/osu/wiki/Anatomy-of-a-slider
             else if (hitObject is Slider slider)
             {
-                if (SongCursor >= slider.Time + slider.Duration && !slider.JudgementDone)
+                if (clock.CurrentTime >= slider.Time + slider.Duration && !slider.JudgementDone)
                 {
                     if (slider.LastHeld <= slider.Time + slider.Duration && slider.LastHeld >= slider.Time + slider.Duration - Slider.FORGIVING_TIME)
                     {
@@ -413,17 +420,17 @@ public class GameView : View, IDisposable
                     //Logger.Instance.Info($"Slider held for {slider.TotalFollowTime}/{slider.Duration}");
                 }
                 
-                if (SongCursor > slider.Time + slider.Duration)
+                if (clock.CurrentTime > slider.Time + slider.Duration)
                     continue; // already judged
                 
                 var playerCursor = Player.Cursor;
                 
-                if (SongCursor - 150 >= slider.Time && slider.HitResult == HitResult.None)
+                if (clock.CurrentTime - 150 >= slider.Time && slider.HitResult == HitResult.None)
                 {
                     _comboCount = 0;
                     AudioManager.Instance.PlaySample(_context.Skin.ComboBreak);
                     hitObject.HitResult = HitResult.Miss;
-                    AddResultParticle(hitObject.Position, hitObject.HitResult, SongCursor);
+                    AddResultParticle(hitObject.Position, hitObject.HitResult, clock.CurrentTime);
                 }
                 
                 float radiusHitCircle = osuRadius * scale;
@@ -436,10 +443,10 @@ public class GameView : View, IDisposable
                         _hitIndicators.Add(new()
                         {
                             Life = HitIndicatorMaxLife,
-                            Offset = SongCursor - hitObject.Time,
+                            Offset = clock.CurrentTime - hitObject.Time,
                         });
-                        slider.HitTime = SongCursor;
-                        var difference = Math.Abs(SongCursor - slider.Time);
+                        slider.HitTime = clock.CurrentTime;
+                        var difference = Math.Abs(clock.CurrentTime - slider.Time);
                         if (difference <= 80 - 6 * _beatmap.OverallDifficulty) // 300
                         {
                             _comboCount++;
@@ -471,17 +478,17 @@ public class GameView : View, IDisposable
                             AudioManager.Instance.PlaySample(_context.Skin.ComboBreak);
                         }
 
-                        slider.HitTime = SongCursor;
-                        AddResultParticle(hitObject.Position, hitObject.HitResult, SongCursor);
+                        slider.HitTime = clock.CurrentTime;
+                        AddResultParticle(hitObject.Position, hitObject.HitResult, clock.CurrentTime);
                         AudioManager.Instance.PlaySample(_context.Skin.Normal.HitNormal);
                     }
                 }
                 
-                var followCirclePos = slider.GetPositionAt(SongCursor);
+                var followCirclePos = slider.GetPositionAt(clock.CurrentTime);
                 var ballPosition = _playfieldTopLeft + followCirclePos * scale;
                 var radiusFollowCircle = (_baseCircleSize * 2.5f) / 2f;
 
-                bool sliderActive = SongCursor >= slider.Time && SongCursor <= slider.Time + slider.Duration;
+                bool sliderActive = clock.CurrentTime >= slider.Time && clock.CurrentTime <= slider.Time + slider.Duration;
                 bool isInFollowRange = sliderActive && 
                                        Vector2.Distance(ballPosition, playerCursor) <= radiusFollowCircle;
                 bool isHolding = Player.ActionPrimaryDown || Player.ActionSecondaryDown;
@@ -494,7 +501,7 @@ public class GameView : View, IDisposable
                     if (isFollowingNow)
                     {
                         // Accumulate follow time
-                        double deltaFollow = SongCursor - Math.Max(slider.LastFollowUpdate, slider.Time);
+                        double deltaFollow = clock.CurrentTime - Math.Max(slider.LastFollowUpdate, slider.Time);
                         slider.TotalFollowTime += deltaFollow;
 
                         // Continuous follow tracking
@@ -511,8 +518,8 @@ public class GameView : View, IDisposable
                         if (slider.CurrentContinuousFollow > slider.LongestContinuousFollow)
                             slider.LongestContinuousFollow = slider.CurrentContinuousFollow;
 
-                        slider.LastHeld = SongCursor;
-                        slider.LastFollowUpdate = SongCursor;
+                        slider.LastHeld = clock.CurrentTime;
+                        slider.LastFollowUpdate = clock.CurrentTime;
                     }
 
                     slider.WasFollowingPreviousFrame = isFollowingNow;
@@ -558,7 +565,7 @@ public class GameView : View, IDisposable
             trails.Dequeue();
 
 
-        _hitResultParticles.RemoveAll(p => SongCursor - p.StartTime > p.MaxLife);
+        _hitResultParticles.RemoveAll(p => clock.CurrentTime - p.StartTime > p.MaxLife);
 
         _prevWidth = Width;
         _prevHeight = Height;
@@ -624,12 +631,12 @@ public class GameView : View, IDisposable
             {
                 fadein =
                     Math.Clamp(
-                        Util.MapRange((float)SongCursor, (float)hitObject.Time - _beatmap.Preempt,
+                        Util.MapRange((float)clock.CurrentTime, (float)hitObject.Time - _beatmap.Preempt,
                             (float)(hitObject.Time - _beatmap.Preempt / 3),
                             0, 1), 0, 1);
                 fadeout =
                     Math.Clamp(
-                        Util.MapRange((float)SongCursor, (float)hitObject.Time, (float)(hitObject.Time + _beatmap.Posttime), 1, 0),
+                        Util.MapRange((float)clock.CurrentTime, (float)hitObject.Time, (float)(hitObject.Time + _beatmap.Posttime), 1, 0),
                         0, 1);
                 drawSize = (float)(objectCircleSize + objectCircleSize * (1 - fadeout) * 0.2);
             }
@@ -639,14 +646,14 @@ public class GameView : View, IDisposable
 
                 fadeout =
                     Math.Clamp(
-                        Util.MapRange((float)SongCursor, (float)hitObject.HitTime,
+                        Util.MapRange((float)clock.CurrentTime, (float)hitObject.HitTime,
                             (float)(hitObject.HitTime + _beatmap.Posttime), 1, 0),
                         0, 1);
 
                 drawSize = (float)(objectCircleSize + objectCircleSize * (1 - fadeout) * 0.3);
             }
             var approachCircleSize = Math.Max(
-                Util.MapRange((float)SongCursor, (float)(hitObject.Time - _beatmap.Preempt), (float)(hitObject.Time + 0),
+                Util.MapRange((float)clock.CurrentTime, (float)(hitObject.Time - _beatmap.Preempt), (float)(hitObject.Time + 0),
                     drawSize * 4, drawSize), drawSize);
             
             switch (hitObject)
@@ -654,8 +661,8 @@ public class GameView : View, IDisposable
                 // Gameplay drawing
                 case HitCircle circle:
                 {
-                    if (circle.Time + _beatmap.Posttime > SongCursor &&
-                        circle.Time - _beatmap.Preempt < SongCursor)
+                    if (circle.Time + _beatmap.Posttime > clock.CurrentTime &&
+                        circle.Time - _beatmap.Preempt < clock.CurrentTime)
                     {
                         if (!_hidden)
                         {
@@ -722,14 +729,14 @@ public class GameView : View, IDisposable
 
                     break;
                 }
-                case Slider slider when !(SongCursor < slider.Time + slider.Duration + _beatmap.Posttime) ||
-                                        !(SongCursor > slider.Time - _beatmap.Preempt):
+                case Slider slider when !(clock.CurrentTime < slider.Time + slider.Duration + _beatmap.Posttime) ||
+                                        !(clock.CurrentTime > slider.Time - _beatmap.Preempt):
                     continue;
                 case Slider slider:
                 {
                     slider.Sliding =
-                        SongCursor >= slider.Time &&
-                        SongCursor <= slider.Time + slider.Duration;
+                        clock.CurrentTime >= slider.Time &&
+                        clock.CurrentTime <= slider.Time + slider.Duration;
 
                     int fbIndex = AcquireSliderFramebuffer();
                     var fb = _sliderFramebuffers[fbIndex];
@@ -771,20 +778,20 @@ public class GameView : View, IDisposable
                 
                     var maxSliderOpacity = 0.8f;
                     float sliderOpacity;
-                    if (SongCursor > slider.Time - _beatmap.Preempt && SongCursor < slider.Time)
+                    if (clock.CurrentTime > slider.Time - _beatmap.Preempt && clock.CurrentTime < slider.Time)
                     {
-                        sliderOpacity = Util.MapRange((float)SongCursor, (float)(slider.Time - _beatmap.Preempt),
+                        sliderOpacity = Util.MapRange((float)clock.CurrentTime, (float)(slider.Time - _beatmap.Preempt),
                             (float)(slider.Time - _beatmap.Preempt / 2), 0, maxSliderOpacity);
                     }
-                    else if (SongCursor >= slider.Time - _beatmap.Preempt / 2 &&
-                             SongCursor < slider.Time + slider.Duration)
+                    else if (clock.CurrentTime >= slider.Time - _beatmap.Preempt / 2 &&
+                             clock.CurrentTime < slider.Time + slider.Duration)
                     {
                         sliderOpacity = maxSliderOpacity;
                     }
                     else
                     {
                         float window = (float)(slider.Time + slider.Duration);
-                        sliderOpacity = Util.MapRange((float)SongCursor, window, window + _beatmap.Posttime,
+                        sliderOpacity = Util.MapRange((float)clock.CurrentTime, window, window + _beatmap.Posttime,
                             maxSliderOpacity,
                             0);
                     }
@@ -800,20 +807,20 @@ public class GameView : View, IDisposable
 
                     if (slider.Sliding)
                     {
-                        var position = slider.GetPositionAt(SongCursor);
+                        var position = slider.GetPositionAt(clock.CurrentTime);
 
                         var scaledX = _playfieldTopLeft.X + position.X * playfieldScale;
                         var scaledY = _playfieldTopLeft.Y + position.Y * playfieldScale;
                         var segmentSize = objectCircleSize * 1f;
 
                         Vector2 prevPos;
-                        if (SongCursor == slider.Time)
+                        if (clock.CurrentTime == slider.Time)
                         {
                             prevPos = slider.Position;
                         }
                         else
                         {
-                            prevPos = slider.GetPositionAt(SongCursor - 1);
+                            prevPos = slider.GetPositionAt(clock.CurrentTime - 1);
                         }
 
                         if (slider.SlideRepeatCount > 1) // sliderepeatcount = actual repeat count + 1
@@ -863,7 +870,7 @@ public class GameView : View, IDisposable
                         {
                             var ballIndex = Math.Clamp(
                                 (int)Util.MapRange(
-                                    (float)SongCursor,
+                                    (float)clock.CurrentTime,
                                     (float)slider.Time,
                                     (float)(slider.Time + slider.Duration),
                                     0,
@@ -966,7 +973,7 @@ public class GameView : View, IDisposable
 
         foreach (var particle in _hitResultParticles.ToList())
         {
-            var age = (float)(SongCursor - particle.StartTime);
+            var age = (float)(clock.CurrentTime - particle.StartTime);
             if (age < 0 || age > particle.MaxLife)
             {
                 _hitResultParticles.Remove(particle);
@@ -1015,7 +1022,7 @@ public class GameView : View, IDisposable
 
 
         // bkz: https://osu.ppy.sh/community/forums/topics/1857309?n=1
-        _health = Math.Abs((float)Math.Cos(SongCursor / 1000));
+        _health = Math.Abs((float)Math.Cos(clock.CurrentTime / 1000));
 
         var scoreboardBgWidth = Width / 2.5f;
 
@@ -1134,7 +1141,7 @@ public class GameView : View, IDisposable
         // timeline
         if (_debugEnabled)
         {
-            var songPointer = Util.MapRange((float)SongCursor, 0, (float)_songLength, 0, Width);
+            var songPointer = Util.MapRange((float)clock.CurrentTime, 0, (float)_songLength, 0, Width);
             r.DrawRectangle(0, Height - 20, songPointer, 20, yellow);
             var cursorSize = new Vector2(30, 60);
             r.DrawRectangle(songPointer - cursorSize.X / 2, Height - cursorSize.Y, cursorSize.X, cursorSize.Y,
@@ -1266,20 +1273,12 @@ public class GameView : View, IDisposable
         if (_debugEnabled)
         {
             r.DrawText(Fonts.Default,
-                $"Cursor: {SongCursor:F0}ms | TrackPos: {_songTrack?.Position:F0}ms\nSongLength: {_songLength:F0}ms\nSampleTracks: {AudioManager.Instance.SampleTracks.Count}/50",
+                $"Cursor: {clock.CurrentTime:F0}ms | TrackPos: {_songTrack?.Position:F0}ms\nSongLength: {_songLength:F0}ms\nSampleTracks: {AudioManager.Instance.SampleTracks.Count}/50",
                 new Vector2(10, 200), Height/45, new Color4<Rgba>(1, 1, 0, 1));
             r.FlushText(Fonts.Default);
         }
         
         r.PopScissor();
-    }
-
-    public override void OnMouseMove(MouseEventArgs e)
-    {
-        base.OnMouseMove(e);
-        
-        _mouseX = e.X;
-        _mouseY = e.Y;
     }
     
     public override void OnResize(ResizeEventArgs e)
@@ -1310,6 +1309,7 @@ public class GameView : View, IDisposable
         //Player?.SetReplay(Replay.ParseReplay(Resources.GetPath("Resources/Replays/fiery.osr")));
         //Player?.SetState(PlayerState.Replay);
         //_doubleTimeEnabled = true; _songTrack.Speed = 1.5f;
+        clock = new(false);
     }
 
     public override void OnExit()
@@ -1355,7 +1355,8 @@ public class GameView : View, IDisposable
         AudioManager.Instance.SampleVolume = 0.10f;
         _songTrack.Audio = _songAudio;
         _songLength = _songAudio.Length; // Todo: maybe move Length back to Audio
-        SongCursor = 0;
+        //clock.CurrentTime = 0;
+        clock.Seek(0);
         _songTrack.Speed = 1.00f;
 
         _startingTimer = WaitingTime + _beatmap.AudioLeadIn;
@@ -1368,7 +1369,7 @@ public class GameView : View, IDisposable
         ResetObjectsAfter(0);
 
         _sortedObjects = _beatmap.HitObjects
-            .OrderByDescending(h => Math.Abs(h.Time - SongCursor));
+            .OrderByDescending(h => Math.Abs(h.Time - clock.CurrentTime));
 
         _backgroundTexture?.Dispose();
         _backgroundTexture = new Texture(Path.Combine(_beatmap.Folder, _beatmap.BackgroundFile));

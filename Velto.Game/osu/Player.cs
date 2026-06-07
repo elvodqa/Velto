@@ -275,7 +275,7 @@ public class Player
         }
 
         // Sync GameView time smoothly
-        _gameView.SongCursor = GetInterpolatedReplayTime();
+        //_gameView.SongCursor = GetInterpolatedReplayTime();
         //_gameView.SongCursor = currentFrame.MsSinceStart;
     }
     
@@ -311,9 +311,9 @@ public class Player
             case PlayerState.Player:
                 if (_gameView == null) return Vector2.Zero;
 
-                float mx = Math.Clamp(Input.MouseX, _gameView.X, _gameView.X + _gameView.Width);
-                float my = Math.Clamp(Input.MouseY, _gameView.Y, _gameView.Y + _gameView.Height);
-                return new Vector2(mx - _gameView.X, my - _gameView.Y);
+                float mx = Math.Clamp(Input.MouseX, 0, 0 + _gameView.Width);
+                float my = Math.Clamp(Input.MouseY, 0, 0 + _gameView.Height);
+                return new Vector2(mx - 0, my - 0);
 
             case PlayerState.Autoplay:
                 return _playfieldOffset + _autoplayCursor * _scale;
@@ -391,7 +391,7 @@ public class Player
 
     private void Alternate(HitObject o)
     {
-        _gameView.SongCursor = o.Time; // I'm a slimey bastard
+        //_gameView.SongCursor = o.Time; // I'm a slimey bastard
         if (!_primaryLastPressed)
             ActionPrimaryPressed = true;
         else

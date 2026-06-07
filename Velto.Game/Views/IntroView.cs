@@ -1,4 +1,5 @@
 using OpenTK.Mathematics;
+using SDL;
 using Velto.Audio;
 using Velto.Core;
 using Velto.Graphics;
@@ -10,8 +11,6 @@ public class IntroView : View
     private float _circleRadius;
     private AudioChannel _menuHitAudio;
     private OsuContext _context;
-    private int _mouseX;
-    private int _mouseY;
     
     public IntroView(OsuContext context) : base(context)
     {
@@ -23,7 +22,7 @@ public class IntroView : View
         var relativeSize = Math.Min(Height, Width);
         var maxCircleRadius = relativeSize / 3;
 
-        if (Vector2.Distance(new Vector2(_mouseX, _mouseY), new Vector2(Width / 2, Height / 2)) < _circleRadius)
+        if (Vector2.Distance(new Vector2(Input.MouseX, Input.MouseY), new Vector2(Width / 2, Height / 2)) < _circleRadius)
         {
             _circleRadius += (int)dt;
         }
@@ -33,11 +32,24 @@ public class IntroView : View
         }
         _circleRadius = (float)Math.Clamp(_circleRadius, maxCircleRadius * 0.9f, maxCircleRadius * 1.1);
 
+        if (Input.IsMouseJustPressed(SDLButton.SDL_BUTTON_LEFT))
+        {
+            if (Vector2.Distance(new Vector2(Input.MouseX, Input.MouseY), new Vector2(Width / 2, Height / 2)) < _circleRadius)
+            {
+                /*ViewManager.Instance.SetTree([
+                    Create<GameView>(),
+                    Create<SongSelectorView>(),
+                ]);*/
+                AudioManager.Instance.PlaySample(_menuHitAudio);
+                ViewManager.Instance.Transition(this, new SongSelectView(_context),200);
+            }
+        }
+
     }
 
     public override void Draw(double dt, Renderer r)
     {
-        r.PushScissor(new ScissorRect(X, Y, Width, Height));
+        r.PushScissor(new ScissorRect(0, 0, Width, Height));
         r.Clear(Color4.Snow);
 
         r.DrawRectangle(0, 0, Width, Height, Color4.Black);
@@ -65,30 +77,7 @@ public class IntroView : View
     {
         base.OnExit();
     }
-
-    public override void OnMouseMove(MouseEventArgs e)
-    {
-        base.OnMouseMove(e);
-        _mouseX = e.X;
-        _mouseY = e.Y;
-
-    }
-
-    public override void OnMouseDown(MouseButton button, MouseEventArgs e)
-    {
-        base.OnMouseDown(button, e);
-
-        if (Vector2.Distance(new Vector2(e.X, e.Y), new Vector2(Width / 2, Height / 2)) < _circleRadius)
-        {
-            /*ViewManager.Instance.SetTree([
-                Create<GameView>(),
-                Create<SongSelectorView>(),
-            ]);*/
-            AudioManager.Instance.PlaySample(_menuHitAudio);
-            ViewManager.Instance.Transition(this, new SongSelectView(_context),200);
-        }
-    }
-
+    
     public override void OnResize(ResizeEventArgs e)
     {
         base.OnResize(e);

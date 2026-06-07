@@ -14,7 +14,7 @@ public struct MouseEventArgs(int x, int y)
     public int Y = y;
 }
 
-public abstract class View : IInputReceiver, IDisposable
+public abstract class View : IDisposable
 {
     protected IGameContext Context { get; }
 
@@ -41,8 +41,6 @@ public abstract class View : IInputReceiver, IDisposable
     // }
     
     public Framebuffer Framebuffer;
-    public float X { get; set; }
-    public float Y { get; set;  }
     public bool Enabled { get; set; } = true;
  
     public float Width
@@ -71,23 +69,9 @@ public abstract class View : IInputReceiver, IDisposable
         }
     }
     
-    public virtual bool HitTest(float mouseX, float mouseY)
-    {
-        return mouseX >= X && mouseX <= X + Width &&
-               mouseY >= Y && mouseY <= Y + Height;
-    }
-    
     public virtual void OnEnter() {}
     public virtual void OnExit() {}
     public virtual void OnResize(ResizeEventArgs e) {}
-    public virtual void OnMouseEnter() { }
-    public virtual void OnMouseLeave() { }
-    public virtual void OnMouseUp(MouseButton button, MouseEventArgs e) { }
-
-    public virtual void OnMouseDown(MouseButton button, MouseEventArgs e) { }
-
-    public virtual void OnMouseMove(MouseEventArgs e) { }
-    
     public abstract void Update(double dt);
     public abstract void Draw(double dt, Renderer r);
 

@@ -5,6 +5,7 @@ using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
 using SDL;
 using Velto.Audio;
+using Velto.Core.Timing;
 using Velto.Graphics;
 using static SDL.SDL3;
 
@@ -41,6 +42,7 @@ public unsafe class Game : IDisposable
     private int _frameCount = 0;
     private double _fps = 0;
     private bool _debugInfo = true;
+    private FramedClock framedClock;
 
     public Vector2 WindowSizeInPixels => Renderer.WindowSizeInPixels;
     
@@ -105,6 +107,8 @@ public unsafe class Game : IDisposable
         
         Fonts.Default = MSDFFont.Load(Resources.GetPath("Resources/Fonts/arial/arial"));
         ViewManager.Instance.Renderer = _renderer;
+
+        framedClock = new();
     }
     
     public virtual void Load() { }
@@ -158,7 +162,8 @@ public unsafe class Game : IDisposable
 
             if (Input.IsKeyboardJustReleased(SDL_Scancode.SDL_SCANCODE_F12)) _debugInfo = !_debugInfo;
             
-            Loop(deltaTime);
+            Loop(framedClock.ElapsedFrameTime);
+            
             
             SDL_GL_SwapWindow(_window);
         }
@@ -178,13 +183,15 @@ public unsafe class Game : IDisposable
 
         if (_debugInfo)
         {
-            _renderer.DrawText(Fonts.Default, $"FPS: {_fps.ToString("0000.0")} [{delta.ToString("00.00")}ms]" +
+            _renderer.DrawText(Fonts.Default, $"FPS: {framedClock.FramesPerSecond} [{framedClock.AverageFrameTime.ToString("00.00")}ms]" +
                                               $" | DrawCallCount: {_renderer.DrawCallCount:000000}\n" +
                                               $"Top: {ViewManager.Instance.Top}", 
                 new (5, 5), Renderer.WindowSizeInPixels.Y / 45, new Color4<Rgba>(1, 1, 1, 1));
         
             _renderer.FlushText(Fonts.Default);
         }
+        
+        framedClock.ProcessFrame();
     }
     
     private void RenderFromEventWatch()
@@ -208,7 +215,7 @@ public unsafe class Game : IDisposable
         _eventWatchTickLast = tickNow;
 
         Loop(deltaTime);
-
+        
         SDL_GL_SwapWindow(_window);
     }
 

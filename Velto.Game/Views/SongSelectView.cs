@@ -37,6 +37,18 @@ public class SongSelectView : View, IDisposable
             _cursor += 1;
             AudioManager.Instance.PlaySample(_context.Skin.MenuClick);
         }
+        
+        foreach (var box in _beatmapMetas)
+        {
+            var wasHovering = box.IsHovered;
+            box.IsHovered = false;
+            RectangleF collision = new(box.Position.X, box.Position.Y, box.Size.X, box.Size.Y);
+            if (collision.Contains(Input.MouseX, Input.MouseY))
+            {
+                if (!wasHovering) AudioManager.Instance.PlaySample(_context.Skin.MenuClick);
+                box.IsHovered = true;
+            }
+        }
 
         _cursor -= (int)Math.Clamp(Input.WheelY * 20, -1, 1);
         
@@ -62,6 +74,15 @@ public class SongSelectView : View, IDisposable
         {
             AudioManager.Instance.PlaySample(_context.Skin.MenuBack);
             ViewManager.Instance.Transition(this, new IntroView(_context), 200);
+        }
+
+        if (Input.IsMouseJustPressed(SDLButton.SDL_BUTTON_LEFT))
+        {
+            var meta = _beatmapMetas.FirstOrDefault(m => m.IsHovered);
+            if (meta != null)
+            {
+                PlayBeatmap(meta.Beatmap);
+            }
         }
     }
 
@@ -163,36 +184,6 @@ public class SongSelectView : View, IDisposable
         Dispose(true);
         base.Dispose();
         GC.SuppressFinalize(this);
-    }
-    
-    public override void OnMouseDown(MouseButton button, MouseEventArgs e)
-    {
-        base.OnMouseDown(button, e);
-
-        if (button == MouseButton.Left)
-        {
-            var meta = _beatmapMetas.FirstOrDefault(m => m.IsHovered);
-            if (meta != null)
-            {
-                PlayBeatmap(meta.Beatmap);
-            }
-        }
-    }
-
-    public override void OnMouseMove(MouseEventArgs e)
-    {
-        base.OnMouseMove(e);
-        foreach (var box in _beatmapMetas)
-        {
-            var wasHovering = box.IsHovered;
-            box.IsHovered = false;
-            RectangleF collision = new(box.Position.X, box.Position.Y, box.Size.X, box.Size.Y);
-            if (collision.Contains(Input.MouseX, Input.MouseY))
-            {
-                if (!wasHovering) AudioManager.Instance.PlaySample(_context.Skin.MenuClick);
-                box.IsHovered = true;
-            }
-        }
     }
     
     public override void OnResize(ResizeEventArgs e)
