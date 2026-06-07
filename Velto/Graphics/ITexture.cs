@@ -20,4 +20,5 @@ public interface ITexture : IDisposable
     int Height { get; }
     TextureFilteringMode FilteringMode { get; }
     TextureWrapMode WrapMode { get; }
+    string Path { get; }
 }

@@ -5,6 +5,7 @@ using Velto.Audio;
 using Velto.Core;
 using Velto.Game.osu;
 using Velto.Graphics;
+using Velto.Graphics.OpenGL;
 
 namespace Velto.Game.Views;
 
@@ -16,10 +17,11 @@ public class SongSelectScreen : Screen, IDisposable
     private int _cursor = 0;
   
     private OsuContext _context;
-    private Dictionary<string, Texture> _textureCache = new();
-    
-    public SongSelectScreen(OsuContext context) : base(context)
+    private Dictionary<string, ITexture> _textureCache = new();
+    private IGraphicsDevice device;
+    public SongSelectScreen(IGraphicsDevice device, OsuContext context) : base(device, context)
     {
+        this.device = device;
         _context = context;
     }
 
@@ -73,7 +75,7 @@ public class SongSelectScreen : Screen, IDisposable
         if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_ESCAPE))
         {
             AudioManager.Instance.PlaySample(_context.Skin.MenuBack);
-            Transition(new IntroScreen(_context), 200);
+            Transition(new IntroScreen(device, _context), 200);
         }
 
         if (Input.IsMouseJustPressed(SDLButton.SDL_BUTTON_LEFT))
@@ -86,9 +88,9 @@ public class SongSelectScreen : Screen, IDisposable
         }
     }
 
-    public override void Draw(Renderer r)
+    public override void Draw(IRenderer r)
     {
-        r.PushScissor(0, 0, Width, Height);
+        r.PushScissor(0, 0, (int)Width, (int)Height);
         r.DrawTexture(_context.Skin.MenuBackground, 0, 0, Width, Height, Color4.White);
         
         for (int i = 0; i < _cursor; i++)
@@ -106,7 +108,7 @@ public class SongSelectScreen : Screen, IDisposable
         r.PopScissor();
     }
     
-    private void DrawBeatmapBox(Renderer r, BeatmapMeta box)
+    private void DrawBeatmapBox(IRenderer r, BeatmapMeta box)
     {
         var selectedColor = box.IsHovered
             ? Color4.Deeppink
@@ -122,7 +124,7 @@ public class SongSelectScreen : Screen, IDisposable
 
         var thumbWidth = BoxHeight * 1.5f;
 
-        var thumb = Renderer.WhiteTexture; // _textureCache[box.Path];
+        var thumb = OpenGLRenderer.WhiteTexture; // _textureCache[box.Path];
         r.DrawTexture(
             thumb,
             box.Position.X,
@@ -146,7 +148,7 @@ public class SongSelectScreen : Screen, IDisposable
     private void PlayBeatmap(Beatmap beatmap)
     {
         AudioManager.Instance.PlaySample(_context.Skin.MenuClick);
-        var game = new GameScreen(_context);
+        var game = new GameScreen(device, _context);
         game.SetBeatmap(beatmap);
         game.Player.SetState(PlayerState.Autoplay);
         Transition(game, 200);

@@ -19,11 +19,11 @@ public class GameBase : Core.Game
         
         _context = new OsuContext()
         {
-            Skin = new Skin(Resources.GetPath($"Resources/Textures/rafis")),
+            Skin = new Skin(GraphicsDevice, Resources.GetPath($"Resources/Textures/rafis")),
             SystemTrack = AudioManager.Instance.CreateTrack(),
         };
         
-        SetScreen(new IntroScreen(_context));
+        SetScreen(new IntroScreen(GraphicsDevice, _context));
         Window.Title = "Velto!";
     }
 }

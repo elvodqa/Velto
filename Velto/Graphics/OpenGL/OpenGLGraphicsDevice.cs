@@ -11,11 +11,11 @@ public class OpenGLGraphicsDevice : IGraphicsDevice
         get => GraphicsBackend.OpenGL;
     }
 
-    private Window window;
+    public Window Window { get; private set; }
 
     public OpenGLGraphicsDevice(Window window)
     {
-        this.window = window;
+        this.Window = window;
     }
 
     public ITexture CreateTexture(int width, int height, TextureFilteringMode filteringMode = TextureFilteringMode.Linear,
@@ -25,19 +25,20 @@ public class OpenGLGraphicsDevice : IGraphicsDevice
     }
 
     public ITexture CreateTexture(string path, TextureFilteringMode filteringMode = TextureFilteringMode.Linear,
-        TextureWrapMode wrapMode = TextureWrapMode.ClampToEdge)
+        TextureWrapMode wrapMode = TextureWrapMode.ClampToEdge, bool generateMipmaps = true, int verticallyFlip = 1)
     {
-        return new OpenGLTexture(path, filteringMode, wrapMode);
+        return new OpenGLTexture(path, filteringMode, wrapMode, generateMipmaps, verticallyFlip);
     }
 
     public IFramebuffer CreateFramebuffer(int width, int height, TextureFilteringMode filteringMode = TextureFilteringMode.Linear)
     {
-        throw new NotImplementedException();
+        return new OpenGLFramebuffer(width, height, filteringMode);
     }
     
     public void Dispose()
     {
         
     }
+    
 
 }

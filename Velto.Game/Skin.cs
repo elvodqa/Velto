@@ -25,38 +25,38 @@ public class Skin : IDisposable
     
     public string Folder { get; private set; }  
     
-    public Texture HitCircle { get; private set; }
-    public Texture HitCircleOverlay { get; private set; }
-    public Texture ApproachCircle { get; private set; }
-    public Texture Cursor { get; private set; }
-    public Texture CursorTrail { get; private set; }
-    public Texture CursorMiddle { get; private set; }
-    public Texture ReverseArrow { get; private set;  }
-    public Texture SliderFollowCircle { get; private set; }
-    public Texture SliderStartCircle { get; private set; }
-    public Texture SliderSpec { get; private set; }
-    public Texture ModAutoplay { get; private set; }
-    public Texture ModNightcore { get; private set; }
-    public Texture ModHidden { get; private set; }
-    public List<Texture> SliderBalls { get; private set; } = new();
-    public Texture[] DefaultNumbers { get; private set; } = new Texture[10];
-    public Texture[] ScoreNumbers { get; private set; } = new Texture[10];
-    public Texture InputOverlayBackground { get; private set; } 
-    public Texture InputOverlayKey { get; private set; } 
-    public Texture Hit300 { get; private set; }
-    public Texture Hit100 { get; private set; }
-    public Texture Hit50 { get; private set; }
-    public Texture Hit0 { get; private set; }
-    public Texture ScorebarBg { get; private set; }
-    public Texture ScorebarColour { get; private set; }
-    public Texture ScoreX { get; private set; }
-    public Texture ScorePercent { get; private set; }
-    public Texture PlayUnranked { get; private set; }
-    public Texture FollowPoint { get; private set; }
-    public List<Texture> FollowPoints { get; private set; } = new();
+    public ITexture HitCircle { get; private set; }
+    public ITexture HitCircleOverlay { get; private set; }
+    public ITexture ApproachCircle { get; private set; }
+    public ITexture Cursor { get; private set; }
+    public ITexture CursorTrail { get; private set; }
+    public ITexture CursorMiddle { get; private set; }
+    public ITexture ReverseArrow { get; private set;  }
+    public ITexture SliderFollowCircle { get; private set; }
+    public ITexture SliderStartCircle { get; private set; }
+    public ITexture SliderSpec { get; private set; }
+    public ITexture ModAutoplay { get; private set; }
+    public ITexture ModNightcore { get; private set; }
+    public ITexture ModHidden { get; private set; }
+    public List<ITexture> SliderBalls { get; private set; } = new();
+    public ITexture[] DefaultNumbers { get; private set; } = new ITexture[10];
+    public ITexture[] ScoreNumbers { get; private set; } = new ITexture[10];
+    public ITexture InputOverlayBackground { get; private set; } 
+    public ITexture InputOverlayKey { get; private set; } 
+    public ITexture Hit300 { get; private set; }
+    public ITexture Hit100 { get; private set; }
+    public ITexture Hit50 { get; private set; }
+    public ITexture Hit0 { get; private set; }
+    public ITexture ScorebarBg { get; private set; }
+    public ITexture ScorebarColour { get; private set; }
+    public ITexture ScoreX { get; private set; }
+    public ITexture ScorePercent { get; private set; }
+    public ITexture PlayUnranked { get; private set; }
+    public ITexture FollowPoint { get; private set; }
+    public List<ITexture> FollowPoints { get; private set; } = new();
     
-    public Texture MenuBackground { get; private set; }
-    public Texture MenuButtonBackground { get; private set; }
+    public ITexture MenuBackground { get; private set; }
+    public ITexture MenuButtonBackground { get; private set; }
     public AudioChannel MenuClick { get; private set;  }
     public AudioChannel MenuBack { get; private set;  }
     public AudioChannel PauseRetryClick { get; private set; }
@@ -65,11 +65,12 @@ public class Skin : IDisposable
     public SampleSet Soft { get; private set; }
     public SampleSet Drum { get; private set; }
     public AudioChannel ComboBreak { get; private set; }
+
+    private IGraphicsDevice device;
     
-  
-    
-    public Skin(string folderPath)
+    public Skin(IGraphicsDevice device, string folderPath)
     {
+        this.device = device;
         Folder = folderPath;
         var parser = new IniDataParser();
         parser.Configuration.SkipInvalidLines = true;
@@ -81,39 +82,39 @@ public class Skin : IDisposable
             
         }
         
-        HitCircle = GetElementTexture("hitcircle", "hitcircle");
-        HitCircleOverlay = GetElementTexture("hitcircleoverlay", "hitcircleoverlay");
-        ApproachCircle = GetElementTexture("approachcircle", "hitcircleoverlay");
-        Cursor = GetElementTexture("cursor", "cursor");
-        CursorTrail = GetElementTexture("cursortrail", "cursor");
-        ReverseArrow = GetElementTexture("reversearrow", "reversearrow");
-        SliderFollowCircle = GetElementTexture("sliderfollowcircle", "sliderfollowcircle");
-        SliderStartCircle = GetElementTexture("sliderstartcircle", "hitcircle");
-        ModAutoplay = GetElementTexture("selection-mod-autoplay", "selection-mod-autoplay");
-        ModNightcore = GetElementTexture("selection-mod-nightcore", "selection-mod-nightcore");
-        ModHidden = GetElementTexture("selection-mod-hidden", "selection-mod-hidden");
+        HitCircle = GetElementITexture("hitcircle", "hitcircle");
+        HitCircleOverlay = GetElementITexture("hitcircleoverlay", "hitcircleoverlay");
+        ApproachCircle = GetElementITexture("approachcircle", "hitcircleoverlay");
+        Cursor = GetElementITexture("cursor", "cursor");
+        CursorTrail = GetElementITexture("cursortrail", "cursor");
+        ReverseArrow = GetElementITexture("reversearrow", "reversearrow");
+        SliderFollowCircle = GetElementITexture("sliderfollowcircle", "sliderfollowcircle");
+        SliderStartCircle = GetElementITexture("sliderstartcircle", "hitcircle");
+        ModAutoplay = GetElementITexture("selection-mod-autoplay", "selection-mod-autoplay");
+        ModNightcore = GetElementITexture("selection-mod-nightcore", "selection-mod-nightcore");
+        ModHidden = GetElementITexture("selection-mod-hidden", "selection-mod-hidden");
         
-        InputOverlayBackground = GetElementTexture("inputoverlay-background", "inputoverlay-background");
-        InputOverlayKey = GetElementTexture("inputoverlay-key", "inputoverlay-key");
-        Hit300 = GetElementTexture("hit300", "hit300");
-        Hit100 = GetElementTexture("hit100", "hit100");
-        Hit50 = GetElementTexture("hit50", "hit50");
-        Hit0 = GetElementTexture("Hit0", "Hit0");
-        ScorebarBg = GetElementTexture("scorebar-bg", "scorebar-bg");
-        ScorebarColour = GetElementTexture("scorebar-colour", "scorebar-colour");
-        ScoreX = GetElementTexture("score-x", "score-x");
-        ScorePercent = GetElementTexture("score-percent", "score-percent");
+        InputOverlayBackground = GetElementITexture("inputoverlay-background", "inputoverlay-background");
+        InputOverlayKey = GetElementITexture("inputoverlay-key", "inputoverlay-key");
+        Hit300 = GetElementITexture("hit300", "hit300");
+        Hit100 = GetElementITexture("hit100", "hit100");
+        Hit50 = GetElementITexture("hit50", "hit50");
+        Hit0 = GetElementITexture("Hit0", "Hit0");
+        ScorebarBg = GetElementITexture("scorebar-bg", "scorebar-bg");
+        ScorebarColour = GetElementITexture("scorebar-colour", "scorebar-colour");
+        ScoreX = GetElementITexture("score-x", "score-x");
+        ScorePercent = GetElementITexture("score-percent", "score-percent");
 
-        PlayUnranked = GetElementTexture("play-unranked", "play-unranked");
+        PlayUnranked = GetElementITexture("play-unranked", "play-unranked");
 
-        MenuBackground = GetElementTexture("menu-background", "menu-background");
-        MenuButtonBackground = GetElementTexture("menu-button-background", "menu-button-background");
+        MenuBackground = GetElementITexture("menu-background", "menu-background");
+        MenuButtonBackground = GetElementITexture("menu-button-background", "menu-button-background");
         
         for (var i = 0; i < 10; i++)
-            ScoreNumbers[i] = GetElementTexture($"score-{i}", $"score-{i}");
+            ScoreNumbers[i] = GetElementITexture($"score-{i}", $"score-{i}");
         
         for (var i = 0; i < 10; i++)
-            DefaultNumbers[i] = GetElementTexture($"default-{i}", $"default-{i}");
+            DefaultNumbers[i] = GetElementITexture($"default-{i}", $"default-{i}");
 
         if (Path.GetFileName(DefaultNumbers[0].Path).Contains("@2x")) NumbersHd = true; 
         if (Path.GetFileName(SliderStartCircle.Path).Contains("sliderfollowcircle")) SliderStartCircleExists = true; 
@@ -128,23 +129,23 @@ public class Skin : IDisposable
                 if (!ElementExists($"sliderb{i}"))
                     break;
                 
-                SliderBalls.Add(GetElementTexture($"sliderb{i}", "sliderb-nd"));
+                SliderBalls.Add(GetElementITexture($"sliderb{i}", "sliderb-nd"));
             }
         }
         else
         {
-            SliderBalls.Add(GetElementTexture("sliderb", "sliderb-nd"));
+            SliderBalls.Add(GetElementITexture("sliderb", "sliderb-nd"));
         }
 
         if (ElementExists("cursormiddle"))
         {
             HasCursorMiddle = true;
-            CursorMiddle = GetElementTexture("cursormiddle", "cursormiddle");
+            CursorMiddle = GetElementITexture("cursormiddle", "cursormiddle");
         }
         if (ElementExists("sliderb-spec"))
         {
             HasSliderSpec = true;
-            SliderSpec = GetElementTexture("sliderb-spec", "sliderb-spec");
+            SliderSpec = GetElementITexture("sliderb-spec", "sliderb-spec");
         }
 
         if (ElementExists("followpoint-0"))
@@ -155,13 +156,13 @@ public class Skin : IDisposable
                 if (!ElementExists($"followpoint-{i}"))
                     break;
                 
-                SliderBalls.Add(GetElementTexture($"followpoint-{i}", "followpoint"));
+                SliderBalls.Add(GetElementITexture($"followpoint-{i}", "followpoint"));
             }
             
         }
         else
         {
-            FollowPoint = GetElementTexture("followpoint", "followpoint");
+            FollowPoint = GetElementITexture("followpoint", "followpoint");
         }
 
         Normal = new SampleSet(Folder, SampleSet.SampleSetType.Normal);
@@ -189,7 +190,7 @@ public class Skin : IDisposable
         return File.Exists($"{Folder}/{element}.png") || File.Exists($"{Folder}/{element}@2x.png");
     }
 
-    private Texture GetElementTexture(string name, string fallback)
+    private ITexture GetElementITexture(string name, string fallback)
     {
         string element;
         // check @2x
@@ -207,13 +208,13 @@ public class Skin : IDisposable
         }
         else
         {
-            return GetDefaultTexture(name, fallback);
+            return GetDefaultITexture(name, fallback);
         }
 
-        return new Texture($"{Folder}/{element}");
+        return device.CreateTexture($"{Folder}/{element}");
     }
 
-    private Texture GetDefaultTexture(string name, string fallback)
+    private ITexture GetDefaultITexture(string name, string fallback)
     {
         string element;
         // check @2x
@@ -230,7 +231,7 @@ public class Skin : IDisposable
             element = fallback + ".png";
         }
 
-        return new Texture(Path.Combine(Resources.DefaultSkinPath, element));
+        return device.CreateTexture(Path.Combine(Resources.DefaultSkinPath, element));
     }
     
     private bool CheckAudio(string name, out string extension)

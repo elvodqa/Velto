@@ -1,8 +1,8 @@
 using OpenTK.Graphics.OpenGL;
 
-namespace Velto.Graphics;
+namespace Velto.Graphics.OpenGL;
 
-public unsafe class BufferObject<TDataType> : IDisposable where TDataType : unmanaged
+public unsafe class OpenGLBufferObject<TDataType> : IDisposable where TDataType : unmanaged
 {
     private readonly BufferTarget _bufferTarget;
     private BufferUsage _bufferUsage;
@@ -11,13 +11,13 @@ public unsafe class BufferObject<TDataType> : IDisposable where TDataType : unma
     /// <summary>
     ///     Creates a GL buffer without allocating storage. You must call BufferData/Allocate before BufferSubData.
     /// </summary>
-    public BufferObject(BufferTarget target)
+    public OpenGLBufferObject(BufferTarget target)
     {
         _bufferTarget = target;
         _handle = GL.GenBuffer();
     }
 
-    public BufferObject(int elementCount, BufferTarget bufferTarget, BufferUsage bufferUsage)
+    public OpenGLBufferObject(int elementCount, BufferTarget bufferTarget, BufferUsage bufferUsage)
     {
         _bufferTarget = bufferTarget;
         _bufferUsage = bufferUsage;
@@ -26,7 +26,7 @@ public unsafe class BufferObject<TDataType> : IDisposable where TDataType : unma
         Allocate(elementCount, bufferUsage);
     }
 
-    public BufferObject(Span<TDataType> data, BufferTarget bufferTarget, BufferUsage bufferUsage)
+    public OpenGLBufferObject(Span<TDataType> data, BufferTarget bufferTarget, BufferUsage bufferUsage)
     {
         _bufferTarget = bufferTarget;
         _bufferUsage = bufferUsage;

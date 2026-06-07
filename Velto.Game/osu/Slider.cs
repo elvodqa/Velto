@@ -1,5 +1,6 @@
 using OpenTK.Mathematics;
 using Velto.Graphics;
+using Velto.Graphics.OpenGL;
 
 namespace Velto.Game.osu;
 
@@ -42,15 +43,6 @@ public class Slider : HitObject
 
     public static double FORGIVING_TIME = 50f;
     
-    
-    public Framebuffer SliderFramebuffer;
-    public Vector2 CacheOffset;
-    public (float[] vbo, uint[] ibo) VboData, IboData;
-    public BufferObject<float> Vbo;
-    public BufferObject<uint> Ebo;
-    public VertexArrayObject<float, uint> Vao;
-    public int IndexCount;
-
     // Duration for a single traversal of the path (i.e., one "span"), in milliseconds.
     public double SpanDuration;
 

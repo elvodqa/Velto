@@ -1,6 +1,7 @@
 using OpenTK.Mathematics;
 using SDL;
 using Velto.Graphics;
+using Velto.Graphics.OpenGL;
 
 namespace Velto.Core;
 
@@ -20,7 +21,7 @@ internal class ScreenManager
     }
     
     public static ScreenManager Instance { get; } = new();
-    public Renderer Renderer;
+    public IRenderer Renderer;
     
     private readonly List<Screen> _views = new();
     private Screen _hovered;
@@ -30,7 +31,7 @@ internal class ScreenManager
     
     public void ResizeCallback(int width, int height)
     {
-        var size = Renderer.WindowSizeInPixels;
+        var size = Renderer.Window.WindowSize;
         foreach (var view in _views)
         {
             view.OnResize(new()
@@ -68,23 +69,23 @@ internal class ScreenManager
         }
     }
     
-    public void Draw(Renderer r)
+    public void Draw(IRenderer r)
     {
         foreach (var view in _views)
         {
-            Renderer.BindFramebuffer(view.Framebuffer);
+            Renderer.PushFramebuffer(view.Framebuffer);
             view.Draw(r);
-            Renderer.UnbindFramebuffer(view.Framebuffer);   
+            Renderer.PopFramebuffer();
         }
     }
 
     public void Present()
     {
-        Renderer.PushScissor(new ScissorRect(0, 0, (int)Renderer.WindowSizeInPixels.X, (int)Renderer.WindowSizeInPixels.Y));
+        Renderer.PushScissor(new ScissorRect(0, 0, (int)Renderer.Window.WindowSize.X, (int)Renderer.Window.WindowSize.Y));
         Renderer.Clear(new(0, 0, 0, 1));
         foreach (var view in _views)
         {
-            Renderer.DrawTexture(view.Framebuffer.Texture, 0, 0, view.Width, view.Height, new Color4<Rgba>(1, 1, 1, 1));
+            Renderer.DrawFramebuffer(view.Framebuffer, new Vector2(0, 0), new Vector2(view.Width, view.Height), new Color4<Rgba>(1, 1, 1, 1));
             foreach (var transition in _transitions)
             {
                 if (view == transition.From || view == transition.To)
@@ -97,14 +98,14 @@ internal class ScreenManager
                             1
                         );
                         var alpha = transition.DisappearFunc(t);
-                        Renderer.DrawRectangle(0, 0,view.Width, view.Height, 
+                        Renderer.DrawRectangle(new Vector2(0, 0),new Vector2(view.Width, view.Height), 
                             Color4.Black with { W = alpha });
                     }
                     if (transition.Timer >= transition.Length / 2)
                     {
                         var t = (transition.Timer - ((transition.Length / 2))) / (transition.Length / 2);
                         var alpha = transition.AppearFunc(t); //transition.EasingFunc(transition.Timer / transition.Length);
-                        Renderer.DrawRectangle(0, 0,view.Width, view.Height, 
+                        Renderer.DrawRectangle(new Vector2(0, 0),new Vector2(view.Width, view.Height), 
                             Color4.Black with { W = 1-alpha });
                     }
                 }

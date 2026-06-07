@@ -8,6 +8,7 @@ using SDL;
 using Velto.Audio;
 using Velto.Core.Timing;
 using Velto.Graphics;
+using Velto.Graphics.OpenGL;
 using static SDL.SDL3;
 
 namespace Velto.Core;
@@ -29,31 +30,45 @@ public class BindingContext : IBindingsContext
 public unsafe class Game : IDisposable
 {
     public Window Window { get; private set; }
+    public IGraphicsDevice GraphicsDevice { get; private set; }
     
     private GCHandle _eventWatchHandle;
     private IntPtr _eventWatchUserdata;
     private ulong _eventWatchTickLast;
     private bool _running;
-    private Renderer _renderer;
+    private IRenderer _renderer;
     private double _fpsTimer = 0.0;
     private int _frameCount = 0;
     private double _fps = 0;
     private bool _debugInfo = true;
    
     private FramedClock drawClock;
+    private GraphicsBackend backend;
     
-    public Game()
+    public Game(GraphicsBackend backend = GraphicsBackend.OpenGL)
     {
+        this.backend = backend;
     }
 
     private void Initialize()
     {
-        Window = new Window(GraphicsBackend.OpenGL);
+        if (backend == GraphicsBackend.OpenGL)
+        {
+            Window = new Window(GraphicsBackend.OpenGL);
+            GraphicsDevice = new OpenGLGraphicsDevice(Window);
+            _renderer = new OpenGLRenderer(GraphicsDevice as OpenGLGraphicsDevice, Window);
+        }
+        if (backend == GraphicsBackend.Metal)
+        {
+            Window = new Window(GraphicsBackend.Metal);
+            GraphicsDevice = new OpenGLGraphicsDevice(Window);
+        }
+        
+        
         Window.SetLoop(Loop);
+       
         
-        _renderer = new(Window.Handle);
-        
-        Fonts.Default = MSDFFont.Load(Resources.GetPath("Resources/Fonts/arial/arial"));
+        Fonts.Default = Font.Load(GraphicsDevice, Resources.GetPath("Resources/Fonts/arial/arial"));
         ScreenManager.Instance.Renderer = _renderer;
     }
     
@@ -95,13 +110,13 @@ public unsafe class Game : IDisposable
         var input = (double)(inputEnd - inputStart) * 1000f / Stopwatch.Frequency;
         var update = (double)(updateEnd - updateStart) * 1000f / Stopwatch.Frequency;
         var draw = (double)(draweEnd - drawBegin) * 1000f / Stopwatch.Frequency;
-        
-       
+
+        var count = (_renderer as OpenGLRenderer).DrawCallCount;
         _renderer.DrawText(Fonts.Default, $"FPS: {Window.Clock.FramesPerSecond} [{Window.Clock.AverageFrameTime.ToString("00.00")}ms]" +
-                                          $" | DrawCallCount: {_renderer.DrawCallCount:000000}\n" +
+                                          $" | DrawCallCount: {count:000000}\n" +
                                           $"Screen: {ScreenManager.Instance.Top}\n"
             +$"Input {input.ToString("00.0000")}ms | Update {update.ToString("00.0000")}ms | Draw {draw.ToString("00.0000")}ms", 
-            new (5, 5), Renderer.WindowSizeInPixels.Y / 45, new Color4<Rgba>(1, 1, 1, 1));
+            new (5, 5), Window.WindowSize.Y / 45, new Color4<Rgba>(1, 1, 1, 1));
     
         _renderer.FlushText(Fonts.Default);
     }

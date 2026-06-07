@@ -3,7 +3,7 @@ using StbImageSharp;
 
 namespace Velto.Graphics.OpenGL;
 
-public unsafe class OpenGLTexture : ITexture
+public class OpenGLTexture : ITexture
 {
     public int Width { get; private set; }
     public int Height { get; private set; }
@@ -11,20 +11,20 @@ public unsafe class OpenGLTexture : ITexture
     public TextureFilteringMode FilteringMode { get; }
     public TextureWrapMode WrapMode { get; }
     
-    public string Path;
+    public string Path { get; private set; }
     public int Handle;
     
     private readonly TextureFilteringMode _filterMode;
     private readonly TextureWrapMode _wrapMode;
         
-    public OpenGLTexture(string path, TextureFilteringMode filterMode = TextureFilteringMode.Linear, 
+    public unsafe OpenGLTexture(string path, TextureFilteringMode filterMode = TextureFilteringMode.Linear, 
         TextureWrapMode wrapMode = TextureWrapMode.Repeat,
-        bool generateMipmaps = true)
+        bool generateMipmaps = true, int flipVertically = 1)
     {
         Path = path;
         _filterMode = filterMode;
         _wrapMode = wrapMode;
-        StbImage.stbi_set_flip_vertically_on_load(1);
+        StbImage.stbi_set_flip_vertically_on_load(flipVertically);
         var result = ImageResult.FromMemory(File.ReadAllBytes(path), ColorComponents.RedGreenBlueAlpha);
 
         Width = result.Width;

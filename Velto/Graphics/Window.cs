@@ -32,6 +32,12 @@ public unsafe class Window : IDisposable
 
     public SDL_Window* Handle { get; private set; }
     public SDL_GLContextState* MainGLContextState { get; private set; }
+    public IntPtr MetalView { get; private set; }
+    public IntPtr MetalLayer { get; private set; }
+
+    public float DisplayScale => SDL_GetWindowDisplayScale(Handle);
+    
+    
     public Vector2 WindowSize
     {
         get
@@ -50,6 +56,7 @@ public unsafe class Window : IDisposable
     private ulong eventWatchTickLast;
     private GCHandle eventWatchHandle;
     private IntPtr eventWatchUserdata;
+    
     
     public Window(GraphicsBackend _backend)
     {
@@ -101,6 +108,16 @@ public unsafe class Window : IDisposable
             Logger.Instance.Info($"GLSL:     {GL.GetString(StringName.ShadingLanguageVersion)}");
             Logger.Instance.Info($"Swap:     {interval}");
         }
+
+        if (backend == GraphicsBackend.Metal)
+        {
+            Handle = SDL_CreateWindow(Title, 1280, 720, SDL_WindowFlags.SDL_WINDOW_METAL 
+                                                        | SDL_WindowFlags.SDL_WINDOW_RESIZABLE
+                                                        | SDL_WindowFlags.SDL_WINDOW_HIGH_PIXEL_DENSITY
+            );
+            MetalView = SDL_Metal_CreateView(Handle);
+            MetalLayer = SDL_Metal_GetLayer(MetalView);
+        }
         
         eventWatchHandle = GCHandle.Alloc(this);
         eventWatchUserdata = GCHandle.ToIntPtr(eventWatchHandle);
@@ -135,7 +152,7 @@ public unsafe class Window : IDisposable
                         running = false;
                         break;
                     case (uint)SDL_EventType.SDL_EVENT_WINDOW_RESIZED:
-                        var size = Renderer.WindowSizeInPixels;
+                        var size = WindowSize;
                         ScreenManager.Instance.ResizeCallback(ev.window.data1, ev.window.data2);
                         Logger.Instance.Info($"Window Resized: {ev.window.data1} x {ev.window.data2}");
                         break;
@@ -195,7 +212,7 @@ public unsafe class Window : IDisposable
         if (type == SDL_EventType.SDL_EVENT_WINDOW_RESIZED ||
             type == SDL_EventType.SDL_EVENT_WINDOW_EXPOSED)
         {
-            var size = Renderer.WindowSizeInPixels;
+            var size = window.WindowSize;
             ScreenManager.Instance.ResizeCallback((int)size.X, (int)size.Y);
             window.RenderFromEventWatch();
         }
@@ -224,6 +241,7 @@ public unsafe class Window : IDisposable
         SDL_GL_DestroyContext(contextState);
     }
     
+    
     public void Dispose()
     {
         if (eventWatchUserdata != IntPtr.Zero)
@@ -234,7 +252,11 @@ public unsafe class Window : IDisposable
 
         if (eventWatchHandle.IsAllocated)
             eventWatchHandle.Free();
-        
+
+        if (backend == GraphicsBackend.Metal)
+        {
+            SDL_Metal_DestroyView(MetalView);
+        }
         if (MainGLContextState != null) DestroyGLContext(MainGLContextState);
         SDL_DestroyWindow(Handle);
     }
