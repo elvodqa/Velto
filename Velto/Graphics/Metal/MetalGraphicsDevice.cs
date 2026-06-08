@@ -19,8 +19,8 @@ public class MetalGraphicsDevice : IGraphicsDevice
 
 
         Device = MTLDevice.CreateSystemDefaultDevice();
-        MetalLayer = new CAMetalLayer(window.MetalLayer);
-        //MetalLayer = new CAMetalLayer(SDL.SDL3.SDL_GetRenderMetalLayer(Window.SdlRenderer));
+        //MetalLayer = new CAMetalLayer(window.MetalLayer);
+        MetalLayer = new CAMetalLayer(SDL.SDL3.SDL_GetRenderMetalLayer(Window.SdlRenderer));
         
         MetalLayer.Device = Device;
         MetalLayer.PixelFormat = MTLPixelFormat.RGBA8Unorm;
