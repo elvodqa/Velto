@@ -4,6 +4,7 @@ using OpenTK.Graphics;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
 using SDL;
+using SharpMetal.ObjectiveCCore;
 using Velto.Core;
 using Velto.Core.Timing;
 using static SDL.SDL3;
@@ -111,6 +112,11 @@ public unsafe class Window : IDisposable
 
         if (backend == GraphicsBackend.Metal)
         {
+            ObjectiveC.LinkMetal();
+            ObjectiveC.LinkCoreGraphics();
+            ObjectiveC.LinkAppKit();
+            ObjectiveC.LinkMetalKit();
+            
             Handle = SDL_CreateWindow(Title, 1280, 720, SDL_WindowFlags.SDL_WINDOW_METAL 
                                                         | SDL_WindowFlags.SDL_WINDOW_RESIZABLE
                                                         | SDL_WindowFlags.SDL_WINDOW_HIGH_PIXEL_DENSITY

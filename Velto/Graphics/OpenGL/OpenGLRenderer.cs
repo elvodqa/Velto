@@ -93,7 +93,7 @@ public unsafe class OpenGLRenderer : IRenderer
 
     private OpenGLGraphicsDevice device;
     private static SDL_Window* _window;
-    public uint DrawCallCount = 0;
+    public uint DrawCallCount { get; private set; }
     
     public OpenGLRenderer(OpenGLGraphicsDevice device, Window window)
     {
@@ -266,7 +266,7 @@ public unsafe class OpenGLRenderer : IRenderer
 
     public void EndFrame()
     {
-        throw new NotImplementedException();
+        // doesn't do shit
     }
     
     private void SetFramebuffer(IFramebuffer? framebuffer = null)
@@ -339,12 +339,7 @@ public unsafe class OpenGLRenderer : IRenderer
         GL.ClearColor(color.X, color.Y, color.Z, color.W);
         GL.Clear(ClearBufferMask.ColorBufferBit /*| ClearBufferMask.DepthBufferBit*/);
     }
-
-    public void DrawTexture(ITexture texture, float x, float y, float width, float height, Color4<Rgba> color, float rotation = 0)
-    {
-        DrawTexture(texture, new Vector2(x, y), new Vector2(width, height), color, rotation);
-    }
-
+    
     public void DrawRectangleCentered(Vector2 center, float w, float h, Color4<Rgba> color,
         float rotation = 0)
     {

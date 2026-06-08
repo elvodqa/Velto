@@ -14,6 +14,7 @@
       <PackageReference Include="ppy.SDL3-CS" Version="2026.520.0" />
       <PackageReference Include="ppy.SDL3_mixer-CS" Version="2026.520.0" />
       <PackageReference Include="SevenZip" Version="19.0.0" />
+      <PackageReference Include="SharpMetal" Version="1.1.0" />
       <PackageReference Include="StbImageSharp" Version="2.30.15" />
     </ItemGroup>
     

@@ -8,6 +8,7 @@ using SDL;
 using Velto.Audio;
 using Velto.Core.Timing;
 using Velto.Graphics;
+using Velto.Graphics.Metal;
 using Velto.Graphics.OpenGL;
 using static SDL.SDL3;
 
@@ -61,7 +62,8 @@ public unsafe class Game : IDisposable
         if (backend == GraphicsBackend.Metal)
         {
             Window = new Window(GraphicsBackend.Metal);
-            GraphicsDevice = new OpenGLGraphicsDevice(Window);
+            GraphicsDevice = new MetalGraphicsDevice(Window);
+            _renderer = new MetalRenderer(GraphicsDevice as MetalGraphicsDevice, Window);
         }
         
         
@@ -111,14 +113,16 @@ public unsafe class Game : IDisposable
         var update = (double)(updateEnd - updateStart) * 1000f / Stopwatch.Frequency;
         var draw = (double)(draweEnd - drawBegin) * 1000f / Stopwatch.Frequency;
 
-        var count = (_renderer as OpenGLRenderer).DrawCallCount;
+        var count = _renderer.DrawCallCount;
         _renderer.DrawText(Fonts.Default, $"FPS: {Window.Clock.FramesPerSecond} [{Window.Clock.AverageFrameTime.ToString("00.00")}ms]" +
-                                          $" | DrawCallCount: {count:000000}\n" +
+                                          $" | DrawCallCount: {count:000000} | {backend} \n" +
                                           $"Screen: {ScreenManager.Instance.Top}\n"
             +$"Input {input.ToString("00.0000")}ms | Update {update.ToString("00.0000")}ms | Draw {draw.ToString("00.0000")}ms", 
             new (5, 5), Window.WindowSize.Y / 45, new Color4<Rgba>(1, 1, 1, 1));
     
         _renderer.FlushText(Fonts.Default);
+        
+        _renderer.EndFrame();
     }
     
     public void Dispose()
