@@ -8,7 +8,7 @@ public class GameBase : Core.Game
 {
     private OsuContext _context;
     
-    public GameBase() : base()
+    public GameBase(GameCreateInfo createInfo) : base(createInfo)
     {
         
     }
@@ -24,6 +24,5 @@ public class GameBase : Core.Game
         };
         
         SetScreen(new IntroScreen(_context));
-        Window.Title = "Velto!";
     }
 }

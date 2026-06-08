@@ -99,15 +99,15 @@ public unsafe class Texture : IDisposable
         GL.DeleteTexture(Handle);
     }
 
-    private static OpenTK.Graphics.OpenGL.TextureWrapMode ToGL(WrapMode mode)
+    private static TextureWrapMode ToGL(WrapMode mode)
     {
         return mode switch
         {
-            WrapMode.Repeat => OpenTK.Graphics.OpenGL.TextureWrapMode.Repeat,
-            WrapMode.MirroredRepeat => OpenTK.Graphics.OpenGL.TextureWrapMode.MirroredRepeat,
-            WrapMode.ClampToEdge => OpenTK.Graphics.OpenGL.TextureWrapMode.ClampToEdge,
-            WrapMode.ClampToBorder => OpenTK.Graphics.OpenGL.TextureWrapMode.ClampToBorder,
-            _ => OpenTK.Graphics.OpenGL.TextureWrapMode.Repeat
+            WrapMode.Repeat => TextureWrapMode.Repeat,
+            WrapMode.MirroredRepeat => TextureWrapMode.MirroredRepeat,
+            WrapMode.ClampToEdge => TextureWrapMode.ClampToEdge,
+            WrapMode.ClampToBorder => TextureWrapMode.ClampToBorder,
+            _ => TextureWrapMode.Repeat
         };
     }
 

@@ -6,7 +6,13 @@ class Program
 {
     static void Main(string[] args)
     {
-        using GameBase game = new();
+        GameCreateInfo gameInfo = new()
+        {
+            Title = "Velto",
+            Maximized = false,
+        };
+
+        using GameBase game = new(gameInfo);
         game.Run();
     }
 }
