@@ -10,7 +10,7 @@
     namespace Velto.Graphics.Metal;
 
     [SupportedOSPlatform("macos")]
-    public unsafe class MetalRenderer : IRenderer
+    public unsafe class MetalRendererOld : IRenderer
     {
         private float[] vertices = {
             // first triangle
@@ -88,21 +88,6 @@
             source.CopyTo(span);
         }
         
-        public static MTLLibrary LoadShader(MTLDevice device, string path)
-        {
-            NSError error = new NSError();
-            var source = NSString.String(File.ReadAllText(path));
-            var library = device.NewLibrary(source, new MTLCompileOptions(), ref error);
-
-            if (error != IntPtr.Zero)
-            {
-                Logger.Instance.Error($"Failed to create library! {error.LocalizedDescription}");
-                return new MTLLibrary();
-            }
-
-            return library;
-        }
-        
         private Stack<ScissorRect> ScissorStack = new();
         private Stack<MetalFramebuffer> FramebufferStack = new();
         private List<DrawCallSet> DrawCallSets = new();
@@ -115,15 +100,10 @@
         private MTLBuffer uvBuffer;
         private MTLBuffer drawCallBuffer;
         private MTLRenderPipelineState renderPipelineState;
-        private MTLRenderPipelineState texturePipeline;
         private MTLCommandQueue commandQueue;
         private List<MTLTexture> textures = new();
-        
-        private CAMetalDrawable drawable;
-        private MTLRenderCommandEncoder encoder;
-        private MTLCommandBuffer commandBuffer;
 
-        public MetalRenderer(MetalGraphicsDevice device, Window window)
+        public MetalRendererOld(MetalGraphicsDevice device, Window window)
         {
             this.device = device;
             Window = window;
@@ -154,7 +134,7 @@
 
 
             NSString shaderSource =
-                NSString.String(File.ReadAllText(Resources.GetPath("Resources/Shaders/texture.metal")));
+                NSString.String(File.ReadAllText(Resources.GetPath("Resources/Shaders/ubershader.metal")));
             NSError libraryError = new NSError();
             var library = this.device.Device.NewLibrary(shaderSource, new MTLCompileOptions(), ref libraryError);
             if (libraryError != IntPtr.Zero)
@@ -184,7 +164,7 @@
             renderPipelineDescriptor.ColorAttachments.SetObject(cd, 0);
             
             NSError pipelineError = new NSError();
-            texturePipeline = this.device.Device.NewRenderPipelineState(renderPipelineDescriptor, ref pipelineError);
+            renderPipelineState = this.device.Device.NewRenderPipelineState(renderPipelineDescriptor, ref pipelineError);
             if (pipelineError != IntPtr.Zero)
             {
                 Logger.Instance.Error($"{pipelineError.LocalizedDescription}");
@@ -200,14 +180,26 @@
 
         public void PushScissor(ScissorRect r)
         {
-            encoder.SetScissorRect(
-                new MTLScissorRect
-                {
-                    x = (ulong)r.X,
-                    y = (ulong)r.Y,
-                    width = (ulong)r.W,
-                    height = (ulong)r.H
-                });
+            // Compute intersection with current scissor
+            ScissorRect current = ScissorStack.Count > 0 
+                ? ScissorStack.Peek() 
+                : new ScissorRect(0, 0, (int)Window.WindowSize.X, (int)Window.WindowSize.Y);
+
+            int x1 = Math.Max(current.X, r.X);
+            int y1 = Math.Max(current.Y, r.Y);
+            int x2 = Math.Min(current.X + current.W, r.X + r.W);
+            int y2 = Math.Min(current.Y + current.H, r.Y + r.H);
+
+            var newRect = new ScissorRect
+            {
+                X = x1,
+                Y = y1,
+                W = Math.Max(0, x2 - x1),
+                H = Math.Max(0, y2 - y1)
+            };
+
+            ScissorStack.Push(newRect);
+            StartNewSetWithCurrentState(); // important!
         }
 
         public void PushScissor(int x, int y, int w, int h)
@@ -254,45 +246,41 @@
             DrawCallSets[^1].ScissorRect = rect;
         }
         
-        public void PushFramebuffer(IFramebuffer framebuffer)
+        public void PushFramebuffer(IFramebuffer fb)
         {
-            
-            var fb = (MetalFramebuffer)framebuffer;
+            var metalFb = fb as MetalFramebuffer;
+            FramebufferStack.Push(metalFb);
+            Framebuffer = metalFb;
 
-            FramebufferStack.Push(Framebuffer);
-
-            EndRenderPass();
-
-            Framebuffer = fb;
-
-            BeginRenderPass(
-                fb,
-                new Color4<Rgba>(0, 0, 0, 0)
-            );
+            StartNewSetWithCurrentState(); // New render pass!
         }
 
         public void PopFramebuffer()
         {
-            EndRenderPass();
+            if (FramebufferStack.Count == 0) return;
+            FramebufferStack.Pop();
 
-            Framebuffer =
-                FramebufferStack.Count > 0
-                    ? FramebufferStack.Pop()
-                    : null;
-
-            BeginRenderPass(Framebuffer);
+            Framebuffer = FramebufferStack.TryPeek(out var prev) ? prev : null;
+            StartNewSetWithCurrentState();
         }
 
         public void BeginFrame()
         {
-            drawable = device.MetalLayer.NextDrawable;
-            commandBuffer = commandQueue.CommandBuffer();
-            Framebuffer = null;
+            textures.Clear();
             FramebufferStack.Clear();
-            BeginRenderPass(
-                target: null,
-                clearColor: new Color4<Rgba>(0, 0, 0, 1)
-            );
+            ScissorStack.Clear();
+            DrawCallSets.Clear();
+        
+            Framebuffer = null; // or default backbuffer
+
+            DrawCallSets.Add(new DrawCallSet
+            {
+                Framebuffer = null, // backbuffer
+                ClearColor = null,  // usually cleared by window or explicit Clear()
+                ScissorRect = new ScissorRect(0, 0, (int)Window.WindowSize.X, (int)Window.WindowSize.Y),
+                View = Matrix4.Identity,
+                Projection = CreateDefaultProjection(),
+            });
         }
 
         public void SetupRenderPassAttachments(MTLRenderPassDescriptor rpd, MetalFramebuffer? framebuffer,
@@ -317,62 +305,64 @@
             rpd.ColorAttachments.SetObject(colorAttachment, 0);
         }
         
-        private void BeginRenderPass(
-            MetalFramebuffer? target,
-            Color4<Rgba>? clearColor = null)
-        {
-            var rpd = new MTLRenderPassDescriptor();
-
-            var colorAttachment = rpd.ColorAttachments.Object(0);
-
-            colorAttachment.Texture =
-                target != null
-                    ? target.Handle
-                    : drawable.Texture;
-
-            colorAttachment.LoadAction =
-                clearColor.HasValue
-                    ? MTLLoadAction.Clear
-                    : MTLLoadAction.Load;
-
-            colorAttachment.StoreAction =
-                MTLStoreAction.Store;
-
-            if (clearColor.HasValue)
-            {
-                colorAttachment.ClearColor = new MTLClearColor
-                {
-                    red = clearColor.Value.X,
-                    green = clearColor.Value.Y,
-                    blue = clearColor.Value.Z,
-                    alpha = clearColor.Value.W
-                };
-            }
-
-            rpd.ColorAttachments.SetObject(colorAttachment, 0);
-
-            encoder = commandBuffer.RenderCommandEncoder(rpd);
-
-            encoder.SetRenderPipelineState(texturePipeline);
-
-            rpd.Dispose();
-        }
-        
-        private void EndRenderPass()
-        {
-            if (encoder == null)
-                return;
-
-            encoder.EndEncoding();
-            encoder.Dispose();
-        }
-        
         public void EndFrame()
         {
-            if (encoder != null)
+            var drawable = device.MetalLayer.NextDrawable;
+            if (drawable == null) return;
+
+            var commandBuffer = commandQueue.CommandBuffer();
+
+            foreach (var set in DrawCallSets)
             {
+                // Skip completely empty passes that do nothing (no clear + no draws)
+                if (set.DrawCalls.Count == 0 && set.ClearColor == null)
+                    continue;
+
+                var rpd = new MTLRenderPassDescriptor();
+                SetupRenderPassAttachments(rpd, set.Framebuffer, set.ClearColor, drawable);
+
+                var encoder = commandBuffer.RenderCommandEncoder(rpd);
+
+                encoder.SetScissorRect(new MTLScissorRect
+                {
+                    x = (ulong)set.ScissorRect.X,
+                    y = (ulong)set.ScissorRect.Y,
+                    width = (ulong)set.ScissorRect.W,
+                    height = (ulong)set.ScissorRect.H
+                });
+
+                encoder.SetRenderPipelineState(renderPipelineState);
+
+                // Use resources (textures)
+                foreach (var texture in textures)
+                {
+                    encoder.UseResource(texture, MTLResourceUsage.Read, MTLRenderStages.RenderStageFragment);
+                }
+
+                // Only do vertex setup + draw if we actually have draw calls
+                if (set.DrawCalls.Count > 0)
+                {
+                    CopyToBuffer(set.DrawCalls.ToArray(), drawCallBuffer);
+                    /*drawCallBuffer.DidModifyRange(new NSRange()
+                    {
+                        location = 0,
+                        length = (ulong)(set.DrawCalls.Count * sizeof(DrawCall))
+                    });*/
+
+                    encoder.SetVertexBuffer(vertexBuffer, 0, 0);
+                    encoder.SetVertexBuffer(uvBuffer, 0, 1);
+
+                    var proj = set.Projection;
+                    encoder.SetVertexBytes((nint)(&proj), (ulong)sizeof(Matrix4), 2);
+
+                    encoder.SetVertexBuffer(drawCallBuffer, 0, 3);
+                    encoder.SetFragmentBuffer(drawCallBuffer, 0, 0);
+
+                    encoder.DrawPrimitives(MTLPrimitiveType.Triangle, 0, 6, (ulong)set.DrawCalls.Count);
+                }
+
                 encoder.EndEncoding();
-                encoder.Dispose();
+                rpd.Dispose();
             }
 
             commandBuffer.PresentDrawable(drawable);
@@ -381,12 +371,7 @@
         
         public void Clear(Color4<Rgba> color)
         {
-            EndRenderPass();
-
-            BeginRenderPass(
-                Framebuffer,
-                color
-            );
+            StartNewSetWithCurrentState(clearColor: color);
         }
 
         public void DrawTexture(ITexture texture, Vector2 position, Vector2 size, Color4<Rgba> color, float rotation = 0)
@@ -396,79 +381,38 @@
                 Matrix4.CreateScale(size.X, size.Y, 1f) *
                 Matrix4.CreateRotationZ(MathHelper.DegreesToRadians(-rotation)) *
                 Matrix4.CreateTranslation(position.X + size.X / 2f, position.Y + size.Y / 2f, 0f);
-
-            Matrix4 proj;
-            if (Framebuffer == null)
-            {
-                proj = Matrix4.CreateOrthographicOffCenter(
-                    0,
-                    Window.WindowSize.X,
-                    Window.WindowSize.Y,
-                    0,
-                    -1f,
-                    1f);
-            }
-            else
-            {
-                proj = Matrix4.CreateOrthographicOffCenter(
-                    0,
-                    Framebuffer.Width,
-                    Framebuffer.Height,
-                    0,
-                    -1f,
-                    1f);
-            }
             
-            encoder.SetVertexBuffer(vertexBuffer, 0, 0);
-            encoder.SetVertexBuffer(uvBuffer, 0, 1);
-            encoder.SetVertexBytes((nint)(&proj), (ulong)sizeof(Matrix4), 2);
-            encoder.SetVertexBytes((nint)(&model), (ulong)sizeof(Matrix4), 3);
-            encoder.SetFragmentTexture((texture as MetalTexture).Handle, 0);
-            encoder.DrawPrimitives(
-                MTLPrimitiveType.Triangle,
-                0,
-                6);
+            DrawCallSets.Last().DrawCalls.Add(new DrawCall()
+            {
+                Type = DrawType.Texture,
+                Texture = (texture as MetalTexture).Handle.GpuResourceID,
+                Color = color,
+                CornerRadius = 0,
+                Model = model,
+            });
+            
+            textures.Add((texture as MetalTexture).Handle);
         }
 
         public void DrawFramebuffer(IFramebuffer framebuffer, Vector2 position, Vector2 size, Color4<Rgba> color, float rotation = 0)
         {
+            var texture = framebuffer as MetalFramebuffer;
             var model =
                 Matrix4.CreateTranslation(-0.5f, -0.5f, 0f) *
                 Matrix4.CreateScale(size.X, size.Y, 1f) *
                 Matrix4.CreateRotationZ(MathHelper.DegreesToRadians(-rotation)) *
                 Matrix4.CreateTranslation(position.X + size.X / 2f, position.Y + size.Y / 2f, 0f);
-
-            Matrix4 proj;
-            if (Framebuffer == null)
-            {
-                proj = Matrix4.CreateOrthographicOffCenter(
-                    0,
-                    Window.WindowSize.X,
-                    Window.WindowSize.Y,
-                    0,
-                    -1f,
-                    1f);
-            }
-            else
-            {
-                proj = Matrix4.CreateOrthographicOffCenter(
-                    0,
-                    Framebuffer.Width,
-                    Framebuffer.Height,
-                    0,
-                    -1f,
-                    1f);
-            }
             
-            encoder.SetVertexBuffer(vertexBuffer, 0, 0);
-            encoder.SetVertexBuffer(uvBuffer, 0, 1);
-            encoder.SetVertexBytes((nint)(&proj), (ulong)sizeof(Matrix4), 2);
-            encoder.SetVertexBytes((nint)(&model), (ulong)sizeof(Matrix4), 3);
-            encoder.SetFragmentTexture((framebuffer as MetalFramebuffer).Handle, 0);
-            encoder.DrawPrimitives(
-                MTLPrimitiveType.Triangle,
-                0,
-                6);
+            DrawCallSets.Last().DrawCalls.Add(new DrawCall()
+            {
+                Type = DrawType.Texture,
+                Texture = texture.Handle.GpuResourceID,
+                Color = color,
+                CornerRadius = 0,
+                Model = model,
+            });
+            
+            textures.Add(texture.Handle);
         }
 
         public void DrawRectangle(Vector2 position, Vector2 size, Color4<Rgba> color, float rotation = 0)

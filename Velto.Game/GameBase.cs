@@ -9,7 +9,7 @@ public class GameBase : Core.Game
 {
     private OsuContext _context;
     
-    public GameBase() : base(GraphicsBackend.Metal)
+    public GameBase() : base(GraphicsBackend.OpenGL)
     {
         
     }

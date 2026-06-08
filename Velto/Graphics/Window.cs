@@ -121,9 +121,10 @@ public unsafe class Window : IDisposable
                                                         | SDL_WindowFlags.SDL_WINDOW_RESIZABLE
                                                         //| SDL_WindowFlags.SDL_WINDOW_HIGH_PIXEL_DENSITY
             );
-            // MetalView = SDL_Metal_CreateView(Handle);
-            // MetalLayer = SDL_Metal_GetLayer(MetalView);
-            SdlRenderer = SDL_CreateRenderer(Handle, "metal");
+            MetalView = SDL_Metal_CreateView(Handle);
+            MetalLayer = SDL_Metal_GetLayer(MetalView);
+            //SdlRenderer = SDL_CreateRenderer(Handle, "");
+            //if (SdlRenderer == null) throw new Exception();
         }
         
         eventWatchHandle = GCHandle.Alloc(this);
