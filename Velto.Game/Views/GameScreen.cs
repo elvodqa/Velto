@@ -733,7 +733,7 @@ public class GameScreen : Screen, IDisposable
                     var fb = _sliderFramebuffers[fbIndex];
                     r.PushFramebuffer(fb.Framebuffer);
                     r.Clear(new(0, 0, 0, 0));
-                    //GL.BlendFunc(BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha);
+                    GL.BlendFunc(BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha);
                     foreach (var point in slider.Points)
                     {
                         var scaledX = _playfieldTopLeft.X + point.X * playfieldScale;
@@ -763,7 +763,7 @@ public class GameScreen : Screen, IDisposable
                             new Color4<Rgba>(0.1f, 0.1f, 0.1f, 1));
                     }
 
-                    //sGL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+                    GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
                     r.PopFramebuffer();
                     ReleaseSliderFramebuffer(fbIndex);
                 

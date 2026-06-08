@@ -124,6 +124,15 @@ public class SongSelectScreen : Screen, IDisposable
 
         var thumbWidth = BoxHeight * 1.5f;
 
+        var thumb = OpenGLRenderer.WhiteTexture; // _textureCache[box.Path];
+        r.DrawTexture(
+            thumb,
+            box.Position.X,
+            box.Position.Y,
+            thumbWidth,
+            BoxHeight,
+            new Color4<Rgba>(1, 1, 1, 1)
+        );
         
         // draw text
         r.DrawText(Fonts.Default, box.Beatmap.ToString(),

@@ -84,7 +84,7 @@ public unsafe class AudioManager : IDisposable
     {
         _counter += delta;
 
-        if (_counter < 100)
+        if (_counter < 1000)
             return;
 
         _counter = 0;

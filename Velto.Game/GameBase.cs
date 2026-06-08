@@ -1,7 +1,6 @@
 using Velto.Audio;
 using Velto.Core;
 using Velto.Game.Views;
-using Velto.Graphics;
 
 namespace Velto.Game;
 
@@ -9,7 +8,7 @@ public class GameBase : Core.Game
 {
     private OsuContext _context;
     
-    public GameBase() : base(GraphicsBackend.Metal)
+    public GameBase() : base()
     {
         
     }
