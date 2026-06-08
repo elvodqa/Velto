@@ -6,8 +6,8 @@ namespace Velto.Graphics.Metal;
 [SupportedOSPlatform("macos")]
 public class MetalFramebuffer : IFramebuffer
 {
-    public int Width { get; private set; }
-    public int Height{ get; private set; }
+    public int Width { get; }
+    public int Height { get; }
     public TextureFilteringMode FilteringMode { get; }
 
     public MTLTexture Handle;
@@ -26,14 +26,11 @@ public class MetalFramebuffer : IFramebuffer
             PixelFormat = MTLPixelFormat.RGBA8Unorm,
             TextureType = MTLTextureType.Type2D,
             Usage = MTLTextureUsage.ShaderRead | MTLTextureUsage.RenderTarget,
-            StorageMode = MTLStorageMode.Shared
         });
     }
     
     public void Resize(int w, int h)
     {
-        Width = w;
-        Height = h;
         Handle.Dispose();
         Handle = device.NewTexture(new MTLTextureDescriptor()
         {
@@ -41,8 +38,7 @@ public class MetalFramebuffer : IFramebuffer
             Height = (ulong)Height,
             PixelFormat = MTLPixelFormat.RGBA8Unorm,
             TextureType = MTLTextureType.Type2D,
-            Usage = MTLTextureUsage.ShaderRead | MTLTextureUsage.RenderTarget,
-            StorageMode = MTLStorageMode.Shared
+            Usage = MTLTextureUsage.ShaderRead,
         });
     }
     

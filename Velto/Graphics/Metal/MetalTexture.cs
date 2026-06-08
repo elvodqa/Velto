@@ -36,7 +36,6 @@ public unsafe class MetalTexture : ITexture
             PixelFormat = MTLPixelFormat.RGBA8Unorm,
             TextureType = MTLTextureType.Type2D,
             Usage = MTLTextureUsage.ShaderRead,
-            StorageMode = MTLStorageMode.Shared
         });
 
         fixed (byte* ptr = result.Data)
