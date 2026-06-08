@@ -108,24 +108,16 @@ public unsafe class MetalRenderer : IRenderer
         whiteTexture = device.CreateTexture(Resources.GetPath("Resources/Textures/white.png"));
         circleTexture = device.CreateTexture(Resources.GetPath("Resources/Textures/circle.png"));
 
-        vertexBuffer = this.device.Device.NewBuffer((ulong)(sizeof(float) * vertices.Length),
-            MTLResourceOptions.ResourceStorageModeShared);
-        uvBuffer = this.device.Device.NewBuffer((ulong)(sizeof(float) * uvs.Length),
-            MTLResourceOptions.ResourceStorageModeShared);
-        
-        CopyToBuffer(vertices, vertexBuffer);
-        vertexBuffer.DidModifyRange(new NSRange()
+        fixed (float* p = vertices)
         {
-            location = 0,
-            length = (ulong)(vertices.Length * sizeof(float))
-        });
-        
-        CopyToBuffer(uvs, uvBuffer);
-        uvBuffer.DidModifyRange(new NSRange()   
+            vertexBuffer =
+                this.device.Device.NewBuffer((nint)p, (ulong)sizeof(float) * (ulong)vertices.Length, MTLResourceOptions.ResourceStorageModeShared);
+        }
+        fixed (float* p = uvs)
         {
-            location = 0,
-            length = (ulong)(uvs.Length * sizeof(float))
-        });
+            uvBuffer =
+                this.device.Device.NewBuffer((nint)p, (ulong)sizeof(float) * (ulong)uvs.Length, MTLResourceOptions.ResourceStorageModeShared);
+        }
         
         drawCallBuffer =
             this.device.Device.NewBuffer((ulong)(sizeof(DrawCall) * 2048), MTLResourceOptions.ResourceStorageModeShared);
@@ -341,11 +333,6 @@ public unsafe class MetalRenderer : IRenderer
             if (set.DrawCalls.Count > 0)
             {
                 CopyToBuffer(set.DrawCalls.ToArray(), drawCallBuffer);
-                drawCallBuffer.DidModifyRange(new NSRange()
-                {
-                    location = 0,
-                    length = (ulong)(set.DrawCalls.Count * sizeof(DrawCall))
-                });
 
                 encoder.SetVertexBuffer(vertexBuffer, 0, 0);
                 encoder.SetVertexBuffer(uvBuffer, 0, 1);
@@ -449,7 +436,7 @@ public unsafe class MetalRenderer : IRenderer
     
     public void Dispose()
     {
-        
+        throw new NotImplementedException();
     }
 
 }
