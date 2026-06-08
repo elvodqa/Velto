@@ -35,7 +35,7 @@ public unsafe class Window : IDisposable
     public SDL_GLContextState* MainGLContextState { get; private set; }
     public IntPtr MetalView { get; private set; }
     public IntPtr MetalLayer { get; private set; }
-
+    public SDL_Renderer* SdlRenderer { get; private set; }
     public float DisplayScale => SDL_GetWindowDisplayScale(Handle);
     
     
@@ -119,10 +119,11 @@ public unsafe class Window : IDisposable
             
             Handle = SDL_CreateWindow(Title, 1280, 720, SDL_WindowFlags.SDL_WINDOW_METAL 
                                                         | SDL_WindowFlags.SDL_WINDOW_RESIZABLE
-                                                        | SDL_WindowFlags.SDL_WINDOW_HIGH_PIXEL_DENSITY
+                                                        //| SDL_WindowFlags.SDL_WINDOW_HIGH_PIXEL_DENSITY
             );
-            MetalView = SDL_Metal_CreateView(Handle);
-            MetalLayer = SDL_Metal_GetLayer(MetalView);
+            // MetalView = SDL_Metal_CreateView(Handle);
+            // MetalLayer = SDL_Metal_GetLayer(MetalView);
+            SdlRenderer = SDL_CreateRenderer(Handle, "metal");
         }
         
         eventWatchHandle = GCHandle.Alloc(this);

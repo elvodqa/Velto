@@ -13,17 +13,19 @@ public class MetalGraphicsDevice : IGraphicsDevice
     public MTLDevice Device;
     public CAMetalLayer MetalLayer;
     
-    public MetalGraphicsDevice(Window window)
+    public unsafe MetalGraphicsDevice(Window window)
     {
         Window = window;
 
 
         Device = MTLDevice.CreateSystemDefaultDevice();
-        MetalLayer = new CAMetalLayer(window.MetalLayer);
+        //MetalLayer = new CAMetalLayer(window.MetalLayer);
+        MetalLayer = new CAMetalLayer(SDL.SDL3.SDL_GetRenderMetalLayer(Window.SdlRenderer));
+        
         MetalLayer.Device = Device;
         MetalLayer.PixelFormat = MTLPixelFormat.RGBA8Unorm;
     }
-
+    
     public ITexture CreateTexture(int width, int height, TextureFilteringMode filteringMode = TextureFilteringMode.Linear,
         TextureWrapMode wrapMode = TextureWrapMode.ClampToEdge)
     {
