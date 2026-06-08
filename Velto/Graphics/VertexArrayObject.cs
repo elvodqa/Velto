@@ -1,5 +1,4 @@
 using OpenTK.Graphics.OpenGL;
-using Velto.Graphics.OpenGL;
 
 namespace Velto.Graphics;
 
@@ -9,7 +8,7 @@ public unsafe class VertexArrayObject<TVertexType, TIndexType> : IDisposable
 {
     private readonly int _handle;
 
-    public VertexArrayObject(OpenGLBufferObject<TVertexType> vbo, OpenGLBufferObject<TIndexType> ebo)
+    public VertexArrayObject(BufferObject<TVertexType> vbo, BufferObject<TIndexType> ebo)
     {
         _handle = GL.GenVertexArray();
         Bind();
@@ -45,7 +44,7 @@ public unsafe class VertexArrayObject<TVertexType> : IDisposable
 {
     private readonly int _handle;
 
-    public VertexArrayObject(OpenGLBufferObject<TVertexType> vbo)
+    public VertexArrayObject(BufferObject<TVertexType> vbo)
     {
         _handle = GL.GenVertexArray();
         Bind();

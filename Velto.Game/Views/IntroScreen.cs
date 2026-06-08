@@ -3,7 +3,6 @@ using SDL;
 using Velto.Audio;
 using Velto.Core;
 using Velto.Graphics;
-using Velto.Graphics.OpenGL;
 
 namespace Velto.Game.Views;
 
@@ -12,11 +11,9 @@ public class IntroScreen : Screen
     private float _circleRadius;
     private AudioChannel _menuHitAudio;
     private OsuContext _context;
-    private IGraphicsDevice device;
     
-    public IntroScreen(IGraphicsDevice device, OsuContext context) : base(device, context)
+    public IntroScreen(OsuContext context) : base(context)
     {
-        this.device = device;
         _context = context;
     }
 
@@ -44,13 +41,13 @@ public class IntroScreen : Screen
                     Create<SongSelectorView>(),
                 ]);*/
                 AudioManager.Instance.PlaySample(_menuHitAudio);
-                Transition(new SongSelectScreen(device, _context),250);
+                Transition(new SongSelectScreen(_context),250);
             }
         }
 
     }
 
-    public override void Draw(IRenderer r)
+    public override void Draw(Renderer r)
     {
         r.PushScissor(new ScissorRect(0, 0, Width, Height));
         r.Clear(Color4.Snow);

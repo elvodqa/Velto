@@ -21,7 +21,7 @@ public class GameScreen : Screen, IDisposable
     
     private double _startingTimer;
 
-    private ITexture? _backgroundTexture;
+    private Texture? _backgroundTexture;
 
     private float _baseCircleSize;
 
@@ -69,7 +69,7 @@ public class GameScreen : Screen, IDisposable
 
     public struct SliderFramebuffer
     {
-        public IFramebuffer Framebuffer;
+        public Framebuffer Framebuffer;
         public float Time;
         public float Duration;
         public bool InUse;
@@ -77,11 +77,9 @@ public class GameScreen : Screen, IDisposable
 
     private OsuContext _context;
     private StopwatchClock clock;
-    private IGraphicsDevice device;
 
-    public GameScreen(IGraphicsDevice device, OsuContext context) : base(device, context)
+    public GameScreen(OsuContext context) : base(context)
     {
-        this.device = device;
         _context = context;
         clock = new(false);
     }
@@ -226,7 +224,7 @@ public class GameScreen : Screen, IDisposable
         {
             //ToggleMenu();
             _isPaused = true;
-            Transition(new SongSelectScreen(device, _context), 200);
+            Transition(new SongSelectScreen(_context), 200);
         }
 
         if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_GRAVE))
@@ -238,7 +236,7 @@ public class GameScreen : Screen, IDisposable
             // _totalScore = 0;
             // ResetObjectsAfter(0);
             //ViewManager.Instance.Transition(this, this, 1000);
-            var game = new GameScreen(device, _context);
+            var game = new GameScreen(_context);
             game.SetBeatmap(_beatmap);
             game.Player.SetState(PlayerState.Autoplay);
             _context.SystemTrack.Audio = _context.Skin.PauseRetryClick;
@@ -582,7 +580,7 @@ public class GameScreen : Screen, IDisposable
         }
     }
     
-    public override void Draw(IRenderer r)
+    public override void Draw(Renderer r)
     {
         r.Clear(new(0, 0, 0, 1));
         r.PushScissor(0, 0, (int)Width, (int)Height);
@@ -609,6 +607,26 @@ public class GameScreen : Screen, IDisposable
 
         // Background Dim
         r.DrawRectangle(0, 0, Width, Height, new Color4<Rgba>(0, 0, 0, 0.80f));
+        
+        // Followpoints
+        
+        // var diff = nextHitObjectPos - prevHitObjectPos;
+        // var degree = Math.Atan2(diff.Y, diff.X);
+        // var distance = 100;
+        //
+        // if (!_context.Skin.HasAnimatedFollowPoints)
+        // {
+        //     var direction = new Vector2(
+        //         (float)Math.Cos(degree),
+        //         (float)Math.Sin(degree)
+        //     );
+        //     int count = diff.Length / distance;
+        //     for (int i = 0; i < count; i++)
+        //     {
+        //         var pos = prevHitObjectPos + direction * (i * distance);
+        //         r.DrawTexture(_context.Skin.FollowPoint, pos.X, pos.Y, 100f, 100f, new Color4<Rgba>(1, 1, 1, 1), (float)degree * MathHelper.RadToDeg + 135);
+        //     }
+        // }
         
         foreach (var hitObject in _sortedObjects)
         {
@@ -731,7 +749,7 @@ public class GameScreen : Screen, IDisposable
 
                     int fbIndex = AcquireSliderFramebuffer();
                     var fb = _sliderFramebuffers[fbIndex];
-                    r.PushFramebuffer(fb.Framebuffer);
+                    r.BindFramebuffer(fb.Framebuffer);
                     r.Clear(new(0, 0, 0, 0));
                     GL.BlendFunc(BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha);
                     foreach (var point in slider.Points)
@@ -764,7 +782,7 @@ public class GameScreen : Screen, IDisposable
                     }
 
                     GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
-                    r.PopFramebuffer();
+                    r.UnbindFramebuffer(fb.Framebuffer);
                     ReleaseSliderFramebuffer(fbIndex);
                 
                     var maxSliderOpacity = 0.8f;
@@ -793,7 +811,7 @@ public class GameScreen : Screen, IDisposable
                         throw new Exception("Slider opactiy > maxSliderOpacity. Fix.");
                     }
 
-                    r.DrawFramebuffer(fb.Framebuffer, new Vector2(0, 0), new Vector2(Width, Height),
+                    r.DrawTexture(fb.Framebuffer.Texture, 0, 0, Width, Height,
                         new Color4<Rgba>(1, 1, 1, 1) { W = sliderOpacity });
 
                     if (slider.Sliding)
@@ -1007,7 +1025,7 @@ public class GameScreen : Screen, IDisposable
             Vector2 drawPos = _playfieldTopLeft + particle.Position * playfieldScale;
             drawPos.Y += yOffset;
 
-            r.DrawTextureCentered(texture, drawPos, new Vector2(w, h),
+            r.DrawCenteredTexture(texture, drawPos, w, h,
                 new Color4<Rgba>(1, 1, 1, alpha));
         }
 
@@ -1028,10 +1046,10 @@ public class GameScreen : Screen, IDisposable
         var colourScale = scoreboardColourWidth / _context.Skin.ScorebarColour.Width;
         var scoreboardColourHeight = _context.Skin.ScorebarColour.Height * colourScale;
 
-        r.PushScissor(20, 22, (int)(20 + scoreboardColourWidth * _health), (int)scoreboardColourHeight);
+        r.SetScissor(20, 22, (int)(20 + scoreboardColourWidth * _health), (int)scoreboardColourHeight);
         r.DrawTexture(_context.Skin.ScorebarColour, 20, 22, scoreboardColourWidth / 1f, scoreboardColourHeight / 1f,
             new Color4<Rgba>(1, 1, 1, 1));
-        r.PopScissor();
+        r.SetScissor(0, 0, (int)Width, (int)Height);
 
 
         // Draw combo count
@@ -1280,7 +1298,7 @@ public class GameScreen : Screen, IDisposable
         {
             _sliderFramebuffers[i] = new()
             {
-                Framebuffer = device.CreateFramebuffer(1280, 720),
+                Framebuffer = new Framebuffer(1280, 720),
                 Duration = 0,
                 Time = 0,
             };
@@ -1356,7 +1374,7 @@ public class GameScreen : Screen, IDisposable
             .OrderByDescending(h => Math.Abs(h.Time - clock.CurrentTime));
 
         _backgroundTexture?.Dispose();
-        _backgroundTexture = device.CreateTexture(Path.Combine(_beatmap.Folder, _beatmap.BackgroundFile));
+        _backgroundTexture = new Texture(Path.Combine(_beatmap.Folder, _beatmap.BackgroundFile));
 
         //Difficulty multiplier = Round((HP Drain + Circle Size + Overall Difficulty + Clamp(Hit object count / Drain time in seconds * 8, 0, 16)) / 38 * 5)
         var objs = _beatmap.HitObjects.OrderBy(t => t.Time);

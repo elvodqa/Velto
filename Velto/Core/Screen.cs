@@ -11,16 +11,14 @@ public struct ResizeEventArgs
 public abstract class Screen : IDisposable
 {
     protected IGameContext Context { get; }
-    protected IGraphicsDevice GraphicsDevice { get; }
-    
-    protected Screen(IGraphicsDevice device, IGameContext context)
+
+    protected Screen(IGameContext context)
     {
-        GraphicsDevice = device;
         Context = context;
-        Framebuffer = device.CreateFramebuffer((int)GraphicsDevice.Window.WindowSize.X, (int)GraphicsDevice.Window.WindowSize.Y);
+        Framebuffer = new Framebuffer((int)Renderer.WindowSizeInPixels.X, (int)Renderer.WindowSizeInPixels.Y);
     } 
     
-    public IFramebuffer Framebuffer;
+    public Framebuffer Framebuffer;
     public bool Enabled { get; set; } = true;
  
     public float Width
@@ -53,7 +51,7 @@ public abstract class Screen : IDisposable
     public virtual void OnExit() {}
     public virtual void OnResize(ResizeEventArgs e) {}
     public abstract void Update(double dt);
-    public abstract void Draw(IRenderer r);
+    public abstract void Draw(Renderer r);
     
     public void Transition(Screen to, float length = 500, 
         Func<float, float>? disappearFunc = null, Func<float, float>? appearFunc = null)

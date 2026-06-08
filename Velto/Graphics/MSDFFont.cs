@@ -1,13 +1,15 @@
 using System.Text.Json;
+using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
+using StbImageSharp;
 
 namespace Velto.Graphics;
 
-public class Font
+public class MSDFFont
 {
-    public ITexture AtlasTexture;
     public float Ascender;
     public int AtlasHeight;
+    public int AtlasTexture;
     public int AtlasWidth;
     public float Descender;
     public float DistanceRange;
@@ -17,17 +19,38 @@ public class Font
     public Dictionary<(uint, uint), float> Kerning = new();
     public float LineHeight;
 
-    public static Font Load(IGraphicsDevice device, string basePath)
+    public static MSDFFont Load(string basePath)
     {
-        Font font = new();
-        font.AtlasTexture = device.CreateTexture(basePath + ".png", verticallyFlip:0);
-        font.AtlasWidth = font.AtlasTexture.Width;
-        font.AtlasHeight = font.AtlasTexture.Height;
+        MSDFFont font = new();
+        LoadTexture(font, basePath + ".png");
         LoadJson(font, basePath + ".json");
         return font;
     }
-    
-    private static void LoadJson(Font font, string path)
+
+    private static void LoadTexture(MSDFFont font, string path)
+    {
+        StbImage.stbi_set_flip_vertically_on_load(0);
+
+        using var stream = File.OpenRead(path);
+        var image = ImageResult.FromStream(stream, ColorComponents.RedGreenBlueAlpha);
+
+        // Restore default used by Texture to avoid surprising later loads.
+        StbImage.stbi_set_flip_vertically_on_load(1);
+
+        var tex = GL.GenTexture();
+        GL.BindTexture(TextureTarget.Texture2D, tex);
+        GL.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba, image.Width, image.Height, 0,
+            PixelFormat.Rgba, PixelType.UnsignedByte, image.Data);
+        GL.TexParameteri(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+        GL.TexParameteri(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+        GL.TexParameteri(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
+        GL.TexParameteri(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
+        font.AtlasTexture = tex;
+        font.AtlasWidth = image.Width;
+        font.AtlasHeight = image.Height;
+    }
+
+    private static void LoadJson(MSDFFont font, string path)
     {
         var jsonText = File.ReadAllText(path);
         var doc = JsonDocument.Parse(jsonText);

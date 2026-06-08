@@ -3,15 +3,15 @@ using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
 using SDL;
 
-namespace Velto.Graphics.OpenGL;
+namespace Velto.Graphics;
 
 using static SDL3;
 
-public unsafe class OpenGLShader : IDisposable
+public unsafe class Shader : IDisposable
 {
     public Dictionary<string, int> _uniforms = new();
 
-    public OpenGLShader(string shaderName)
+    public Shader(string shaderName)
     {
         var vertexSource =
             File.ReadAllText(Path.Combine(SDL_GetBasePath(), "Resources", "Shaders", $"{shaderName}.vert"));
@@ -20,7 +20,7 @@ public unsafe class OpenGLShader : IDisposable
         load(vertexSource, fragmentSource);
     }
 
-    public OpenGLShader(string vertexSource, string fragmentSource)
+    public Shader(string vertexSource, string fragmentSource)
     {
         load(vertexSource, fragmentSource);
     }
