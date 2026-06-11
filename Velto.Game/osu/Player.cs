@@ -175,7 +175,6 @@ public class Player
             return;
         }
 
-        // Sliding. TODO: stop sliding if there is another hit object approaching
         if (current is Slider activeSlider &&
             _songCursor >= activeSlider.Time &&
             _songCursor <= activeSlider.Time + activeSlider.Duration)
@@ -194,7 +193,6 @@ public class Player
             if (nextIsComingSoon)
             {
                 ActionPrimaryDown = false;
-                currentIndex++;
                 return;
             }
 
@@ -205,6 +203,7 @@ public class Player
             if (_lastAutoplayHitIndex != currentIndex)
             {
                 Alternate(current);
+                _gameScreen.Judge(current.Time);
                 _lastAutoplayHitIndex = currentIndex;
             }
             return;
@@ -221,9 +220,13 @@ public class Player
             if (_lastAutoplayHitIndex != currentIndex)
             {
                 Alternate(current);
+                _gameScreen.Judge(current.Time);
                 _lastAutoplayHitIndex = currentIndex;
             }
         }
+        
+        _prevPrimary = false;
+        _prevSecondary = false;
     }
     
     private void HandleReplayRollback()
@@ -239,7 +242,7 @@ public class Player
         var frames = Replay!.Frames;
         _replayFrameIndex = 0;
 
-        while (_replayFrameIndex < frames.Count - 1 &&
+        while (_replayFrameIndex < frames.Count - 1 && 
                frames[_replayFrameIndex + 1].MsSinceStart <= _songCursor)
         {
             _replayFrameIndex++;
@@ -293,31 +296,6 @@ public class Player
         }
     }
     
-    private double GetInterpolatedReplayTime()
-    {
-        if (Replay == null || Replay.Frames.Count == 0)
-            return _songCursor;
-
-        var frames = Replay.Frames;
-
-        if (_replayFrameIndex >= frames.Count - 1)
-            return frames[^1].MsSinceStart;
-
-        var f0 = frames[_replayFrameIndex];
-        var f1 = frames[_replayFrameIndex + 1];
-
-        double segmentStart = f0.MsSinceStart;
-        double segmentEnd = segmentStart + f1.MsSincePreviousFrame;
-
-        if (segmentEnd <= segmentStart)
-            return segmentStart;
-
-        float t = (float)((_songCursor - segmentStart) / (segmentEnd - segmentStart));
-        t = Math.Clamp(t, 0f, 1f);
-
-        return segmentStart + t * (segmentEnd - segmentStart);
-    }
-
     private Vector2 GetCurrentCursor()
     {
         switch (State)
@@ -346,27 +324,9 @@ public class Player
             return _playfieldOffset;
 
         var frames = Replay.Frames;
-        return _playfieldOffset + _scale * new Vector2(frames[_replayFrameIndex].X, frames[_replayFrameIndex].Y);
-        if (_replayFrameIndex >= frames.Count - 1)
-        {
-            var last = frames[^1];
-            return _playfieldOffset + new Vector2(last.X, last.Y) * _scale;
-        }
-
-        var f0 = frames[_replayFrameIndex];
-        var f1 = frames[_replayFrameIndex + 1];
-
-        double segmentStart = f0.MsSinceStart;
-        double segmentEnd = segmentStart + f1.MsSincePreviousFrame;
-
-        float t = (segmentEnd <= segmentStart) ? 0f :
-            (float)((_songCursor - segmentStart) / (segmentEnd - segmentStart));
-
-        t = Math.Clamp(t, 0f, 1f);
-        t = t * t * (3f - 2f * t);
-
-        var pos = Vector2.Lerp(new Vector2(f0.X, f0.Y), new Vector2(f1.X, f1.Y), t);
-        return _playfieldOffset + pos * _scale;
+        if (_replayFrameIndex < frames.Count)
+            return _playfieldOffset + _scale * new Vector2(frames[_replayFrameIndex].X, frames[_replayFrameIndex].Y);
+        return _playfieldOffset + _scale * new Vector2(frames[_replayFrameIndex-1].X, frames[_replayFrameIndex-1].Y);
     }
 
     private Vector2 GetPositionAtTime(double songCursor, int targetIndex)

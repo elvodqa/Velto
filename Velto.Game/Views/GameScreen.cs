@@ -187,7 +187,7 @@ public class GameScreen : Screen, IDisposable
             if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_RIGHT))
             {
                 _songTrack?.Speed += 0.10f;
-                clock.Rate += 0.10f;
+                clock.Rate += 0.10f; 
             }
 
             if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_LEFT))
