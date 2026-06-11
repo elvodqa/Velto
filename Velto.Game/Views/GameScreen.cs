@@ -137,8 +137,8 @@ public class GameScreen : Screen, IDisposable
             //clock.CurrentTime = _songTrack.Position;
             //clock.CurrentTime += delta;
 
-            clock.Rate = 1.5f;
-            _songTrack.Speed = 1.5f;
+            //clock.Rate = 1f;
+            //_songTrack.Speed = 1f;
             //_songTrack.Position = clock.CurrentTime;
         }
 
@@ -187,11 +187,13 @@ public class GameScreen : Screen, IDisposable
             if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_RIGHT))
             {
                 _songTrack?.Speed += 0.10f;
+                clock.Rate += 0.10f;
             }
 
             if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_LEFT))
             {
                 _songTrack?.Speed -= 0.10f;
+                clock.Rate -= 0.10f;
             }
         }
         else
@@ -304,6 +306,7 @@ public class GameScreen : Screen, IDisposable
             {
                 _doubleTimeEnabled = !_doubleTimeEnabled;
                 _songTrack?.Speed = _doubleTimeEnabled ? 1.5f : 1.0f;
+                clock.Rate = _doubleTimeEnabled ? 1.5f : 1.0f;
             }
 
             if (Math.Abs(Input.WheelY) > 0.01f)

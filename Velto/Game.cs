@@ -200,8 +200,8 @@ public unsafe class Game : IDisposable
 
 
         var input = (double)(inputEnd - inputStart) * 1000f / Stopwatch.Frequency;
-        var update = (double)(inputEnd - inputStart) * 1000f / Stopwatch.Frequency;
-        var draw = (double)(inputEnd - inputStart) * 1000f / Stopwatch.Frequency;
+        var update = (double)(updateEnd - updateStart) * 1000f / Stopwatch.Frequency;
+        var draw = (double)(draweEnd - drawBegin) * 1000f / Stopwatch.Frequency;
         
         if (_debugInfo)
         {
