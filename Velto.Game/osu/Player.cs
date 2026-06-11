@@ -57,6 +57,7 @@ public class Player
     public void SetReplay(Replay replay)
     {
         Replay = replay;
+        
         _replayFrameIndex = 0;
     }
 
@@ -118,8 +119,10 @@ public class Player
                 break;
         }
 
-        _prevPrimary = ActionPrimaryDown;
-        _prevSecondary = ActionSecondaryDown;
+        // NOTE: _prevPrimary/_prevSecondary are only meaningful for replays and are
+        // advanced per processed frame inside UpdateReplay(). They must NOT be clobbered
+        // here, otherwise an update that processes no new replay frame would reset the
+        // held-key state and make the next frame look like a fresh press.
     }
 
     private void UpdatePlayerInput()
@@ -241,6 +244,11 @@ public class Player
         {
             _replayFrameIndex++;
         }
+
+        // Restart edge detection cleanly after a seek so the first frame we re-process
+        // doesn't get treated as a spurious key press.
+        _prevPrimary = false;
+        _prevSecondary = false;
     }
 
     private void UpdateReplay()
@@ -249,34 +257,40 @@ public class Player
             return;
 
         var frames = Replay.Frames;
-        
-        // Normal forward advancement
-        while (_replayFrameIndex < frames.Count - 1 &&
-               frames[_replayFrameIndex + 1].MsSinceStart <= _songCursor)
+
+        // Normal forward advancement.
+        // Each replay frame is judged at its own timestamp. Key edges ("just pressed") are
+        // computed against the previously *processed* frame and the per-frame state is
+        // advanced inside the loop, so a key held across many frames only fires a single
+        // press event instead of one per frame (which previously leaked onto later objects
+        // and judged them far too early).
+        while (_replayFrameIndex < frames.Count &&
+               frames[_replayFrameIndex].MsSinceStart <= _songCursor)
         {
+            var currentFrame = frames[_replayFrameIndex];
+
+            // Reconstruct key states for this frame from scratch (so a release is honored).
+            bool primaryDown = false;
+            bool secondaryDown = false;
+            foreach (var key in currentFrame.KeysPressed)
+            {
+                if (key == Keypress.K1 || key == Keypress.M1)
+                    primaryDown = true;
+                else if (key == Keypress.K2 || key == Keypress.M2)
+                    secondaryDown = true;
+            }
+
+            ActionPrimaryDown = primaryDown;
+            ActionSecondaryDown = secondaryDown;
+            ActionPrimaryPressed = primaryDown && !_prevPrimary;
+            ActionSecondaryPressed = secondaryDown && !_prevSecondary;
+
+            _gameScreen.Judge(currentFrame.MsSinceStart);
+
+            _prevPrimary = primaryDown;
+            _prevSecondary = secondaryDown;
             _replayFrameIndex++;
         }
-
-        var currentFrame = frames[_replayFrameIndex];
-        
-        // Reconstruct key states
-        foreach (var key in currentFrame.KeysPressed)
-        {
-            if (key == Keypress.K1)
-            {
-                ActionPrimaryDown = true;
-                if (!_prevPrimary) ActionPrimaryPressed = true;
-            }
-            else if (key == Keypress.K2)
-            {
-                ActionSecondaryDown = true;
-                if (!_prevSecondary) ActionSecondaryPressed = true;
-            }
-        }
-
-        // Sync GameView time smoothly
-        //_gameView.SongCursor = GetInterpolatedReplayTime();
-        //_gameView.SongCursor = currentFrame.MsSinceStart;
     }
     
     private double GetInterpolatedReplayTime()
@@ -332,7 +346,7 @@ public class Player
             return _playfieldOffset;
 
         var frames = Replay.Frames;
-
+        return _playfieldOffset + _scale * new Vector2(frames[_replayFrameIndex].X, frames[_replayFrameIndex].Y);
         if (_replayFrameIndex >= frames.Count - 1)
         {
             var last = frames[^1];

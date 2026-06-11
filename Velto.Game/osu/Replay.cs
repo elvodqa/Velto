@@ -356,10 +356,14 @@ public class Replay
                                 break;
                             }
 
+                            // A frame's absolute time is the running total *including* this
+                            // frame's delta. Accumulate first so the frame is stamped with its
+                            // real time instead of the previous frame's (which judged everything
+                            // one frame early).
+                            currentMs += prevMs;
+
                             ReplayFrame rf = new ReplayFrame(currentMs, prevMs, currentX, currentY, keyPresses);
                             replay.Frames.Add(rf);
-
-                            currentMs += prevMs;
                         }
 
                         replay.OnlineScoreID = reader.ReadInt64();

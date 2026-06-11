@@ -98,7 +98,7 @@ public class Skin : IDisposable
         Hit300 = GetElementTexture("hit300", "hit300");
         Hit100 = GetElementTexture("hit100", "hit100");
         Hit50 = GetElementTexture("hit50", "hit50");
-        Hit0 = GetElementTexture("Hit0", "Hit0");
+        Hit0 = GetElementTexture("hit0", "hit0");
         ScorebarBg = GetElementTexture("scorebar-bg", "scorebar-bg");
         ScorebarColour = GetElementTexture("scorebar-colour", "scorebar-colour");
         ScoreX = GetElementTexture("score-x", "score-x");

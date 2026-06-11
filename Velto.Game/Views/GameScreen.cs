@@ -177,8 +177,8 @@ public class GameScreen : Screen, IDisposable
 
         if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_F4))
         {
-            SetBeatmap(new Beatmap(Resources.GetPath("Resources/Songs/564165 ke-ji feat. Nanahira - Ange du Blanc Pur/ke-ji feat. Nanahira - Ange du Blanc Pur (BarkingMadDog) [ABSOLUTION].osu")));
-            Player.SetReplay(Replay.ParseReplay(Resources.GetPath("Resources/Replays/ange.osr")));
+            SetBeatmap(new Beatmap(Resources.GetPath("Resources/Songs/983942 Oomori Seiko - JUSTadICE (TV Size)/Oomori Seiko - JUSTadICE (TV Size) (fieryrage) [Extreme].osu")));
+            Player.SetReplay(Replay.ParseReplay(Resources.GetPath("Resources/Replays/fiery.osr")));
             Player.SetState(PlayerState.Replay);
         }
 
@@ -320,226 +320,7 @@ public class GameScreen : Screen, IDisposable
         
         Player.Update(delta, clock.CurrentTime, _playfieldTopLeft, scale);
         // Handle objects bkz: https://osu.ppy.sh/wiki/en/Gameplay/Judgement/osu%21 
-        foreach (var hitObject in _beatmap.HitObjects)
-        {
-            if (hitObject.Time > clock.CurrentTime + _beatmap.Preempt) continue;
-            
-            if (hitObject is HitCircle circle)
-            {
-                var playerCursor = Player.Cursor;
-                if (hitObject.HitResult == HitResult.None)
-                {
-                    if (clock.CurrentTime -  (200 - 10 * _beatmap.OverallDifficulty) >= circle.Time)
-                    {
-                        _comboCount = 0;
-                        hitObject.HitResult = HitResult.Miss;
-                        hitObject.Failed = true;
-                        AddResultParticle(hitObject.Position, hitObject.HitResult, clock.CurrentTime);
-                        AudioManager.Instance.PlaySample(_context.Skin.ComboBreak);
-                    }
-                    
-                    float radiusScreen = osuRadius * scale;
-                    var circlePosition = _playfieldTopLeft + circle.Position * scale;
-                    if (Vector2.Distance(circlePosition, playerCursor) <= radiusScreen)
-                        if (Player.ActionPrimaryPressed || Player.ActionSecondaryPressed)
-                        {
-                            // bkz: https://osu.ppy.sh/wiki/en/Gameplay/Judgement/osu%21
-                            _hitIndicators.Add(new()
-                            {
-                                Life = HitIndicatorMaxLife,
-                                Offset = hitObject.Time - clock.CurrentTime,
-                            });
-                            hitObject.HitTime = clock.CurrentTime;
-                            var difference = Math.Abs(clock.CurrentTime - hitObject.Time);
-                            if (difference <= 80 - 6 * _beatmap.OverallDifficulty) // 300
-                            {
-                                _comboCount++;
-                                var score = 300 * (1 + (Math.Max(_comboCount - 1, 0) * _difficultyMultiplier *
-                                    _modMultiplier / 25));
-                                _totalScore += score;
-                                hitObject.HitResult = HitResult.Good;
-                            }
-                            else if (difference <= 140 - 8 * _beatmap.OverallDifficulty) // 100
-                            {
-                                _comboCount++;
-                                var score = 100 * (1 + (Math.Max(_comboCount - 1, 0) * _difficultyMultiplier *
-                                    _modMultiplier / 25));
-                                _totalScore += score;
-                                hitObject.HitResult = HitResult.Ok;
-                            }
-                            else if (difference <= 200 - 10 * _beatmap.OverallDifficulty) // 50
-                            {
-                                _comboCount++;
-                                var score = 50 * (1 + (Math.Max(_comboCount - 1, 0) * _difficultyMultiplier *
-                                    _modMultiplier / 25));
-                                _totalScore += score;
-                                hitObject.HitResult = HitResult.Meh;
-                            }
-                            else // miss
-                            {
-                                _comboCount = 0;
-                                hitObject.HitResult = HitResult.Miss;
-                                AudioManager.Instance.PlaySample(_context.Skin.ComboBreak);
-                            }
-
-                            circle.HitTime = clock.CurrentTime;
-                            AddResultParticle(hitObject.Position, hitObject.HitResult, clock.CurrentTime);
-                            AudioManager.Instance.PlaySample(_context.Skin.Normal.HitNormal);
-                        }
-
-                    // Noteblock
-                    if (Player.ActionPrimaryPressed || Player.ActionSecondaryPressed)
-                    {
-                        break;
-                    }
-                }
-            }
-            // https://github.com/ppy/osu/wiki/Anatomy-of-a-slider
-            else if (hitObject is Slider slider)
-            {
-                if (clock.CurrentTime >= slider.Time + slider.Duration && !slider.JudgementDone)
-                {
-                    if (slider.LastHeld <= slider.Time + slider.Duration && slider.LastHeld >= slider.Time + slider.Duration - Slider.FORGIVING_TIME)
-                    {
-                        slider.WasFollowedAtEnd = slider.IsCurrentlyBeingFollowed;
-                    }
-
-                    // var sliderCompletion = 0;
-                    // if (slider.WasFollowedAtEnd)
-                    // {
-                    //     _comboCount++;
-                    //     var score = 300 * (1 + (Math.Max(_comboCount - 1, 0) * _difficultyMultiplier * _modMultiplier / 25));
-                    //     _totalScore += score;
-                    //     AddResultParticle(slider.GetPositionAt(slider.Time + slider.Duration), HitResult.Good, _songCursor);
-                    //     AudioManager.Instance.PlaySample(_context.Skin.Normal.HitNormal);
-                    // }
-                    // else
-                    // {
-                    //     _comboCount = 0;
-                    //     AddResultParticle(slider.GetPositionAt(slider.Time + slider.Duration), HitResult.Miss, _songCursor);
-                    //     AudioManager.Instance.PlaySample(_context.Skin.ComboBreak);
-                    // }
-                    slider.JudgementDone = true;
-                    //Logger.Instance.Info($"Slider held for {slider.TotalFollowTime}/{slider.Duration}");
-                }
-                
-                if (clock.CurrentTime > slider.Time + slider.Duration)
-                    continue; // already judged
-                
-                var playerCursor = Player.Cursor;
-                
-                if (clock.CurrentTime - 150 >= slider.Time && slider.HitResult == HitResult.None)
-                {
-                    _comboCount = 0;
-                    AudioManager.Instance.PlaySample(_context.Skin.ComboBreak);
-                    hitObject.HitResult = HitResult.Miss;
-                    AddResultParticle(hitObject.Position, hitObject.HitResult, clock.CurrentTime);
-                }
-                
-                float radiusHitCircle = osuRadius * scale;
-                var circlePosition = _playfieldTopLeft + slider.Position * scale;
-                if (Vector2.Distance(circlePosition, playerCursor) <= radiusHitCircle)
-                {
-                    if ((Player.ActionPrimaryPressed || Player.ActionSecondaryPressed) &&
-                        slider.HitResult == HitResult.None)
-                    {
-                        _hitIndicators.Add(new()
-                        {
-                            Life = HitIndicatorMaxLife,
-                            Offset = clock.CurrentTime - hitObject.Time,
-                        });
-                        slider.HitTime = clock.CurrentTime;
-                        var difference = Math.Abs(clock.CurrentTime - slider.Time);
-                        if (difference <= 80 - 6 * _beatmap.OverallDifficulty) // 300
-                        {
-                            _comboCount++;
-                            var score = 300 * (1 + (Math.Max(_comboCount - 1, 0) * _difficultyMultiplier *
-                                _modMultiplier / 25));
-                            _totalScore += score;
-                            hitObject.HitResult = HitResult.Good;
-                        }
-                        else if (difference <= 140 - 8 * _beatmap.OverallDifficulty) // 100
-                        {
-                            _comboCount++;
-                            var score = 100 * (1 + (Math.Max(_comboCount - 1, 0) * _difficultyMultiplier *
-                                _modMultiplier / 25));
-                            _totalScore += score;
-                            hitObject.HitResult = HitResult.Ok;
-                        }
-                        else if (difference <= 200 - 10 * _beatmap.OverallDifficulty) // 50
-                        {
-                            _comboCount++;
-                            var score = 50 * (1 + (Math.Max(_comboCount - 1, 0) * _difficultyMultiplier *
-                                _modMultiplier / 25));
-                            _totalScore += score;
-                            hitObject.HitResult = HitResult.Meh;
-                        }
-                        else // miss
-                        {
-                            hitObject.HitResult = HitResult.Miss;
-                            _comboCount = 0;
-                            AudioManager.Instance.PlaySample(_context.Skin.ComboBreak);
-                        }
-
-                        slider.HitTime = clock.CurrentTime;
-                        AddResultParticle(hitObject.Position, hitObject.HitResult, clock.CurrentTime);
-                        AudioManager.Instance.PlaySample(_context.Skin.Normal.HitNormal);
-                    }
-                }
-                
-                var followCirclePos = slider.GetPositionAt(clock.CurrentTime);
-                var ballPosition = _playfieldTopLeft + followCirclePos * scale;
-                var radiusFollowCircle = (_baseCircleSize * 2.5f) / 2f;
-
-                bool sliderActive = clock.CurrentTime >= slider.Time && clock.CurrentTime <= slider.Time + slider.Duration;
-                bool isInFollowRange = sliderActive && 
-                                       Vector2.Distance(ballPosition, playerCursor) <= radiusFollowCircle;
-                bool isHolding = Player.ActionPrimaryDown || Player.ActionSecondaryDown;
-                bool isFollowingNow = sliderActive && isInFollowRange && isHolding;
-
-                if (sliderActive)
-                {
-                    slider.IsCurrentlyBeingFollowed = isFollowingNow;
-
-                    if (isFollowingNow)
-                    {
-                        // Accumulate follow time
-                        double deltaFollow = clock.CurrentTime - Math.Max(slider.LastFollowUpdate, slider.Time);
-                        slider.TotalFollowTime += deltaFollow;
-
-                        // Continuous follow tracking
-                        if (slider.WasFollowingPreviousFrame)
-                        {
-                            slider.CurrentContinuousFollow += deltaFollow;
-                        }
-                        else
-                        {
-                            // Just started following again
-                            slider.CurrentContinuousFollow = deltaFollow;
-                        }
-
-                        if (slider.CurrentContinuousFollow > slider.LongestContinuousFollow)
-                            slider.LongestContinuousFollow = slider.CurrentContinuousFollow;
-
-                        slider.LastHeld = clock.CurrentTime;
-                        slider.LastFollowUpdate = clock.CurrentTime;
-                    }
-
-                    slider.WasFollowingPreviousFrame = isFollowingNow;
-                }
-                
-                // Optional: play tick sounds while following
-                if (isInFollowRange && isHolding)
-                {
-                    // You can add logic here for slider ticks
-                }
-
-                if (Player.ActionPrimaryPressed || Player.ActionSecondaryPressed)
-                {
-                    break;
-                }
-            }
-        }
+        //Judge(clock.CurrentTime);
         
         // if (_lastCursorPosition != Vector2.Zero && Vector2.Distance(Player.Cursor, _lastCursorPosition) > 8)
         //     trails.Enqueue(new TrailInfo
@@ -582,7 +363,233 @@ public class GameScreen : Screen, IDisposable
                 trails.Enqueue(trail);
         }
     }
-    
+
+    public void Judge(double time)
+    {
+        var scale = _playfieldWidth / PlayfieldW;
+        var osuRadius = 54.4f - 4.48f * _beatmap.CircleSize;
+        foreach (var hitObject in _beatmap.HitObjects)
+        {
+            if (hitObject.Time > time + _beatmap.Preempt) continue;
+            
+            if (hitObject is HitCircle circle)
+            {
+                var playerCursor = Player.Cursor;
+                if (hitObject.HitResult == HitResult.None)
+                {
+                    if (time -  (200 - 10 * _beatmap.OverallDifficulty) >= circle.Time)
+                    {
+                        _comboCount = 0;
+                        hitObject.HitResult = HitResult.Miss;
+                        hitObject.Failed = true;
+                        AddResultParticle(hitObject.Position, hitObject.HitResult, time);
+                        AudioManager.Instance.PlaySample(_context.Skin.ComboBreak);
+                    }
+                    
+                    float radiusScreen = osuRadius * scale;
+                    var circlePosition = _playfieldTopLeft + circle.Position * scale;
+                    if (Vector2.Distance(circlePosition, playerCursor) <= radiusScreen)
+                        if (Player.ActionPrimaryPressed || Player.ActionSecondaryPressed)
+                        {
+                            // bkz: https://osu.ppy.sh/wiki/en/Gameplay/Judgement/osu%21
+                            var difference = Math.Abs(time - hitObject.Time);
+                            // osu! only registers a click as a hit when it lands inside the
+                            // hit window. Clicks earlier than the 50 window are ignored (the
+                            // note can still be hit on time); clicks past it have already been
+                            // auto-missed above. So we never produce a Miss from an early click.
+                            if (difference <= 200 - 10 * _beatmap.OverallDifficulty)
+                            {
+                                _hitIndicators.Add(new()
+                                {
+                                    Life = HitIndicatorMaxLife,
+                                    Offset = hitObject.Time - time,
+                                });
+                                hitObject.HitTime = time;
+                                if (difference <= 80 - 6 * _beatmap.OverallDifficulty) // 300
+                                {
+                                    _comboCount++;
+                                    var score = 300 * (1 + (Math.Max(_comboCount - 1, 0) * _difficultyMultiplier *
+                                        _modMultiplier / 25));
+                                    _totalScore += score;
+                                    hitObject.HitResult = HitResult.Good;
+                                }
+                                else if (difference <= 140 - 8 * _beatmap.OverallDifficulty) // 100
+                                {
+                                    _comboCount++;
+                                    var score = 100 * (1 + (Math.Max(_comboCount - 1, 0) * _difficultyMultiplier *
+                                        _modMultiplier / 25));
+                                    _totalScore += score;
+                                    hitObject.HitResult = HitResult.Ok;
+                                }
+                                else // 50
+                                {
+                                    _comboCount++;
+                                    var score = 50 * (1 + (Math.Max(_comboCount - 1, 0) * _difficultyMultiplier *
+                                        _modMultiplier / 25));
+                                    _totalScore += score;
+                                    hitObject.HitResult = HitResult.Meh;
+                                }
+
+                                circle.HitTime = time;
+                                AddResultParticle(hitObject.Position, hitObject.HitResult, time);
+                                AudioManager.Instance.PlaySample(_context.Skin.Normal.HitNormal);
+                            }
+                        }
+
+                    // Noteblock
+                    if (Player.ActionPrimaryPressed || Player.ActionSecondaryPressed)
+                    {
+                        break;
+                    }
+                }
+            }
+            // https://github.com/ppy/osu/wiki/Anatomy-of-a-slider
+            else if (hitObject is Slider slider)
+            {
+                if (time >= slider.Time + slider.Duration && !slider.JudgementDone)
+                {
+                    if (slider.LastHeld <= slider.Time + slider.Duration && slider.LastHeld >= slider.Time + slider.Duration - Slider.FORGIVING_TIME)
+                    {
+                        slider.WasFollowedAtEnd = slider.IsCurrentlyBeingFollowed;
+                    }
+
+                    // var sliderCompletion = 0;
+                    // if (slider.WasFollowedAtEnd)
+                    // {
+                    //     _comboCount++;
+                    //     var score = 300 * (1 + (Math.Max(_comboCount - 1, 0) * _difficultyMultiplier * _modMultiplier / 25));
+                    //     _totalScore += score;
+                    //     AddResultParticle(slider.GetPositionAt(slider.Time + slider.Duration), HitResult.Good, _songCursor);
+                    //     AudioManager.Instance.PlaySample(_context.Skin.Normal.HitNormal);
+                    // }
+                    // else
+                    // {
+                    //     _comboCount = 0;
+                    //     AddResultParticle(slider.GetPositionAt(slider.Time + slider.Duration), HitResult.Miss, _songCursor);
+                    //     AudioManager.Instance.PlaySample(_context.Skin.ComboBreak);
+                    // }
+                    slider.JudgementDone = true;
+                    //Logger.Instance.Info($"Slider held for {slider.TotalFollowTime}/{slider.Duration}");
+                }
+                
+                if (time > slider.Time + slider.Duration)
+                    continue; // already judged
+                
+                var playerCursor = Player.Cursor;
+                
+                if (time - 150 >= slider.Time && slider.HitResult == HitResult.None)
+                {
+                    _comboCount = 0;
+                    AudioManager.Instance.PlaySample(_context.Skin.ComboBreak);
+                    hitObject.HitResult = HitResult.Miss;
+                    AddResultParticle(hitObject.Position, hitObject.HitResult, time);
+                }
+                
+                float radiusHitCircle = osuRadius * scale;
+                var circlePosition = _playfieldTopLeft + slider.Position * scale;
+                if (Vector2.Distance(circlePosition, playerCursor) <= radiusHitCircle)
+                {
+                    if ((Player.ActionPrimaryPressed || Player.ActionSecondaryPressed) &&
+                        slider.HitResult == HitResult.None)
+                    {
+                        var difference = Math.Abs(time - slider.Time);
+                        // Same as hit circles: an early click (before the 50 window) is ignored
+                        // rather than turned into a Miss, so the slider head can still be hit.
+                        if (difference <= 200 - 10 * _beatmap.OverallDifficulty)
+                        {
+                            _hitIndicators.Add(new()
+                            {
+                                Life = HitIndicatorMaxLife,
+                                Offset = time - hitObject.Time,
+                            });
+                            slider.HitTime = time;
+                            if (difference <= 80 - 6 * _beatmap.OverallDifficulty) // 300
+                            {
+                                _comboCount++;
+                                var score = 300 * (1 + (Math.Max(_comboCount - 1, 0) * _difficultyMultiplier *
+                                    _modMultiplier / 25));
+                                _totalScore += score;
+                                hitObject.HitResult = HitResult.Good;
+                            }
+                            else if (difference <= 140 - 8 * _beatmap.OverallDifficulty) // 100
+                            {
+                                _comboCount++;
+                                var score = 100 * (1 + (Math.Max(_comboCount - 1, 0) * _difficultyMultiplier *
+                                    _modMultiplier / 25));
+                                _totalScore += score;
+                                hitObject.HitResult = HitResult.Ok;
+                            }
+                            else // 50
+                            {
+                                _comboCount++;
+                                var score = 50 * (1 + (Math.Max(_comboCount - 1, 0) * _difficultyMultiplier *
+                                    _modMultiplier / 25));
+                                _totalScore += score;
+                                hitObject.HitResult = HitResult.Meh;
+                            }
+
+                            slider.HitTime = time;
+                            AddResultParticle(hitObject.Position, hitObject.HitResult, time);
+                            AudioManager.Instance.PlaySample(_context.Skin.Normal.HitNormal);
+                        }
+                    }
+                }
+                
+                var followCirclePos = slider.GetPositionAt(time);
+                var ballPosition = _playfieldTopLeft + followCirclePos * scale;
+                var radiusFollowCircle = (_baseCircleSize * 2.5f) / 2f;
+
+                bool sliderActive = time >= slider.Time && time <= slider.Time + slider.Duration;
+                bool isInFollowRange = sliderActive && 
+                                       Vector2.Distance(ballPosition, playerCursor) <= radiusFollowCircle;
+                bool isHolding = Player.ActionPrimaryDown || Player.ActionSecondaryDown;
+                bool isFollowingNow = sliderActive && isInFollowRange && isHolding;
+
+                if (sliderActive)
+                {
+                    slider.IsCurrentlyBeingFollowed = isFollowingNow;
+
+                    if (isFollowingNow)
+                    {
+                        // Accumulate follow time
+                        double deltaFollow = time - Math.Max(slider.LastFollowUpdate, slider.Time);
+                        slider.TotalFollowTime += deltaFollow;
+
+                        // Continuous follow tracking
+                        if (slider.WasFollowingPreviousFrame)
+                        {
+                            slider.CurrentContinuousFollow += deltaFollow;
+                        }
+                        else
+                        {
+                            // Just started following again
+                            slider.CurrentContinuousFollow = deltaFollow;
+                        }
+
+                        if (slider.CurrentContinuousFollow > slider.LongestContinuousFollow)
+                            slider.LongestContinuousFollow = slider.CurrentContinuousFollow;
+
+                        slider.LastHeld = time;
+                        slider.LastFollowUpdate = time;
+                    }
+
+                    slider.WasFollowingPreviousFrame = isFollowingNow;
+                }
+                
+                // Optional: play tick sounds while following
+                if (isInFollowRange && isHolding)
+                {
+                    // You can add logic here for slider ticks
+                }
+
+                if (Player.ActionPrimaryPressed || Player.ActionSecondaryPressed)
+                {
+                    break;
+                }
+            }
+        }
+    }
+
     public override void Draw(Renderer r)
     {
         r.Clear(new(0, 0, 0, 1));
