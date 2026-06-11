@@ -177,8 +177,8 @@ public class GameScreen : Screen, IDisposable
 
         if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_F4))
         {
-            SetBeatmap(new Beatmap(Resources.GetPath("Resources/Songs/983942 Oomori Seiko - JUSTadICE (TV Size)/Oomori Seiko - JUSTadICE (TV Size) (fieryrage) [Extreme].osu")));
-            Player.SetReplay(Replay.ParseReplay(Resources.GetPath("Resources/Replays/fiery.osr")));
+            SetBeatmap(new Beatmap(Resources.GetPath("Resources/Songs/564165 ke-ji feat. Nanahira - Ange du Blanc Pur/ke-ji feat. Nanahira - Ange du Blanc Pur (BarkingMadDog) [ABSOLUTION].osu")));
+            Player.SetReplay(Replay.ParseReplay(Resources.GetPath("Resources/Replays/ange.osr")));
             Player.SetState(PlayerState.Replay);
         }
 
