@@ -177,8 +177,11 @@ public class GameScreen : Screen, IDisposable
 
         if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_F4))
         {
-            SetBeatmap(new Beatmap(Resources.GetPath("Resources/Songs/983942 Oomori Seiko - JUSTadICE (TV Size)/Oomori Seiko - JUSTadICE (TV Size) (fieryrage) [Extreme].osu")));
-            Player.SetReplay(Replay.ParseReplay(Resources.GetPath("Resources/Replays/fiery.osr")));
+            //SetBeatmap(new Beatmap(Resources.GetPath("Resources/Songs/983942 Oomori Seiko - JUSTadICE (TV Size)/Oomori Seiko - JUSTadICE (TV Size) (fieryrage) [Extreme].osu")));
+            //Player.SetReplay(Replay.ParseReplay(Resources.GetPath("Resources/Replays/fiery.osr")));
+            SetBeatmap(new Beatmap(Resources.GetPath("Resources/Songs/564165 ke-ji feat. Nanahira - Ange du Blanc Pur/ke-ji feat. Nanahira - Ange du Blanc Pur (BarkingMadDog) [ABSOLUTION].osu")));
+            Player.SetReplay(Replay.ParseReplay(Resources.GetPath("Resources/Replays/ange.osr")));
+
             Player.SetState(PlayerState.Replay);
         }
 
@@ -448,26 +451,26 @@ public class GameScreen : Screen, IDisposable
             {
                 if (time >= slider.Time + slider.Duration && !slider.JudgementDone)
                 {
-                    if (slider.LastHeld <= slider.Time + slider.Duration && slider.LastHeld >= slider.Time + slider.Duration - Slider.FORGIVING_TIME)
+                    if (slider.LastHeld <= slider.Time + slider.Duration + Slider.FORGIVING_TIME && slider.LastHeld >= slider.Time + slider.Duration - Slider.FORGIVING_TIME)
                     {
                         slider.WasFollowedAtEnd = slider.IsCurrentlyBeingFollowed;
                     }
 
                     // var sliderCompletion = 0;
-                    // if (slider.WasFollowedAtEnd)
-                    // {
-                    //     _comboCount++;
-                    //     var score = 300 * (1 + (Math.Max(_comboCount - 1, 0) * _difficultyMultiplier * _modMultiplier / 25));
-                    //     _totalScore += score;
-                    //     AddResultParticle(slider.GetPositionAt(slider.Time + slider.Duration), HitResult.Good, _songCursor);
-                    //     AudioManager.Instance.PlaySample(_context.Skin.Normal.HitNormal);
-                    // }
-                    // else
-                    // {
-                    //     _comboCount = 0;
-                    //     AddResultParticle(slider.GetPositionAt(slider.Time + slider.Duration), HitResult.Miss, _songCursor);
-                    //     AudioManager.Instance.PlaySample(_context.Skin.ComboBreak);
-                    // }
+                    if (slider.WasFollowedAtEnd)
+                    {
+                        _comboCount++;
+                        var score = 300 * (1 + (Math.Max(_comboCount - 1, 0) * _difficultyMultiplier * _modMultiplier / 25));
+                        _totalScore += score;
+                        AddResultParticle(slider.GetPositionAt(slider.Time + slider.Duration), HitResult.Good, clock.CurrentTime);
+                        AudioManager.Instance.PlaySample(_context.Skin.Normal.HitNormal);
+                    }
+                    else
+                    {
+                        //_comboCount = 0;
+                        //AddResultParticle(slider.GetPositionAt(slider.Time + slider.Duration), HitResult.Miss, clock.CurrentTime);
+                        //AudioManager.Instance.PlaySample(_context.Skin.ComboBreak);
+                    }
                     slider.JudgementDone = true;
                     //Logger.Instance.Info($"Slider held for {slider.TotalFollowTime}/{slider.Duration}");
                 }
@@ -699,7 +702,7 @@ public class GameScreen : Screen, IDisposable
                             posX - drawSize / 2,
                             posY - drawSize / 2,
                             drawSize,
-                            drawSize, circle.Color with { W = Math.Min(1, 1) });
+                            drawSize, circle.Color with { W = Math.Min(fadein, fadeout) });
 
                         r.DrawTexture(_context.Skin.HitCircleOverlay,
                             posX - drawSize / 2,

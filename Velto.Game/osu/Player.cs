@@ -225,8 +225,8 @@ public class Player
             }
         }
         
-        _prevPrimary = false;
-        _prevSecondary = false;
+        //_prevPrimary = false;
+        //_prevSecondary = false;
     }
     
     private void HandleReplayRollback()
