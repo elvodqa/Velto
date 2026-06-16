@@ -99,9 +99,12 @@ public class Player
         ActionSecondaryPressed = false;
         ActionSecondaryDown = false;
         
-        if (isRollback && State == PlayerState.Replay)
+        if (isRollback)
         {
-            HandleReplayRollback();
+            if (State == PlayerState.Replay)
+                HandleReplayRollback();
+            else if (State == PlayerState.Autoplay)
+                HandleAutoplayRollback();
         }
 
         switch (State)
@@ -136,99 +139,107 @@ public class Player
             ActionSecondaryPressed = true;
         if (Input.IsKeyDown(SDL_Scancode.SDL_SCANCODE_X))
             ActionSecondaryDown = true;
+        
+        _gameScreen.Judge(_gameScreen.clock.CurrentTime);
     }
 
     private void UpdateAutoplay()
     {
-        double HIT_WINDOW = 80.0 - 6.0 * _beatmap.OverallDifficulty;
+        double hitWindow = 80.0 - 6.0 * _beatmap.OverallDifficulty;
 
         var objects = _beatmap.HitObjects;
         if (objects.Count == 0) return;
 
-        int currentIndex = -1;
-        HitObject? current = null;
-        
-        for (int i = 0; i < objects.Count; i++)
+        // --- Judging: process ALL objects whose hit time has arrived ---
+        // Uses a replay-style while loop so no object is skipped when
+        // songCursor jumps past several objects in a single update.
+        while (_lastAutoplayHitIndex + 1 < objects.Count)
         {
-            var obj = objects[i];
+            int nextIndex = _lastAutoplayHitIndex + 1;
+            var nextObj = objects[nextIndex];
 
-            if (_songCursor < obj.Time)
+            if (_songCursor >= nextObj.Time - hitWindow)
             {
-                currentIndex = i;
-                current = obj;
-                break;
+                Alternate(nextObj);
+                _gameScreen.Judge(nextObj.Time);
+                _lastAutoplayHitIndex = nextIndex;
+
+                // If we just hit an active slider, stop here — it needs to be
+                // held through its duration before we advance to the next object.
+                if (nextObj is Slider s && _songCursor <= s.Time + s.Duration)
+                    break;
             }
-            
-            if (obj is Slider slider && 
-                _songCursor >= slider.Time && 
-                _songCursor <= slider.Time + slider.Duration)
+            else
             {
-                currentIndex = i;
-                current = obj;
                 break;
             }
         }
 
-        if (currentIndex == -1)
+        // --- Cursor movement: find the current object based on song position ---
+        // This is independent of the judging index so the cursor always
+        // reflects the correct spatial position regardless of early judges.
+        int cursorIndex = -1;
+        for (int i = 0; i < objects.Count; i++)
+        {
+            var obj = objects[i];
+            if (_songCursor < obj.Time)
+            {
+                cursorIndex = i;
+                break;
+            }
+            if (obj is Slider slider &&
+                _songCursor >= slider.Time &&
+                _songCursor <= slider.Time + slider.Duration)
+            {
+                cursorIndex = i;
+                break;
+            }
+        }
+
+        if (cursorIndex == -1)
         {
             _autoplayCursor = objects[^1].Position;
             return;
         }
 
+        var current = objects[cursorIndex];
+
+        // Active slider hold
         if (current is Slider activeSlider &&
             _songCursor >= activeSlider.Time &&
             _songCursor <= activeSlider.Time + activeSlider.Duration)
         {
-            // look ahead
-            HitObject? next = null;
-            if (currentIndex + 1 < objects.Count)
-                next = objects[currentIndex + 1];
-
-            double lookaheadTime = 100; // tweak (ms)
-
-            bool nextIsComingSoon =
-                next != null &&
-                next.Time - _songCursor <= lookaheadTime;
-
-            if (nextIsComingSoon)
+            int nextIdx = cursorIndex + 1;
+            if (nextIdx < objects.Count &&
+                objects[nextIdx].Time - _songCursor <= 100)
             {
                 ActionPrimaryDown = false;
                 return;
             }
 
-            // normal slider behavior
             _autoplayCursor = activeSlider.GetPositionAt(_songCursor);
             ActionPrimaryDown = true;
-
-            if (_lastAutoplayHitIndex != currentIndex)
-            {
-                Alternate(current);
-                _gameScreen.Judge(current.Time);
-                _lastAutoplayHitIndex = currentIndex;
-            }
             return;
         }
 
-        // Hit circle / movement
-        _autoplayCursor = GetPositionAtTime(_songCursor, currentIndex);
-
-        double timeToHit = current.Time - _songCursor;
-        double hitWindow = 80.0 - 6.0 * _beatmap.OverallDifficulty;
-
-        if (timeToHit <= hitWindow && timeToHit >= -20.0)
-        {
-            if (_lastAutoplayHitIndex != currentIndex)
-            {
-                Alternate(current);
-                _gameScreen.Judge(current.Time);
-                _lastAutoplayHitIndex = currentIndex;
-            }
-        }
-        
-        //_prevPrimary = false;
-        //_prevSecondary = false;
+        // Move toward the upcoming object
+        _autoplayCursor = GetPositionAtTime(_songCursor, cursorIndex);
     }
     
+    private void HandleAutoplayRollback()
+    {
+        // Recalculate the last-hit index based on current song position.
+        // Without this, seeking backwards during autoplay would cause
+        // objects to be skipped because _lastAutoplayHitIndex stays stale.
+        var objects = _beatmap.HitObjects;
+        _lastAutoplayHitIndex = -1;
+        while (_lastAutoplayHitIndex + 1 < objects.Count &&
+               objects[_lastAutoplayHitIndex + 1].Time <= _songCursor)
+        {
+            _lastAutoplayHitIndex++;
+        }
+    }
+
     private void HandleReplayRollback()
     {
         // Reset to beginning when going backwards

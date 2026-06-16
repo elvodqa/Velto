@@ -17,6 +17,8 @@ public class SongSelectScreen : Screen, IDisposable
   
     private OsuContext _context;
     private Dictionary<string, Texture> _textureCache = new();
+    private bool autoplayEnabled = false;
+    private bool modMenuOpen = false;
     
     public SongSelectScreen(OsuContext context) : base(context)
     {
@@ -43,7 +45,7 @@ public class SongSelectScreen : Screen, IDisposable
             var wasHovering = box.IsHovered;
             box.IsHovered = false;
             RectangleF collision = new(box.Position.X, box.Position.Y, box.Size.X, box.Size.Y);
-            if (collision.Contains(Input.MouseX, Input.MouseY))
+            if (collision.Contains(Input.MouseX, Input.MouseY) && !modMenuOpen)
             {
                 if (!wasHovering) AudioManager.Instance.PlaySample(_context.Skin.MenuClick);
                 box.IsHovered = true;
@@ -70,16 +72,28 @@ public class SongSelectScreen : Screen, IDisposable
             PlayBeatmap(_beatmapMetas[_cursor].Beatmap);
         }
         
-        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_ESCAPE))
+        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_ESCAPE) && !modMenuOpen)
         {
             AudioManager.Instance.PlaySample(_context.Skin.MenuBack);
             Transition(new IntroScreen(_context), 200);
         }
+        
+        if ((Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_ESCAPE) && modMenuOpen) 
+            || (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_F2) && modMenuOpen))
+        {
+            modMenuOpen = false;
+        }
+        
+        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_F2) && !modMenuOpen)
+        {
+            modMenuOpen = true;
+        }
+        
 
         if (Input.IsMouseJustPressed(SDLButton.SDL_BUTTON_LEFT))
         {
             var meta = _beatmapMetas.FirstOrDefault(m => m.IsHovered);
-            if (meta != null)
+            if (meta != null && !modMenuOpen)
             {
                 PlayBeatmap(meta.Beatmap);
             }
@@ -141,6 +155,17 @@ public class SongSelectScreen : Screen, IDisposable
             box.Size.Y/5f, new Color4<Rgba>(1, 1, 1, 1));
         
         r.FlushText(Fonts.Default);
+        
+        r.DrawRectangle(0, Height - Height/7, Width, Height/7, Color4.Beige);
+
+        if (modMenuOpen)
+        {
+            r.DrawRectangle(0, 0, Width, Height, new Color4<Rgba>(0, 0, 0, 0.10f));
+            
+            
+            
+        }
+        
     }
 
     private void PlayBeatmap(Beatmap beatmap)
@@ -148,7 +173,7 @@ public class SongSelectScreen : Screen, IDisposable
         AudioManager.Instance.PlaySample(_context.Skin.MenuClick);
         var game = new GameScreen(_context);
         game.SetBeatmap(beatmap);
-        game.Player.SetState(PlayerState.Autoplay);
+        game.Player.SetState(autoplayEnabled ? PlayerState.Autoplay : PlayerState.Player);
         Transition(game, 200);
     }
 

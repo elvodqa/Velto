@@ -19,7 +19,7 @@ public class GameBase : Core.Game
         
         _context = new OsuContext()
         {
-            Skin = new Skin(Resources.GetPath($"Resources/Textures/rafis")),
+            Skin = new Skin(Resources.GetPath($"Resources/Textures/default")),
             SystemTrack = AudioManager.Instance.CreateTrack(),
         };
         

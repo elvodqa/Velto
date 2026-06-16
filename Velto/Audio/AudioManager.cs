@@ -22,6 +22,7 @@ public unsafe class AudioManager : IDisposable
     public readonly Queue<Track> SampleTracks = new();
     private const int MaxSamples = 50;
     public float SampleVolume { get; set; }
+    public float SampleSpeed { get; set; }
     private double _counter = 0;
     
     public AudioManager()
@@ -74,6 +75,7 @@ public unsafe class AudioManager : IDisposable
             Track track = CreateTrack();
             track.Audio = audioChannel;
             track.Volume = SampleVolume;
+            track.Speed = SampleSpeed;
             track.Play();
 
             SampleTracks.Enqueue(track);
@@ -84,7 +86,7 @@ public unsafe class AudioManager : IDisposable
     {
         _counter += delta;
 
-        if (_counter < 1000)
+        if (_counter < 100)
             return;
 
         _counter = 0;

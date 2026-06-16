@@ -59,7 +59,9 @@ public class GameScreen : Screen, IDisposable
     // https://osu.ppy.sh/wiki/en/Gameplay/Score/ScoreV1/osu%21
     private float _health = 1.0f;
     private int _comboCount = 0;
-    private float _totalScore = 0;
+    private float _currentScore = 0;
+    private float _maxScore = 0;
+    private float _rawScore = 0;
     private float _difficultyMultiplier = 1.0f;
     private float _modMultiplier = 1.0f;
     private readonly List<HitIndicator> _hitIndicators = new();
@@ -76,7 +78,7 @@ public class GameScreen : Screen, IDisposable
     }
 
     private OsuContext _context;
-    private StopwatchClock clock;
+    public StopwatchClock clock;
 
     public GameScreen(OsuContext context) : base(context)
     {
@@ -190,13 +192,15 @@ public class GameScreen : Screen, IDisposable
             if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_RIGHT))
             {
                 _songTrack?.Speed += 0.10f;
-                clock.Rate += 0.10f; 
+                clock.Rate += 0.10f;
+                AudioManager.Instance.SampleSpeed += 0.10f;
             }
 
             if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_LEFT))
             {
                 _songTrack?.Speed -= 0.10f;
                 clock.Rate -= 0.10f;
+                AudioManager.Instance.SampleSpeed -= 0.10f;
             }
         }
         else
@@ -387,6 +391,7 @@ public class GameScreen : Screen, IDisposable
                         hitObject.Failed = true;
                         AddResultParticle(hitObject.Position, hitObject.HitResult, time);
                         AudioManager.Instance.PlaySample(_context.Skin.ComboBreak);
+                        _maxScore += 300;
                     }
                     
                     float radiusScreen = osuRadius * scale;
@@ -413,7 +418,8 @@ public class GameScreen : Screen, IDisposable
                                     _comboCount++;
                                     var score = 300 * (1 + (Math.Max(_comboCount - 1, 0) * _difficultyMultiplier *
                                         _modMultiplier / 25));
-                                    _totalScore += score;
+                                    _currentScore += score;
+                                    _rawScore += 300;
                                     hitObject.HitResult = HitResult.Good;
                                 }
                                 else if (difference <= 140 - 8 * _beatmap.OverallDifficulty) // 100
@@ -421,7 +427,8 @@ public class GameScreen : Screen, IDisposable
                                     _comboCount++;
                                     var score = 100 * (1 + (Math.Max(_comboCount - 1, 0) * _difficultyMultiplier *
                                         _modMultiplier / 25));
-                                    _totalScore += score;
+                                    _currentScore += score;
+                                    _rawScore += 100;
                                     hitObject.HitResult = HitResult.Ok;
                                 }
                                 else // 50
@@ -429,13 +436,15 @@ public class GameScreen : Screen, IDisposable
                                     _comboCount++;
                                     var score = 50 * (1 + (Math.Max(_comboCount - 1, 0) * _difficultyMultiplier *
                                         _modMultiplier / 25));
-                                    _totalScore += score;
+                                    _currentScore += score;
+                                    _rawScore += 50;
                                     hitObject.HitResult = HitResult.Meh;
                                 }
-
+                            
                                 circle.HitTime = time;
                                 AddResultParticle(hitObject.Position, hitObject.HitResult, time);
                                 AudioManager.Instance.PlaySample(_context.Skin.Normal.HitNormal);
+                                _maxScore += 300;
                             }
                         }
 
@@ -461,7 +470,7 @@ public class GameScreen : Screen, IDisposable
                     {
                         _comboCount++;
                         var score = 300 * (1 + (Math.Max(_comboCount - 1, 0) * _difficultyMultiplier * _modMultiplier / 25));
-                        _totalScore += score;
+                        _currentScore += score;
                         AddResultParticle(slider.GetPositionAt(slider.Time + slider.Duration), HitResult.Good, clock.CurrentTime);
                         AudioManager.Instance.PlaySample(_context.Skin.Normal.HitNormal);
                     }
@@ -471,6 +480,7 @@ public class GameScreen : Screen, IDisposable
                         //AddResultParticle(slider.GetPositionAt(slider.Time + slider.Duration), HitResult.Miss, clock.CurrentTime);
                         //AudioManager.Instance.PlaySample(_context.Skin.ComboBreak);
                     }
+                    _maxScore += 300;
                     slider.JudgementDone = true;
                     //Logger.Instance.Info($"Slider held for {slider.TotalFollowTime}/{slider.Duration}");
                 }
@@ -486,6 +496,7 @@ public class GameScreen : Screen, IDisposable
                     AudioManager.Instance.PlaySample(_context.Skin.ComboBreak);
                     hitObject.HitResult = HitResult.Miss;
                     AddResultParticle(hitObject.Position, hitObject.HitResult, time);
+                    _maxScore += 300;
                 }
                 
                 float radiusHitCircle = osuRadius * scale;
@@ -511,7 +522,8 @@ public class GameScreen : Screen, IDisposable
                                 _comboCount++;
                                 var score = 300 * (1 + (Math.Max(_comboCount - 1, 0) * _difficultyMultiplier *
                                     _modMultiplier / 25));
-                                _totalScore += score;
+                                _currentScore += score;
+                                _rawScore += 300;
                                 hitObject.HitResult = HitResult.Good;
                             }
                             else if (difference <= 140 - 8 * _beatmap.OverallDifficulty) // 100
@@ -519,7 +531,8 @@ public class GameScreen : Screen, IDisposable
                                 _comboCount++;
                                 var score = 100 * (1 + (Math.Max(_comboCount - 1, 0) * _difficultyMultiplier *
                                     _modMultiplier / 25));
-                                _totalScore += score;
+                                _currentScore += score;
+                                _rawScore += 100;
                                 hitObject.HitResult = HitResult.Ok;
                             }
                             else // 50
@@ -527,10 +540,11 @@ public class GameScreen : Screen, IDisposable
                                 _comboCount++;
                                 var score = 50 * (1 + (Math.Max(_comboCount - 1, 0) * _difficultyMultiplier *
                                     _modMultiplier / 25));
-                                _totalScore += score;
+                                _currentScore += score;
+                                _rawScore += 50;
                                 hitObject.HitResult = HitResult.Meh;
                             }
-
+                            _maxScore += 300;
                             slider.HitTime = time;
                             AddResultParticle(hitObject.Position, hitObject.HitResult, time);
                             AudioManager.Instance.PlaySample(_context.Skin.Normal.HitNormal);
@@ -1031,7 +1045,7 @@ public class GameScreen : Screen, IDisposable
                 _ => _context.Skin.Hit0, // miss
             };
 
-            float baseSize = _baseCircleSize * 1.1f; // slightly bigger than circle
+            float baseSize = _baseCircleSize * 0.7f;
             float w = baseSize * scale;
             float h = texture.Height * (w / texture.Width);
 
@@ -1066,6 +1080,7 @@ public class GameScreen : Screen, IDisposable
 
 
         // Draw combo count
+        
         var comboNum = _comboCount.ToString();
 
         var comboDigitScale = Height / 15 / _context.Skin.ScoreNumbers[0].Height;
@@ -1115,7 +1130,7 @@ public class GameScreen : Screen, IDisposable
 
 
         // Draw score
-        var scoreNum = ((int)_totalScore).ToString();
+        var scoreNum = ((int)_currentScore).ToString();
 
         var scoreDigitScale = Height / 15 / _context.Skin.ScoreNumbers[0].Height; //400 / (_context.Skin.NumbersHd ? 256f : 128f);
         float scoreTotalWidth = 0;
@@ -1149,6 +1164,9 @@ public class GameScreen : Screen, IDisposable
 
             scoreCursorX += w;
         }
+        
+        
+        r.DrawText(Fonts.Default,  $"{(_rawScore/_maxScore)*100f:F}", new(300, 300), 40, Color4.White);
 
 
         var yellow = new Color4<Rgba>(242 / 255f, 191 / 255f, 36 / 255f, 1);
@@ -1373,6 +1391,8 @@ public class GameScreen : Screen, IDisposable
         //clock.CurrentTime = 0;
         clock.Seek(0);
         _songTrack.Speed = 1.00f;
+        AudioManager.Instance.SampleSpeed = 1.00f;
+        clock.Rate = 1.00f;
 
         _startingTimer = WaitingTime + _beatmap.AudioLeadIn;
         _musicStarted = false;
@@ -1398,7 +1418,9 @@ public class GameScreen : Screen, IDisposable
                                                   38 *
                                                   5);
         _comboCount = 0;
-        _totalScore = 0;
+        _currentScore = 0;
+        _maxScore = 0;
+        _rawScore = 0;
 
         Logger.Instance.Info($"Beatmap set to {beatmap}");
     }

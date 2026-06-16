@@ -89,7 +89,7 @@ public unsafe class Game : IDisposable
         int interval;
         if (!SDL_GL_SetSwapInterval(-1))
         {
-            SDL_GL_SetSwapInterval(1);
+            SDL_GL_SetSwapInterval(0);
         }
         SDL_GL_GetSwapInterval(&interval);
         
