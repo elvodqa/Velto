@@ -1,8 +1,8 @@
 # Velto
 
-An osu! player written with my ass, featuring yahay505.
+An osu! player written in C#.
 
-> Yes, the repository contains copyrighted material.
+> This repository contains copyrighted material.
 
 ## Preview
 
