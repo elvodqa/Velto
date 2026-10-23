@@ -8,6 +8,8 @@ public unsafe class AudioChannel : IDisposable
 {
     public MIX_Audio* Handle;
     public string Path;
+
+    public bool IsLoaded => Handle != null;
     
     public double Length
     {

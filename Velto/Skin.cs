@@ -34,6 +34,9 @@ public class Skin : IDisposable
     public Texture ReverseArrow { get; private set;  }
     public Texture SliderFollowCircle { get; private set; }
     public Texture SliderStartCircle { get; private set; }
+    public Texture SliderEndCircle { get; private set; }
+    public Texture SliderEndCircleOverlay { get; private set; }
+    public Texture SliderScorePoint { get; private set; }
     public Texture SliderSpec { get; private set; }
     public Texture ModAutoplay { get; private set; }
     public Texture ModNightcore { get; private set; }
@@ -51,6 +54,7 @@ public class Skin : IDisposable
     public Texture ScorebarColour { get; private set; }
     public Texture ScoreX { get; private set; }
     public Texture ScorePercent { get; private set; }
+    public Texture ScoreDot { get; private set; }
     public Texture PlayUnranked { get; private set; }
     public Texture FollowPoint { get; private set; }
     public List<Texture> FollowPoints { get; private set; } = new();
@@ -89,6 +93,9 @@ public class Skin : IDisposable
         ReverseArrow = GetElementTexture("reversearrow", "reversearrow");
         SliderFollowCircle = GetElementTexture("sliderfollowcircle", "sliderfollowcircle");
         SliderStartCircle = GetElementTexture("sliderstartcircle", "hitcircle");
+        SliderEndCircle = GetElementTexture("sliderendcircle", "hitcircle");
+        SliderEndCircleOverlay = GetElementTexture("sliderendcircleoverlay", "hitcircleoverlay");
+        SliderScorePoint = GetElementTexture("sliderscorepoint", "sliderscorepoint");
         ModAutoplay = GetElementTexture("selection-mod-autoplay", "selection-mod-autoplay");
         ModNightcore = GetElementTexture("selection-mod-nightcore", "selection-mod-nightcore");
         ModHidden = GetElementTexture("selection-mod-hidden", "selection-mod-hidden");
@@ -103,6 +110,7 @@ public class Skin : IDisposable
         ScorebarColour = GetElementTexture("scorebar-colour", "scorebar-colour");
         ScoreX = GetElementTexture("score-x", "score-x");
         ScorePercent = GetElementTexture("score-percent", "score-percent");
+        ScoreDot = GetElementTexture("score-dot", "score-dot");
 
         PlayUnranked = GetElementTexture("play-unranked", "play-unranked");
 
@@ -155,7 +163,7 @@ public class Skin : IDisposable
                 if (!ElementExists($"followpoint-{i}"))
                     break;
                 
-                SliderBalls.Add(GetElementTexture($"followpoint-{i}", "followpoint"));
+                FollowPoints.Add(GetElementTexture($"followpoint-{i}", "followpoint"));
             }
             
         }
@@ -274,6 +282,9 @@ public class Skin : IDisposable
         ReverseArrow?.Dispose();
         SliderFollowCircle?.Dispose();
         SliderStartCircle?.Dispose();
+        SliderEndCircle?.Dispose();
+        SliderEndCircleOverlay?.Dispose();
+        SliderScorePoint?.Dispose();
         SliderSpec?.Dispose();
         ModAutoplay?.Dispose();
         ModNightcore?.Dispose();
@@ -299,6 +310,7 @@ public class Skin : IDisposable
         ScorebarColour?.Dispose();
         ScoreX?.Dispose();
         ScorePercent?.Dispose();
+        ScoreDot?.Dispose();
         
         Normal.Dispose();
         Soft.Dispose();

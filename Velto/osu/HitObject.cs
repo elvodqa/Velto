@@ -25,6 +25,16 @@ public enum HitResult
     Miss
 }
 
+[Flags]
+public enum HitSoundType
+{
+    None = 0,
+    Normal = 1,
+    Whistle = 2,
+    Finish = 4,
+    Clap = 8
+}
+
 public abstract class HitObject
 {
     public int ComboNumber;
@@ -35,6 +45,15 @@ public abstract class HitObject
     public double Time { get; set; }
     public bool NewCombo { get; set; } = false;
     public Color4<Rgba> Color { get; set; }
+    public int HitSound;
+    public int HitSampleSet;
+    public int HitAdditionSampleSet;
+    public int HitSampleIndex;
+    public int HitSampleVolume;
+    public string? HitSampleFile;
+    public int EffectiveSampleSet = 1;
+    public int EffectiveAdditionSampleSet = 1;
+    public int EffectiveSampleIndex;
     
     // public abstract void Draw(double dt, Renderer renderer, Vector2 playfieldTopLeft, float scale, double songCursor, 
     //     double startingTimer, float baseCircleSize, Texture approachCircleTexture,

@@ -76,6 +76,21 @@ public class SampleSet : IDisposable
         }
         return AudioManager.Instance.LoadAudio(Path.Combine(Resources.DefaultSkinPath, $"{TypeString}-{name}.wav"));
     }
+
+    public AudioChannel GetChannel(string name)
+    {
+        return name switch
+        {
+            "hitclap" => HitClap,
+            "hitfinish" => HitFinish,
+            "hitnormal" => HitNormal,
+            "hitwhistle" => HitWhistle,
+            "sliderslide" => SliderSlide,
+            "slidertick" => SliderTick,
+            "sliderwhistle" => SliderWhistle,
+            _ => HitNormal,
+        };
+    }
     
     public void Dispose()
     {

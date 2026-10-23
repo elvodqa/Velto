@@ -26,6 +26,8 @@ public unsafe class Texture : IDisposable
     public string Path;
     public int Handle;
 
+    public float Scale => Path.Contains("@2x") ? 0.5f : 1f;
+
     public Texture(string path, FilterMode filterMode = FilterMode.Linear, WrapMode wrapMode = WrapMode.Repeat,
         bool generateMipmaps = true)
     {

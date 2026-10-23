@@ -20,8 +20,19 @@ public class CurvePoint
 public class Slider : HitObject
 {
     public List<CurvePoint> CurvePoints = new();
-    public int EdgeSets;
-    public int EdgeSounds;
+    public List<(int Normal, int Addition)> EdgeSets = new();
+    public List<int> EdgeSounds = new();
+    public List<double> TickTimes = new();
+    public int NextTickIndex;
+    public int NextRepeatIndex = 1;
+    public int PartsHit;
+    public int PartsTotal;
+    public int TickHits;
+    public int TickMisses;
+    public int RepeatHits;
+    public int RepeatMisses;
+    public bool TailHit;
+    public double TickInterval;
     public double Length;
     public double Duration = 0;
     public List<Vector2> Points = new();

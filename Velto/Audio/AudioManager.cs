@@ -43,6 +43,22 @@ public unsafe class AudioManager : IDisposable
         return audioChannel;
     }
 
+    public AudioChannel? TryLoadAudio(string path)
+    {
+        var handle = MIX_LoadAudio(_mixer, path, false);
+        if (handle == null)
+            return null;
+
+        var audioChannel = new AudioChannel
+        {
+            Path = path,
+            Handle = handle,
+        };
+
+        Audios.Add(audioChannel);
+        return audioChannel;
+    }
+
     public Track CreateTrack()
     {
         Track track = new Track();

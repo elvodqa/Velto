@@ -27,8 +27,16 @@ public class GameScreen : Screen, IDisposable
 
     private Beatmap _beatmap;
     private IOrderedEnumerable<HitObject> _sortedObjects;
+    private List<HitObject> _orderedObjects = new();
 
     private bool _isPaused;
+    private double _pauseInputCooldown;
+    private RectangleF _pauseResumeButton;
+    private RectangleF _pauseRetryButton;
+    private RectangleF _pauseBackButton;
+    private bool _pauseResumeHovered;
+    private bool _pauseRetryHovered;
+    private bool _pauseBackHovered;
     
     private bool _musicStarted;
     private float _musicVolume;
@@ -60,11 +68,16 @@ public class GameScreen : Screen, IDisposable
     private float _health = 1.0f;
     private int _comboCount = 0;
     private float _currentScore = 0;
-    private float _maxScore = 0;
-    private float _rawScore = 0;
+    private int _count300 = 0;
+    private int _count100 = 0;
+    private int _count50 = 0;
+    private int _countMiss = 0;
     private float _difficultyMultiplier = 1.0f;
     private float _modMultiplier = 1.0f;
     private readonly List<HitIndicator> _hitIndicators = new();
+    private readonly Dictionary<string, AudioChannel> _mapSamples = new();
+    private readonly HashSet<string> _unloadableSamples = new();
+    private readonly Dictionary<Slider, Track> _sliderSlides = new();
 
     private float _playfieldWidth, _playfieldHeight;
     private Vector2 _playfieldTopLeft;
@@ -88,15 +101,10 @@ public class GameScreen : Screen, IDisposable
 
     public void ToggleMenu()
     {
-        _isPaused = !_isPaused;
         if (_isPaused)
-        {
-            _songTrack?.Pause();
-        }
+            ResumeGame();
         else
-        {
-            _songTrack?.Resume();
-        }
+            PauseGame();
     }
 
     public override void Update(double delta)
@@ -111,6 +119,19 @@ public class GameScreen : Screen, IDisposable
                 fb.Framebuffer.Resize((int)Width, (int)Height);
                 _sliderFramebuffers[i] = fb;
             }
+        }
+
+        if (_isPaused)
+        {
+            UpdatePauseMenu(delta);
+            return;
+        }
+
+        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_ESCAPE) ||
+            Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_SPACE))
+        {
+            PauseGame();
+            return;
         }
 
         if (_startingTimer > 0)
@@ -229,13 +250,6 @@ public class GameScreen : Screen, IDisposable
             _debugEnabled = !_debugEnabled;
         }
         
-        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_ESCAPE))
-        {
-            //ToggleMenu();
-            _isPaused = true;
-            Transition(new SongSelectScreen(_context), 200);
-        }
-
         if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_GRAVE))
         {
             // _songTrack?.Position = 0;
@@ -291,22 +305,6 @@ public class GameScreen : Screen, IDisposable
         _sortedObjects = _beatmap.HitObjects
             .OrderByDescending(h => Math.Abs(h.Time - clock.CurrentTime));
         
-        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_SPACE))
-        {
-            if (_isPaused)
-            {
-                _songTrack?.Resume();
-                clock.Start();
-                _songTrack.Position = clock.CurrentTime;
-            }
-            else
-            {
-                clock.Stop();
-                _songTrack?.Pause();
-            }
-            _isPaused = !_isPaused;
-        }
-        
         if (Input.IsKeyDown(SDL_Scancode.SDL_SCANCODE_LCTRL))
         {
             if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_D))
@@ -326,8 +324,9 @@ public class GameScreen : Screen, IDisposable
         }
         
         Player.Update(delta, clock.CurrentTime, _playfieldTopLeft, scale);
-        // Handle objects bkz: https://osu.ppy.sh/wiki/en/Gameplay/Judgement/osu%21 
-        //Judge(clock.CurrentTime);
+        if (Player.State != PlayerState.Replay)
+            Judge(clock.CurrentTime);
+        UpdateHealth(delta);
         
         // if (_lastCursorPosition != Vector2.Zero && Vector2.Distance(Player.Cursor, _lastCursorPosition) > 8)
         //     trails.Enqueue(new TrailInfo
@@ -371,240 +370,702 @@ public class GameScreen : Screen, IDisposable
         }
     }
 
+    private void PauseGame()
+    {
+        if (_isPaused) return;
+
+        _isPaused = true;
+        _pauseInputCooldown = 250;
+        clock.Stop();
+        _songTrack?.Pause();
+        StopAllSliderSlides();
+        UpdatePauseLayout();
+        AudioManager.Instance.PlaySample(_context.Skin.MenuClick);
+    }
+
+    private void ResumeGame()
+    {
+        if (!_isPaused) return;
+
+        _isPaused = false;
+        _pauseInputCooldown = 250;
+
+        if (_musicStarted)
+        {
+            clock.Start();
+            if (_songTrack != null)
+                _songTrack.Position = clock.CurrentTime;
+            _songTrack?.Resume();
+        }
+
+        AudioManager.Instance.PlaySample(_context.Skin.MenuClick);
+    }
+
+    private void UpdatePauseMenu(double delta)
+    {
+        if (_pauseInputCooldown > 0)
+            _pauseInputCooldown -= delta;
+
+        UpdatePauseLayout();
+
+        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_ESCAPE) ||
+            Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_SPACE) ||
+            Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_RETURN))
+        {
+            ResumeGame();
+            return;
+        }
+
+        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_R))
+        {
+            RetryGame();
+            return;
+        }
+
+        if (Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_Q) ||
+            Input.IsKeyJustPressed(SDL_Scancode.SDL_SCANCODE_BACKSPACE))
+        {
+            BackToSongSelect();
+            return;
+        }
+
+        var mouse = new Vector2(Input.MouseX, Input.MouseY);
+        _pauseResumeHovered = Contains(_pauseResumeButton, mouse);
+        _pauseRetryHovered = Contains(_pauseRetryButton, mouse);
+        _pauseBackHovered = Contains(_pauseBackButton, mouse);
+
+        if (_pauseInputCooldown > 0 || !Input.IsMouseJustPressed(SDLButton.SDL_BUTTON_LEFT))
+            return;
+
+        if (_pauseResumeHovered)
+        {
+            ResumeGame();
+            return;
+        }
+
+        if (_pauseRetryHovered)
+        {
+            RetryGame();
+            return;
+        }
+
+        if (_pauseBackHovered)
+            BackToSongSelect();
+    }
+
+    private void UpdatePauseLayout()
+    {
+        var width = Width * 0.28f;
+        var height = Height * 0.075f;
+        var x = Width / 2f - width / 2f;
+        var y = Height * 0.47f;
+        var gap = Height * 0.018f;
+
+        _pauseResumeButton = new RectangleF(x, y, width, height);
+        _pauseRetryButton = new RectangleF(x, y + height + gap, width, height);
+        _pauseBackButton = new RectangleF(x, y + (height + gap) * 2f, width, height);
+    }
+
+    private void RetryGame()
+    {
+        _isPaused = false;
+        StopAllSliderSlides();
+        _songTrack?.Stop(0);
+
+        var state = Player.State;
+        var replay = Player.Replay;
+
+        var game = new GameScreen(_context);
+        game.SetBeatmap(_beatmap);
+        game.Player.SetState(state);
+        game._doubleTimeEnabled = _doubleTimeEnabled;
+
+        if (_doubleTimeEnabled)
+        {
+            game._songTrack!.Speed = 1.5f;
+            game.clock.Rate = 1.5f;
+        }
+
+        if (state == PlayerState.Replay && replay != null)
+            game.Player.SetReplay(replay);
+
+        AudioManager.Instance.PlaySample(_context.Skin.PauseRetryClick);
+        Transition(game, 200);
+    }
+
+    private void BackToSongSelect()
+    {
+        _isPaused = false;
+        StopAllSliderSlides();
+        _songTrack?.Stop(0);
+        AudioManager.Instance.PlaySample(_context.Skin.MenuBack);
+        Transition(new SongSelectScreen(_context), 200);
+    }
+
+    private void DrawPauseMenu(Renderer r)
+    {
+        var panelWidth = Width * 0.4f;
+        var panelHeight = Height * 0.55f;
+        var panelX = Width / 2f - panelWidth / 2f;
+        var panelY = Height / 2f - panelHeight / 2f;
+
+        var pink = new Color4<Rgba>(1f, 0.4f, 0.67f, 1f);
+
+        r.DrawRectangle(0, 0, Width, Height, new Color4<Rgba>(0f, 0f, 0f, 0.65f));
+        r.DrawRectangle(panelX, panelY, panelWidth, panelHeight,
+            new Color4<Rgba>(0.04f, 0.07f, 0.12f, 0.97f));
+        r.DrawRectangle(panelX, panelY, panelWidth, Math.Max(4f, Height * 0.008f), pink);
+        r.DrawRectangleBorder(panelX, panelY, panelWidth, panelHeight,
+            Math.Max(1f, Height / 720f), pink with { W = 0.45f });
+
+        r.DrawTextCentered(Fonts.Default, "Paused",
+            new Vector2(Width / 2f, panelY + panelHeight * 0.18f),
+            panelHeight * 0.09f, Color4.White);
+
+        r.DrawTextCentered(Fonts.Default, $"{_beatmap.Artist} - {_beatmap.Title}",
+            new Vector2(Width / 2f, panelY + panelHeight * 0.28f),
+            panelHeight * 0.04f, new Color4<Rgba>(1f, 1f, 1f, 0.65f));
+
+        r.DrawTextCentered(Fonts.Default, $"[{_beatmap.Version}]",
+            new Vector2(Width / 2f, panelY + panelHeight * 0.34f),
+            panelHeight * 0.035f, new Color4<Rgba>(1f, 1f, 1f, 0.5f));
+
+        DrawPauseButton(r, _pauseResumeButton, "Continue", "ESC / SPACE", _pauseResumeHovered, true);
+        DrawPauseButton(r, _pauseRetryButton, "Retry", "R", _pauseRetryHovered, false);
+        DrawPauseButton(r, _pauseBackButton, "Back to Song Select", "Q", _pauseBackHovered, false);
+    }
+
+    private void DrawPauseButton(Renderer r, RectangleF rect, string label, string hint, bool hovered,
+        bool accent)
+    {
+        var pink = new Color4<Rgba>(1f, 0.4f, 0.67f, 1f);
+        var background = accent
+            ? new Color4<Rgba>(1f, 0.4f, 0.67f, hovered ? 0.35f : 0.18f)
+            : new Color4<Rgba>(1f, 1f, 1f, hovered ? 0.1f : 0.035f);
+
+        r.DrawRectangle(rect.X, rect.Y, rect.Width, rect.Height, background);
+        r.DrawRectangleBorder(rect.X, rect.Y, rect.Width, rect.Height, Math.Max(1f, Height / 900f),
+            accent || hovered ? pink with { W = 0.75f } : new Color4<Rgba>(1f, 1f, 1f, 0.1f));
+
+        r.DrawTextCentered(Fonts.Default, label,
+            new Vector2(rect.X + rect.Width / 2f, rect.Y + rect.Height * 0.4f),
+            rect.Height * 0.36f, Color4.White);
+
+        r.DrawTextCentered(Fonts.Default, hint,
+            new Vector2(rect.X + rect.Width / 2f, rect.Y + rect.Height * 0.74f),
+            rect.Height * 0.2f, new Color4<Rgba>(1f, 1f, 1f, 0.62f));
+    }
+
+    private static bool Contains(RectangleF rect, Vector2 point)
+    {
+        return rect.Contains(point.X, point.Y);
+    }
+
     public void Judge(double time)
     {
         var scale = _playfieldWidth / PlayfieldW;
         var osuRadius = 54.4f - 4.48f * _beatmap.CircleSize;
+        var hitWindow300 = 80 - 6 * _beatmap.OverallDifficulty;
+        var hitWindow100 = 140 - 8 * _beatmap.OverallDifficulty;
+        var hitWindow50 = 200 - 10 * _beatmap.OverallDifficulty;
+
         foreach (var hitObject in _beatmap.HitObjects)
         {
             if (hitObject.Time > time + _beatmap.Preempt) continue;
-            
+
+            var playerCursor = Player.Cursor;
+            var isPressed = Player.ActionPrimaryPressed || Player.ActionSecondaryPressed;
+
             if (hitObject is HitCircle circle)
             {
-                var playerCursor = Player.Cursor;
-                if (hitObject.HitResult == HitResult.None)
-                {
-                    if (time -  (200 - 10 * _beatmap.OverallDifficulty) >= circle.Time)
-                    {
-                        _comboCount = 0;
-                        hitObject.HitResult = HitResult.Miss;
-                        hitObject.Failed = true;
-                        AddResultParticle(hitObject.Position, hitObject.HitResult, time);
-                        AudioManager.Instance.PlaySample(_context.Skin.ComboBreak);
-                        _maxScore += 300;
-                    }
-                    
-                    float radiusScreen = osuRadius * scale;
-                    var circlePosition = _playfieldTopLeft + circle.Position * scale;
-                    if (Vector2.Distance(circlePosition, playerCursor) <= radiusScreen)
-                        if (Player.ActionPrimaryPressed || Player.ActionSecondaryPressed)
-                        {
-                            // bkz: https://osu.ppy.sh/wiki/en/Gameplay/Judgement/osu%21
-                            var difference = Math.Abs(time - hitObject.Time);
-                            // osu! only registers a click as a hit when it lands inside the
-                            // hit window. Clicks earlier than the 50 window are ignored (the
-                            // note can still be hit on time); clicks past it have already been
-                            // auto-missed above. So we never produce a Miss from an early click.
-                            if (difference <= 200 - 10 * _beatmap.OverallDifficulty)
-                            {
-                                _hitIndicators.Add(new()
-                                {
-                                    Life = HitIndicatorMaxLife,
-                                    Offset = hitObject.Time - time,
-                                });
-                                hitObject.HitTime = time;
-                                if (difference <= 80 - 6 * _beatmap.OverallDifficulty) // 300
-                                {
-                                    _comboCount++;
-                                    var score = 300 * (1 + (Math.Max(_comboCount - 1, 0) * _difficultyMultiplier *
-                                        _modMultiplier / 25));
-                                    _currentScore += score;
-                                    _rawScore += 300;
-                                    hitObject.HitResult = HitResult.Good;
-                                }
-                                else if (difference <= 140 - 8 * _beatmap.OverallDifficulty) // 100
-                                {
-                                    _comboCount++;
-                                    var score = 100 * (1 + (Math.Max(_comboCount - 1, 0) * _difficultyMultiplier *
-                                        _modMultiplier / 25));
-                                    _currentScore += score;
-                                    _rawScore += 100;
-                                    hitObject.HitResult = HitResult.Ok;
-                                }
-                                else // 50
-                                {
-                                    _comboCount++;
-                                    var score = 50 * (1 + (Math.Max(_comboCount - 1, 0) * _difficultyMultiplier *
-                                        _modMultiplier / 25));
-                                    _currentScore += score;
-                                    _rawScore += 50;
-                                    hitObject.HitResult = HitResult.Meh;
-                                }
-                            
-                                circle.HitTime = time;
-                                AddResultParticle(hitObject.Position, hitObject.HitResult, time);
-                                AudioManager.Instance.PlaySample(_context.Skin.Normal.HitNormal);
-                                _maxScore += 300;
-                            }
-                        }
+                if (circle.HitResult != HitResult.None) continue;
 
-                    // Noteblock
-                    if (Player.ActionPrimaryPressed || Player.ActionSecondaryPressed)
+                var circlePosition = _playfieldTopLeft + circle.Position * scale;
+                var difference = Math.Abs(time - circle.Time);
+                var inRange = Vector2.Distance(circlePosition, playerCursor) <= osuRadius * scale;
+
+                if (inRange && isPressed && difference <= hitWindow50)
+                {
+                    var result = difference <= hitWindow300
+                        ? HitResult.Good
+                        : difference <= hitWindow100
+                            ? HitResult.Ok
+                            : HitResult.Meh;
+
+                    circle.HitTime = time;
+                    circle.HitResult = result;
+                    RegisterJudgement(result);
+                    AddScore(HitValue(result));
+                    AddResultParticle(circle.Position, result, time);
+                    PlayHitSound(circle.HitSound, circle.EffectiveSampleSet, circle.EffectiveAdditionSampleSet,
+                        circle.EffectiveSampleIndex);
+                    _hitIndicators.Add(new()
                     {
-                        break;
-                    }
+                        Life = HitIndicatorMaxLife,
+                        Offset = time - circle.Time,
+                    });
+                }
+                else if (time - hitWindow50 >= circle.Time)
+                {
+                    circle.HitResult = HitResult.Miss;
+                    circle.Failed = true;
+                    RegisterJudgement(HitResult.Miss);
+                    AddResultParticle(circle.Position, HitResult.Miss, time);
+                    AudioManager.Instance.PlaySample(_context.Skin.ComboBreak);
+                }
+
+                if (isPressed)
+                {
+                    break;
                 }
             }
-            // https://github.com/ppy/osu/wiki/Anatomy-of-a-slider
             else if (hitObject is Slider slider)
             {
-                if (time >= slider.Time + slider.Duration && !slider.JudgementDone)
-                {
-                    if (slider.LastHeld <= slider.Time + slider.Duration + Slider.FORGIVING_TIME && slider.LastHeld >= slider.Time + slider.Duration - Slider.FORGIVING_TIME)
-                    {
-                        slider.WasFollowedAtEnd = slider.IsCurrentlyBeingFollowed;
-                    }
+                var endTime = slider.Time + slider.Duration;
 
-                    // var sliderCompletion = 0;
-                    if (slider.WasFollowedAtEnd)
+                if (!slider.JudgementDone && time >= endTime)
+                {
+                    var previousTime = Math.Max(slider.LastFollowUpdate, slider.Time);
+                    var followedAtEnd = slider.LastHeld >= endTime - Slider.FORGIVING_TIME;
+
+                    ProcessSliderParts(slider, endTime, previousTime,
+                        followedAtEnd || slider.WasFollowingPreviousFrame);
+
+                    slider.WasFollowedAtEnd = followedAtEnd;
+
+                    if (followedAtEnd)
                     {
-                        _comboCount++;
-                        var score = 300 * (1 + (Math.Max(_comboCount - 1, 0) * _difficultyMultiplier * _modMultiplier / 25));
-                        _currentScore += score;
-                        AddResultParticle(slider.GetPositionAt(slider.Time + slider.Duration), HitResult.Good, clock.CurrentTime);
-                        AudioManager.Instance.PlaySample(_context.Skin.Normal.HitNormal);
+                        slider.TailHit = true;
+                        slider.PartsHit++;
+                        AddSliderPartScore(30);
+                        AdjustHealth(0.02f);
+                        PlaySliderEdgeSound(slider, slider.SlideRepeatCount);
                     }
                     else
                     {
-                        //_comboCount = 0;
-                        //AddResultParticle(slider.GetPositionAt(slider.Time + slider.Duration), HitResult.Miss, clock.CurrentTime);
-                        //AudioManager.Instance.PlaySample(_context.Skin.ComboBreak);
+                        AdjustHealth(-0.01f);
                     }
-                    _maxScore += 300;
+
+                    RegisterSliderCompletion(slider);
+                    StopSliderSlide(slider);
                     slider.JudgementDone = true;
-                    //Logger.Instance.Info($"Slider held for {slider.TotalFollowTime}/{slider.Duration}");
                 }
-                
-                if (time > slider.Time + slider.Duration)
-                    continue; // already judged
-                
-                var playerCursor = Player.Cursor;
-                
-                if (time - 150 >= slider.Time && slider.HitResult == HitResult.None)
+
+                if (time > endTime)
+                    continue;
+
+                if (slider.HitResult == HitResult.None)
                 {
-                    _comboCount = 0;
-                    AudioManager.Instance.PlaySample(_context.Skin.ComboBreak);
-                    hitObject.HitResult = HitResult.Miss;
-                    AddResultParticle(hitObject.Position, hitObject.HitResult, time);
-                    _maxScore += 300;
-                }
-                
-                float radiusHitCircle = osuRadius * scale;
-                var circlePosition = _playfieldTopLeft + slider.Position * scale;
-                if (Vector2.Distance(circlePosition, playerCursor) <= radiusHitCircle)
-                {
-                    if ((Player.ActionPrimaryPressed || Player.ActionSecondaryPressed) &&
-                        slider.HitResult == HitResult.None)
+                    var difference = Math.Abs(time - slider.Time);
+                    var headPosition = _playfieldTopLeft + slider.Position * scale;
+                    var inRange = Vector2.Distance(headPosition, playerCursor) <= osuRadius * scale;
+
+                    if (inRange && isPressed && difference <= hitWindow50)
                     {
-                        var difference = Math.Abs(time - slider.Time);
-                        // Same as hit circles: an early click (before the 50 window) is ignored
-                        // rather than turned into a Miss, so the slider head can still be hit.
-                        if (difference <= 200 - 10 * _beatmap.OverallDifficulty)
+                        var result = difference <= hitWindow300
+                            ? HitResult.Good
+                            : difference <= hitWindow100
+                                ? HitResult.Ok
+                                : HitResult.Meh;
+
+                        slider.HitTime = time;
+                        slider.HitResult = result;
+                        slider.PartsHit++;
+                        ApplyHealth(result);
+                        AddScore(HitValue(result));
+                        AddResultParticle(slider.Position, result, time);
+                        PlaySliderEdgeSound(slider, 0);
+                        _hitIndicators.Add(new()
                         {
-                            _hitIndicators.Add(new()
-                            {
-                                Life = HitIndicatorMaxLife,
-                                Offset = time - hitObject.Time,
-                            });
-                            slider.HitTime = time;
-                            if (difference <= 80 - 6 * _beatmap.OverallDifficulty) // 300
-                            {
-                                _comboCount++;
-                                var score = 300 * (1 + (Math.Max(_comboCount - 1, 0) * _difficultyMultiplier *
-                                    _modMultiplier / 25));
-                                _currentScore += score;
-                                _rawScore += 300;
-                                hitObject.HitResult = HitResult.Good;
-                            }
-                            else if (difference <= 140 - 8 * _beatmap.OverallDifficulty) // 100
-                            {
-                                _comboCount++;
-                                var score = 100 * (1 + (Math.Max(_comboCount - 1, 0) * _difficultyMultiplier *
-                                    _modMultiplier / 25));
-                                _currentScore += score;
-                                _rawScore += 100;
-                                hitObject.HitResult = HitResult.Ok;
-                            }
-                            else // 50
-                            {
-                                _comboCount++;
-                                var score = 50 * (1 + (Math.Max(_comboCount - 1, 0) * _difficultyMultiplier *
-                                    _modMultiplier / 25));
-                                _currentScore += score;
-                                _rawScore += 50;
-                                hitObject.HitResult = HitResult.Meh;
-                            }
-                            _maxScore += 300;
-                            slider.HitTime = time;
-                            AddResultParticle(hitObject.Position, hitObject.HitResult, time);
-                            AudioManager.Instance.PlaySample(_context.Skin.Normal.HitNormal);
-                        }
+                            Life = HitIndicatorMaxLife,
+                            Offset = time - slider.Time,
+                        });
+                    }
+                    else if (time - hitWindow50 >= slider.Time)
+                    {
+                        slider.HitResult = HitResult.Miss;
+                        slider.Failed = true;
+                        _comboCount = 0;
+                        ApplyHealth(HitResult.Miss);
+                        AddResultParticle(slider.Position, HitResult.Miss, time);
+                        AudioManager.Instance.PlaySample(_context.Skin.ComboBreak);
                     }
                 }
-                
+
                 var followCirclePos = slider.GetPositionAt(time);
                 var ballPosition = _playfieldTopLeft + followCirclePos * scale;
                 var radiusFollowCircle = (_baseCircleSize * 2.5f) / 2f;
 
-                bool sliderActive = time >= slider.Time && time <= slider.Time + slider.Duration;
-                bool isInFollowRange = sliderActive && 
-                                       Vector2.Distance(ballPosition, playerCursor) <= radiusFollowCircle;
-                bool isHolding = Player.ActionPrimaryDown || Player.ActionSecondaryDown;
-                bool isFollowingNow = sliderActive && isInFollowRange && isHolding;
+                var sliderActive = time >= slider.Time && time <= endTime;
+                var isInFollowRange = sliderActive &&
+                                      Vector2.Distance(ballPosition, playerCursor) <= radiusFollowCircle;
+                var isHolding = Player.ActionPrimaryDown || Player.ActionSecondaryDown;
+                var isFollowingNow = isInFollowRange && isHolding;
 
                 if (sliderActive)
                 {
+                    var previousTime = Math.Max(slider.LastFollowUpdate, slider.Time);
+                    var deltaFollow = time - previousTime;
+
+                    ProcessSliderParts(slider, time, previousTime, isFollowingNow);
                     slider.IsCurrentlyBeingFollowed = isFollowingNow;
+                    UpdateSliderSlide(slider, isFollowingNow);
 
                     if (isFollowingNow)
                     {
-                        // Accumulate follow time
-                        double deltaFollow = time - Math.Max(slider.LastFollowUpdate, slider.Time);
                         slider.TotalFollowTime += deltaFollow;
 
-                        // Continuous follow tracking
                         if (slider.WasFollowingPreviousFrame)
-                        {
                             slider.CurrentContinuousFollow += deltaFollow;
-                        }
                         else
-                        {
-                            // Just started following again
                             slider.CurrentContinuousFollow = deltaFollow;
-                        }
 
                         if (slider.CurrentContinuousFollow > slider.LongestContinuousFollow)
                             slider.LongestContinuousFollow = slider.CurrentContinuousFollow;
 
                         slider.LastHeld = time;
-                        slider.LastFollowUpdate = time;
+                    }
+                    else
+                    {
+                        slider.CurrentContinuousFollow = 0;
                     }
 
+                    slider.LastFollowUpdate = time;
                     slider.WasFollowingPreviousFrame = isFollowingNow;
                 }
-                
-                // Optional: play tick sounds while following
-                if (isInFollowRange && isHolding)
-                {
-                    // You can add logic here for slider ticks
-                }
 
-                if (Player.ActionPrimaryPressed || Player.ActionSecondaryPressed)
+                if (isPressed)
                 {
                     break;
                 }
             }
         }
+    }
+
+    private float Accuracy
+    {
+        get
+        {
+            var total = _count300 + _count100 + _count50 + _countMiss;
+            if (total == 0) return 1f;
+            return (6f * _count300 + 2f * _count100 + _count50) / (6f * total);
+        }
+    }
+
+    private static int HitValue(HitResult result)
+    {
+        return result switch
+        {
+            HitResult.Good => 300,
+            HitResult.Ok => 100,
+            HitResult.Meh => 50,
+            _ => 0,
+        };
+    }
+
+    private void AddScore(int hitValue)
+    {
+        if (hitValue <= 0) return;
+
+        _comboCount++;
+        _currentScore += hitValue * (1 + Math.Max(_comboCount - 1, 0) * _difficultyMultiplier *
+            _modMultiplier / 25f);
+    }
+
+    private void RegisterJudgement(HitResult result)
+    {
+        switch (result)
+        {
+            case HitResult.Good:
+                _count300++;
+                break;
+            case HitResult.Ok:
+                _count100++;
+                break;
+            case HitResult.Meh:
+                _count50++;
+                break;
+            case HitResult.Miss:
+                _countMiss++;
+                _comboCount = 0;
+                break;
+        }
+
+        ApplyHealth(result);
+    }
+
+    private void ApplyHealth(HitResult result)
+    {
+        var hp = _beatmap.HPDrainRate;
+        var change = result switch
+        {
+            HitResult.Good => 0.03f,
+            HitResult.Ok => MapDifficultyRange(hp, 0.088f, 0.011f, 0.011f),
+            HitResult.Meh => MapDifficultyRange(hp, 0.008f, 0.002f, 0.002f),
+            HitResult.Miss => -MapDifficultyRange(hp, 0.03f, 0.125f, 0.2f),
+            _ => 0f,
+        };
+
+        AdjustHealth(change);
+    }
+
+    private void AdjustHealth(float amount)
+    {
+        _health = Math.Clamp(_health + amount, 0f, 1f);
+    }
+
+    private void UpdateHealth(double delta)
+    {
+        if (!_musicStarted || _isPaused || _orderedObjects.Count == 0) return;
+
+        var firstTime = _orderedObjects[0].Time;
+        var lastObject = _orderedObjects[^1];
+        var lastTime = lastObject switch
+        {
+            Slider slider => slider.Time + slider.Duration,
+            Spinner spinner => spinner.EndTime,
+            _ => lastObject.Time,
+        };
+        if (clock.CurrentTime < firstTime || clock.CurrentTime > lastTime) return;
+
+        var rate = 0.0000025f + _beatmap.HPDrainRate * 0.0000015f;
+        var drain = rate * (float)(delta * clock.Rate);
+        AdjustHealth(-drain);
+    }
+
+    private static float MapDifficultyRange(float value, float min, float mid, float max)
+    {
+        if (value > 5f)
+            return mid + (max - mid) * (value - 5f) / 5f;
+        if (value < 5f)
+            return min + (mid - min) * value / 5f;
+        return mid;
+    }
+
+    private void PlayHitSound(int sound, int normalSet, int additionSet, int sampleIndex)
+    {
+        PlaySampleFrom(normalSet, "hitnormal", sampleIndex);
+
+        if ((sound & (int)HitSoundType.Whistle) != 0)
+            PlaySampleFrom(additionSet, "hitwhistle", sampleIndex);
+        if ((sound & (int)HitSoundType.Finish) != 0)
+            PlaySampleFrom(additionSet, "hitfinish", sampleIndex);
+        if ((sound & (int)HitSoundType.Clap) != 0)
+            PlaySampleFrom(additionSet, "hitclap", sampleIndex);
+    }
+
+    private void PlaySliderEdgeSound(Slider slider, int edge)
+    {
+        var sound = slider.HitSound;
+
+        if (slider.EdgeSounds.Count > 0)
+            sound = slider.EdgeSounds[Math.Min(edge, slider.EdgeSounds.Count - 1)];
+
+        var normalSet = slider.EffectiveSampleSet;
+        var additionSet = slider.EffectiveAdditionSampleSet;
+
+        if (slider.EdgeSets.Count > 0)
+        {
+            var sets = slider.EdgeSets[Math.Min(edge, slider.EdgeSets.Count - 1)];
+            if (sets.Normal > 0)
+                normalSet = sets.Normal;
+            if (sets.Addition > 0)
+                additionSet = sets.Addition;
+        }
+
+        PlayHitSound(sound, normalSet, additionSet, slider.EffectiveSampleIndex);
+    }
+
+    private void ProcessSliderParts(Slider slider, double time, double previousTime, bool following)
+    {
+        if (slider.SpanDuration <= 0) return;
+
+        var spanIndex = (int)Math.Floor((time - slider.Time) / slider.SpanDuration);
+        spanIndex = Math.Clamp(spanIndex, 0, Math.Max(0, slider.SlideRepeatCount - 1));
+
+        while (slider.NextRepeatIndex <= spanIndex &&
+               slider.NextRepeatIndex < slider.SlideRepeatCount)
+        {
+            var edge = slider.NextRepeatIndex;
+            var repeatTime = slider.Time + edge * slider.SpanDuration;
+
+            if (following && repeatTime > previousTime - 0.5)
+            {
+                slider.RepeatHits++;
+                slider.PartsHit++;
+                AddSliderPartScore(30);
+                AdjustHealth(0.02f);
+                PlaySliderEdgeSound(slider, edge);
+            }
+            else
+            {
+                slider.RepeatMisses++;
+                _comboCount = 0;
+                AdjustHealth(-0.01f);
+            }
+
+            slider.NextRepeatIndex++;
+        }
+
+        while (slider.NextTickIndex < slider.TickTimes.Count &&
+               slider.TickTimes[slider.NextTickIndex] <= time)
+        {
+            var tickTime = slider.TickTimes[slider.NextTickIndex++];
+
+            if (following && tickTime > previousTime && tickTime <= time)
+            {
+                slider.TickHits++;
+                slider.PartsHit++;
+                AddSliderPartScore(10);
+                AdjustHealth(0.005f);
+                PlaySampleFrom(slider.EffectiveSampleSet, "slidertick", slider.EffectiveSampleIndex);
+            }
+            else
+            {
+                slider.TickMisses++;
+                _comboCount = 0;
+                AdjustHealth(-0.002f);
+            }
+        }
+    }
+
+    private void AddSliderPartScore(int value)
+    {
+        _comboCount++;
+        _currentScore += value;
+    }
+
+    private void RegisterSliderCompletion(Slider slider)
+    {
+        var total = Math.Max(1, slider.PartsTotal);
+        var ratio = slider.PartsHit / (float)total;
+
+        var result = ratio >= 0.999f
+            ? HitResult.Good
+            : ratio >= 0.5f
+                ? HitResult.Ok
+                : ratio > 0f
+                    ? HitResult.Meh
+                    : HitResult.Miss;
+
+        switch (result)
+        {
+            case HitResult.Good:
+                _count300++;
+                break;
+            case HitResult.Ok:
+                _count100++;
+                break;
+            case HitResult.Meh:
+                _count50++;
+                break;
+            case HitResult.Miss:
+                _countMiss++;
+                _comboCount = 0;
+                break;
+        }
+    }
+
+    private void UpdateSliderSlide(Slider slider, bool following)
+    {
+        if (following)
+        {
+            if (_sliderSlides.ContainsKey(slider)) return;
+
+            var sample = GetGameplaySample(slider.EffectiveSampleSet, "sliderslide",
+                slider.EffectiveSampleIndex);
+            if (sample?.IsLoaded != true) return;
+
+            var track = AudioManager.Instance.CreateTrack();
+            track.Audio = sample;
+            track.Volume = AudioManager.Instance.SampleVolume;
+            track.Speed = AudioManager.Instance.SampleSpeed;
+            track.Loops = -1;
+            track.Play();
+            _sliderSlides[slider] = track;
+        }
+        else
+        {
+            StopSliderSlide(slider);
+        }
+    }
+
+    private void StopSliderSlide(Slider slider)
+    {
+        if (_sliderSlides.Remove(slider, out var track))
+            track.Dispose();
+    }
+
+    private void StopAllSliderSlides()
+    {
+        foreach (var track in _sliderSlides.Values)
+            track.Dispose();
+
+        _sliderSlides.Clear();
+    }
+
+    private void PlaySampleFrom(int sampleSet, string name, int sampleIndex)
+    {
+        var sample = GetGameplaySample(sampleSet, name, sampleIndex);
+        if (sample?.IsLoaded == true)
+            AudioManager.Instance.PlaySample(sample);
+    }
+
+    private AudioChannel? GetGameplaySample(int sampleSet, string name, int sampleIndex)
+    {
+        if (sampleSet is < 1 or > 3)
+            sampleSet = 1;
+
+        var type = sampleSet switch
+        {
+            2 => "soft",
+            3 => "drum",
+            _ => "normal",
+        };
+
+        var key = $"{type}:{name}:{sampleIndex}";
+        if (_mapSamples.TryGetValue(key, out var cached))
+            return cached;
+
+        if (!_unloadableSamples.Contains(key))
+        {
+            var names = sampleIndex > 0
+                ? new[] { $"{type}-{name}{sampleIndex}", $"{type}-{name}" }
+                : new[] { $"{type}-{name}" };
+
+            var folders = sampleIndex > 0
+                ? new[] { _beatmap.Folder, _context.Skin.Folder, Resources.DefaultSkinPath }
+                : new[] { _beatmap.Folder };
+
+            foreach (var folder in folders)
+            {
+                foreach (var candidate in names)
+                {
+                    foreach (var extension in new[] { ".wav", ".ogg", ".mp3" })
+                    {
+                        var path = Path.Combine(folder, candidate + extension);
+                        if (!File.Exists(path)) continue;
+
+                        var loaded = AudioManager.Instance.TryLoadAudio(path);
+                        if (loaded == null) continue;
+
+                        _mapSamples[key] = loaded;
+                        return loaded;
+                    }
+                }
+            }
+
+            _unloadableSamples.Add(key);
+        }
+
+        var bank = sampleSet switch
+        {
+            2 => _context.Skin.Soft,
+            3 => _context.Skin.Drum,
+            _ => _context.Skin.Normal,
+        };
+
+        return bank.GetChannel(name);
     }
 
     public override void Draw(Renderer r)
@@ -635,26 +1096,8 @@ public class GameScreen : Screen, IDisposable
         // Background Dim
         r.DrawRectangle(0, 0, Width, Height, new Color4<Rgba>(0, 0, 0, 0.80f));
         
-        // Followpoints
-        
-        // var diff = nextHitObjectPos - prevHitObjectPos;
-        // var degree = Math.Atan2(diff.Y, diff.X);
-        // var distance = 100;
-        //
-        // if (!_context.Skin.HasAnimatedFollowPoints)
-        // {
-        //     var direction = new Vector2(
-        //         (float)Math.Cos(degree),
-        //         (float)Math.Sin(degree)
-        //     );
-        //     int count = diff.Length / distance;
-        //     for (int i = 0; i < count; i++)
-        //     {
-        //         var pos = prevHitObjectPos + direction * (i * distance);
-        //         r.DrawTexture(_context.Skin.FollowPoint, pos.X, pos.Y, 100f, 100f, new Color4<Rgba>(1, 1, 1, 1), (float)degree * MathHelper.RadToDeg + 135);
-        //     }
-        // }
-        
+        DrawFollowPoints(r, playfieldScale);
+
         foreach (var hitObject in _sortedObjects)
         {
             var posX = _playfieldTopLeft.X + hitObject.Position.X * playfieldScale;
@@ -841,6 +1284,10 @@ public class GameScreen : Screen, IDisposable
                     r.DrawTexture(fb.Framebuffer.Texture, 0, 0, Width, Height,
                         new Color4<Rgba>(1, 1, 1, 1) { W = sliderOpacity });
 
+                    DrawSliderEndCircle(r, slider, playfieldScale, drawSize, Math.Min(fadein, fadeout));
+                    DrawSliderTicks(r, slider, playfieldScale, sliderOpacity);
+                    DrawSliderRepeatArrows(r, slider, playfieldScale, sliderOpacity);
+
                     if (slider.Sliding)
                     {
                         var position = slider.GetPositionAt(clock.CurrentTime);
@@ -857,36 +1304,6 @@ public class GameScreen : Screen, IDisposable
                         else
                         {
                             prevPos = slider.GetPositionAt(clock.CurrentTime - 1);
-                        }
-
-                        if (slider.SlideRepeatCount > 1) // sliderepeatcount = actual repeat count + 1
-                        {
-                            for (int i = 0; i < slider.SlideRepeatCount; i++)
-                            {
-                                //if (_songCursor >= slider.Time + slider.Duration - slider.SpanDuration) continue;
-                                if (i - 2 >= slider.SlideRepeatCount) continue;
-                            
-                                var repeatPosition = slider.GetPositionAt(slider.Time + i * slider.SpanDuration);
-                                
-                                var repeatScaledX = _playfieldTopLeft.X + repeatPosition.X * playfieldScale;
-                                var repeatScaledY = _playfieldTopLeft.Y + repeatPosition.Y * playfieldScale;
-                                var repeatDrawSize = objectCircleSize * 1f;
-
-                                var repeatPrevPos = slider.Points[slider.Points.Count - 2];
-                                
-                                Vector2 repeatDirection = repeatPosition - repeatPrevPos;
-                                var repeatRotation = Math.Atan2(repeatDirection.Y, repeatDirection.X) * -MathHelper.RadToDeg +
-                                                     180;
-
-                                r.DrawTexture(_context.Skin.ReverseArrow,
-                                    repeatScaledX - repeatDrawSize / 2,
-                                    repeatScaledY - repeatDrawSize / 2,
-                                    repeatDrawSize,
-                                    repeatDrawSize,
-                                    new Color4<Rgba>(1, 1, 1, 1) with { W = sliderOpacity },
-                                    (float)repeatRotation
-                                );
-                            }
                         }
 
                         Vector2 direction = position - prevPos;
@@ -1057,9 +1474,6 @@ public class GameScreen : Screen, IDisposable
         }
 
 
-        // bkz: https://osu.ppy.sh/community/forums/topics/1857309?n=1
-        _health = Math.Abs((float)Math.Cos(clock.CurrentTime / 1000));
-
         var scoreboardBgWidth = Width / 2.5f;
 
         var bgScale = scoreboardBgWidth / _context.Skin.ScorebarBg.Width;
@@ -1073,10 +1487,11 @@ public class GameScreen : Screen, IDisposable
         var colourScale = scoreboardColourWidth / _context.Skin.ScorebarColour.Width;
         var scoreboardColourHeight = _context.Skin.ScorebarColour.Height * colourScale;
 
-        r.SetScissor(20, 22, (int)(20 + scoreboardColourWidth * _health), (int)scoreboardColourHeight);
-        r.DrawTexture(_context.Skin.ScorebarColour, 20, 22, scoreboardColourWidth / 1f, scoreboardColourHeight / 1f,
+        var healthWidth = Math.Clamp(scoreboardColourWidth * _health, 0f, scoreboardColourWidth);
+        r.PushScissor(20, 22, (int)healthWidth, (int)scoreboardColourHeight);
+        r.DrawTexture(_context.Skin.ScorebarColour, 20, 22, scoreboardColourWidth, scoreboardColourHeight,
             new Color4<Rgba>(1, 1, 1, 1));
-        r.SetScissor(0, 0, (int)Width, (int)Height);
+        r.PopScissor();
 
 
         // Draw combo count
@@ -1166,7 +1581,8 @@ public class GameScreen : Screen, IDisposable
         }
         
         
-        r.DrawText(Fonts.Default,  $"{(_rawScore/_maxScore)*100f:F}", new(300, 300), 40, Color4.White);
+        DrawScoreString(r, $"{Accuracy * 100f:0.00}%", Width - 30, 30 + Height / 15f + 10,
+            scoreDigitScale * 0.55f, true);
 
 
         var yellow = new Color4<Rgba>(242 / 255f, 191 / 255f, 36 / 255f, 1);
@@ -1258,7 +1674,8 @@ public class GameScreen : Screen, IDisposable
 
         if (_isPaused)
         {
-            //r.DrawRectangle(0, 0, Width, Height, new Vector4(0, 0, 0, 0.85f));
+            DrawPauseMenu(r);
+            r.FlushText(Fonts.Default);
         }
         
         // Game cursor
@@ -1313,6 +1730,196 @@ public class GameScreen : Screen, IDisposable
         
         r.PopScissor();
     }
+
+    private void DrawFollowPoints(Renderer r, float playfieldScale)
+    {
+        if (_orderedObjects.Count < 2) return;
+        if (!_context.Skin.HasAnimatedFollowPoints && _context.Skin.FollowPoint == null) return;
+
+        var baseScale = _baseCircleSize / 128f;
+        var preempt = 800.0 * Math.Min(1.0, _beatmap.Preempt / 450.0);
+
+        for (var i = 0; i < _orderedObjects.Count - 1; i++)
+        {
+            var start = _orderedObjects[i];
+            var end = _orderedObjects[i + 1];
+
+            if (start is Spinner || end is Spinner) continue;
+
+            var startTime = start is Slider startSlider ? startSlider.Time + startSlider.Duration : start.Time;
+            var startPosition = start is Slider slider ? slider.GetPositionAt(startTime) : start.Position;
+            var endPosition = end.Position;
+            var distanceVector = endPosition - startPosition;
+            var distance = distanceVector.Length;
+
+            if (distance <= 48f) continue;
+
+            var duration = end.Time - startTime;
+            if (duration <= 0) continue;
+
+            var rotation = -MathHelper.RadiansToDegrees(MathF.Atan2(distanceVector.Y, distanceVector.X));
+
+            for (var d = 48f; d < distance - 32f; d += 32f)
+            {
+                var fraction = d / distance;
+                var fadeOutTime = startTime + fraction * duration;
+                var fadeInTime = fadeOutTime - preempt;
+
+                const float fadeDuration = 400f;
+                if (clock.CurrentTime < fadeInTime || clock.CurrentTime > fadeOutTime + fadeDuration) continue;
+
+                float alpha;
+                float pointScale;
+                Vector2 position;
+
+                if (clock.CurrentTime < fadeInTime + fadeDuration)
+                {
+                    var t = Math.Clamp((float)((clock.CurrentTime - fadeInTime) / fadeDuration), 0f, 1f);
+                    t = 1f - (1f - t) * (1f - t);
+                    alpha = t;
+                    pointScale = MathHelper.Lerp(1.5f, 1f, t);
+                    position = Vector2.Lerp(startPosition + distanceVector * (fraction - 0.1f),
+                        startPosition + distanceVector * fraction, t);
+                }
+                else
+                {
+                    var t = Math.Clamp((float)((clock.CurrentTime - fadeOutTime) / fadeDuration), 0f, 1f);
+                    alpha = 1f - t;
+                    pointScale = 1f;
+                    position = startPosition + distanceVector * fraction;
+                }
+
+                if (alpha <= 0f) continue;
+
+                var texture = GetFollowPointTexture(fadeInTime);
+                if (texture == null) continue;
+
+                var sizeScale = baseScale * texture.Scale * pointScale;
+                var width = texture.Width * sizeScale;
+                var height = texture.Height * sizeScale;
+                var screenPosition = _playfieldTopLeft + position * playfieldScale;
+
+                r.DrawTexture(texture, screenPosition.X - width / 2f, screenPosition.Y - height / 2f,
+                    width, height, new Color4<Rgba>(1, 1, 1, alpha), rotation);
+            }
+        }
+    }
+
+    private Texture? GetFollowPointTexture(double fadeInTime)
+    {
+        if (!_context.Skin.HasAnimatedFollowPoints) return _context.Skin.FollowPoint;
+        if (_context.Skin.FollowPoints.Count == 0) return null;
+
+        var elapsed = clock.CurrentTime - fadeInTime;
+        var frame = (int)(elapsed / 40.0) % _context.Skin.FollowPoints.Count;
+        if (frame < 0) frame += _context.Skin.FollowPoints.Count;
+        return _context.Skin.FollowPoints[frame];
+    }
+
+    private void DrawSliderTicks(Renderer r, Slider slider, float playfieldScale, float opacity)
+    {
+        if (slider.TickTimes.Count == 0) return;
+
+        var texture = _context.Skin.SliderScorePoint;
+        var scale = _baseCircleSize / 128f * texture.Scale;
+
+        foreach (var tickTime in slider.TickTimes)
+        {
+            var position = slider.GetPositionAt(tickTime);
+            var screenPosition = _playfieldTopLeft + position * playfieldScale;
+            var width = texture.Width * scale;
+            var height = texture.Height * scale;
+
+            r.DrawTexture(texture, screenPosition.X - width / 2f, screenPosition.Y - height / 2f,
+                width, height, new Color4<Rgba>(1, 1, 1, 1) with { W = opacity });
+        }
+    }
+
+    private void DrawSliderEndCircle(Renderer r, Slider slider, float playfieldScale, float drawSize, float opacity)
+    {
+        var position = slider.GetPositionAt(slider.Time + slider.Duration);
+        var screenPosition = _playfieldTopLeft + position * playfieldScale;
+
+        r.DrawTexture(_context.Skin.SliderEndCircle,
+            screenPosition.X - drawSize / 2f, screenPosition.Y - drawSize / 2f,
+            drawSize, drawSize, slider.Color with { W = opacity });
+
+        r.DrawTexture(_context.Skin.SliderEndCircleOverlay,
+            screenPosition.X - drawSize / 2f, screenPosition.Y - drawSize / 2f,
+            drawSize, drawSize, new Color4<Rgba>(1, 1, 1, 1) with { W = opacity });
+    }
+
+    private void DrawSliderRepeatArrows(Renderer r, Slider slider, float playfieldScale, float opacity)
+    {
+        if (slider.SlideRepeatCount <= 1 || slider.SpanDuration <= 0 || slider.Points.Count < 2) return;
+
+        var texture = _context.Skin.ReverseArrow;
+        var scale = _baseCircleSize / 128f * texture.Scale;
+
+        for (var i = 1; i < slider.SlideRepeatCount; i++)
+        {
+            var repeatTime = slider.Time + i * slider.SpanDuration;
+            if (repeatTime >= slider.Time + slider.Duration) continue;
+
+            var repeatPosition = slider.GetPositionAt(repeatTime);
+            var sample = Math.Min(1.0, slider.SpanDuration * 0.05);
+            var nextPosition = slider.GetPositionAt(repeatTime + sample);
+            var direction = nextPosition - repeatPosition;
+
+            if (direction.LengthSquared < 0.0001f)
+            {
+                var previousPosition = slider.GetPositionAt(repeatTime - sample);
+                direction = repeatPosition - previousPosition;
+            }
+
+            if (direction.LengthSquared < 0.0001f) continue;
+
+            var rotation = -MathHelper.RadiansToDegrees(MathF.Atan2(direction.Y, direction.X));
+            var width = texture.Width * scale;
+            var height = texture.Height * scale;
+            var screenPosition = _playfieldTopLeft + repeatPosition * playfieldScale;
+
+            r.DrawTexture(texture, screenPosition.X - width / 2f, screenPosition.Y - height / 2f,
+                width, height, new Color4<Rgba>(1, 1, 1, 1) with { W = opacity }, rotation);
+        }
+    }
+
+    private void DrawScoreString(Renderer r, string text, float x, float y, float scale, bool rightAlign)
+    {
+        var width = 0f;
+        foreach (var c in text)
+        {
+            var texture = GetScoreTexture(c);
+            if (texture != null)
+                width += texture.Width * scale;
+        }
+
+        var cursorX = rightAlign ? x - width : x;
+
+        foreach (var c in text)
+        {
+            var texture = GetScoreTexture(c);
+            if (texture == null) continue;
+
+            var w = texture.Width * scale;
+            var h = texture.Height * scale;
+            r.DrawTexture(texture, cursorX, y, w, h, new Color4<Rgba>(1, 1, 1, 1));
+            cursorX += w;
+        }
+    }
+
+    private Texture? GetScoreTexture(char c)
+    {
+        if (c is >= '0' and <= '9') return _context.Skin.ScoreNumbers[c - '0'];
+
+        return c switch
+        {
+            '.' => _context.Skin.ScoreDot,
+            '%' => _context.Skin.ScorePercent,
+            'x' => _context.Skin.ScoreX,
+            _ => null,
+        };
+    }
     
     public override void OnResize(ResizeEventArgs e)
     {
@@ -1353,6 +1960,8 @@ public class GameScreen : Screen, IDisposable
     
     void ResetObjectsAfter(double cursorMs)
     {
+        StopAllSliderSlides();
+
         foreach (var obj in _beatmap.HitObjects)
         {
             if (obj.Time >= cursorMs)
@@ -1370,6 +1979,17 @@ public class GameScreen : Screen, IDisposable
                     s.CurrentContinuousFollow = 0.0;
                     s.LongestContinuousFollow = 0.0;
                     s.WasFollowingPreviousFrame = false;
+                    s.LastHeld = 0.0;
+                    s.JudgementDone = false;
+                    s.Sliding = false;
+                    s.NextTickIndex = 0;
+                    s.NextRepeatIndex = 1;
+                    s.PartsHit = 0;
+                    s.TickHits = 0;
+                    s.TickMisses = 0;
+                    s.RepeatHits = 0;
+                    s.RepeatMisses = 0;
+                    s.TailHit = false;
                 }
             }
         }
@@ -1378,6 +1998,8 @@ public class GameScreen : Screen, IDisposable
     public void SetBeatmap(Beatmap beatmap)
     {
         _beatmap = beatmap;
+        StopAllSliderSlides();
+        DisposeMapSamples();
 
         _songTrack?.Dispose();
         _songAudio?.Dispose();
@@ -1403,6 +2025,7 @@ public class GameScreen : Screen, IDisposable
         
         ResetObjectsAfter(0);
 
+        _orderedObjects = _beatmap.HitObjects.OrderBy(h => h.Time).ToList();
         _sortedObjects = _beatmap.HitObjects
             .OrderByDescending(h => Math.Abs(h.Time - clock.CurrentTime));
 
@@ -1419,8 +2042,11 @@ public class GameScreen : Screen, IDisposable
                                                   5);
         _comboCount = 0;
         _currentScore = 0;
-        _maxScore = 0;
-        _rawScore = 0;
+        _count300 = 0;
+        _count100 = 0;
+        _count50 = 0;
+        _countMiss = 0;
+        _health = 1.0f;
 
         Logger.Instance.Info($"Beatmap set to {beatmap}");
     }
@@ -1439,7 +2065,18 @@ public class GameScreen : Screen, IDisposable
             _backgroundTexture?.Dispose();
             _songTrack?.Dispose();
             _songAudio?.Dispose();
+            StopAllSliderSlides();
+            DisposeMapSamples();
         }
+    }
+
+    private void DisposeMapSamples()
+    {
+        foreach (var sample in _mapSamples.Values.Distinct())
+            sample.Dispose();
+
+        _mapSamples.Clear();
+        _unloadableSamples.Clear();
     }
 
     public class TrailInfo

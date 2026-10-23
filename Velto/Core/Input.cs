@@ -59,16 +59,19 @@ public unsafe class Input
         float x, y;
         _currentMouse = SDL_GetMouseState(&x, &y);
 
-        //float scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
-        //if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) scale = 2;
-        float scale = SDL_GetWindowDisplayScale(window);
+        int windowWidth, windowHeight;
+        int pixelWidth, pixelHeight;
+        SDL_GetWindowSize(window, &windowWidth, &windowHeight);
+        SDL_GetWindowSizeInPixels(window, &pixelWidth, &pixelHeight);
 
-        // position
+        var scaleX = windowWidth > 0 ? pixelWidth / (float)windowWidth : 1f;
+        var scaleY = windowHeight > 0 ? pixelHeight / (float)windowHeight : 1f;
+
         float prevX = MouseX;
         float prevY = MouseY;
 
-        MouseX = x * scale;
-        MouseY = y * scale;
+        MouseX = x * scaleX;
+        MouseY = y * scaleY;
 
         // delta
         DeltaX = MouseX - prevX;

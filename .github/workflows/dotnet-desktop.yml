@@ -25,17 +25,17 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '10.0.x'
 
       - name: Restore
-        run: dotnet restore Velto.Game/Velto.csproj
+        run: dotnet restore Velto/Velto.csproj
 
       - name: Build
-        run: dotnet build Velto.Game/Velto.csproj --configuration Release --no-restore
+        run: dotnet build Velto/Velto.csproj --configuration Release --no-restore
 
       - name: Publish
         run: >
-          dotnet publish Velto.Game/Velto.csproj
+          dotnet publish Velto/Velto.csproj
           -c Release
           -r ${{ matrix.rid }}
           --self-contained true

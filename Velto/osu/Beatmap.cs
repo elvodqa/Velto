@@ -178,9 +178,11 @@ public class Beatmap
                     {
                         NewCombo = isNewCombo,
                         Time = time,
-                        Position = new Vector2(x, y)
+                        Position = new Vector2(x, y),
+                        HitSound = int.Parse(split[4])
                     };
 
+                    ApplyHitSample(hitCircle, split.Length > 5 ? split[5] : string.Empty);
                     HitObjects.Add(hitCircle);
                 }
                 else if (isSlider)
@@ -189,8 +191,8 @@ public class Beatmap
                     slider.NewCombo = isNewCombo;
                     slider.Position = new Vector2(int.Parse(split[0]), int.Parse(split[1]));
                     slider.Time = int.Parse(split[2]);
+                    slider.HitSound = int.Parse(split[4]);
                     
-                    //slider.HitSound = int.Parse(split[4]);
                     var sliderData = split[5].Split('|');
                     var defaultCurveType = sliderData[0] switch
                     {
@@ -228,6 +230,28 @@ public class Beatmap
                     
                     slider.SlideRepeatCount = int.Parse(split[6]);
                     slider.Length = double.Parse(split[7]);
+
+                    if (split.Length > 8 && !string.IsNullOrEmpty(split[8]))
+                    {
+                        foreach (var sound in split[8].Split('|'))
+                        {
+                            if (int.TryParse(sound, out var value))
+                                slider.EdgeSounds.Add(value);
+                        }
+                    }
+
+                    if (split.Length > 9 && !string.IsNullOrEmpty(split[9]))
+                    {
+                        foreach (var set in split[9].Split('|'))
+                        {
+                            var pair = set.Split(':');
+                            var normal = pair.Length > 0 && int.TryParse(pair[0], out var n) ? n : 0;
+                            var addition = pair.Length > 1 && int.TryParse(pair[1], out var a) ? a : 0;
+                            slider.EdgeSets.Add((normal, addition));
+                        }
+                    }
+
+                    ApplyHitSample(slider, split.Length > 10 ? split[10] : string.Empty);
                     
                     /*if (int.Parse(split[3]) == 6)
                     {
@@ -243,16 +267,33 @@ public class Beatmap
                     HitObjects.Add(slider);
                 } else if (isSpinner)
                 {
-                    HitObjects.Add(new Spinner()
+                    var spinner = new Spinner()
                     {
                         Time = time,
                         EndTime = double.Parse(split[5]),
-                    });   
+                        HitSound = int.Parse(split[4]),
+                    };
+
+                    ApplyHitSample(spinner, split.Length > 6 ? split[6] : string.Empty);
+                    HitObjects.Add(spinner);
                 }
             }
         }
 
         //CalculatePrepass();
+    }
+
+    private static void ApplyHitSample(HitObject hitObject, string sample)
+    {
+        if (string.IsNullOrEmpty(sample))
+            return;
+
+        var parts = sample.Split(':', 5);
+        hitObject.HitSampleSet = parts.Length > 0 && int.TryParse(parts[0], out var normal) ? normal : 0;
+        hitObject.HitAdditionSampleSet = parts.Length > 1 && int.TryParse(parts[1], out var addition) ? addition : 0;
+        hitObject.HitSampleIndex = parts.Length > 2 && int.TryParse(parts[2], out var index) ? index : 0;
+        hitObject.HitSampleVolume = parts.Length > 3 && int.TryParse(parts[3], out var volume) ? volume : 0;
+        hitObject.HitSampleFile = parts.Length > 4 && !string.IsNullOrWhiteSpace(parts[4]) ? parts[4] : null;
     }
 
     // General
@@ -291,9 +332,28 @@ public class Beatmap
         var comboCounter = 0;
         var colorCounter = 0;
         var sortedTimingPoints = TimingPoints.OrderBy(t => t.Time).ToList();
+        var timingPointIndex = 0;
+        var timingSampleSet = 1;
+        var timingSampleIndex = 0;
 
         foreach (var hitobject in HitObjects)
         {
+            while (timingPointIndex < sortedTimingPoints.Count &&
+                   sortedTimingPoints[timingPointIndex].Time <= hitobject.Time)
+            {
+                var timing = sortedTimingPoints[timingPointIndex++];
+                if (timing.SampleSet > 0)
+                    timingSampleSet = timing.SampleSet;
+                if (timing.SampleIndex > 0)
+                    timingSampleIndex = timing.SampleIndex;
+            }
+
+            hitobject.EffectiveSampleSet = hitobject.HitSampleSet > 0 ? hitobject.HitSampleSet : timingSampleSet;
+            hitobject.EffectiveAdditionSampleSet = hitobject.HitAdditionSampleSet > 0
+                ? hitobject.HitAdditionSampleSet
+                : timingSampleSet;
+            hitobject.EffectiveSampleIndex = hitobject.HitSampleIndex > 0 ? hitobject.HitSampleIndex : timingSampleIndex;
+
             float preempt;
             if (ApproachRate < 5)
                 preempt = 1200 + 120 * (5 - ApproachRate);
@@ -404,6 +464,39 @@ public class Beatmap
                 var spans = Math.Max(1, slider.SlideRepeatCount);
                 slider.SpanDuration = slider.Length * msPerBeat / pxPerBeat;
                 slider.Duration = slider.SpanDuration * spans;
+
+                var tickRate = SliderTickRate > 0 ? SliderTickRate : 1f;
+                var tickDistance = pxPerBeat / (svMultiplier * tickRate);
+                if (tickDistance <= 0)
+                    tickDistance = 1;
+
+                slider.TickInterval = msPerBeat / (tickRate * svMultiplier);
+                slider.TickTimes.Clear();
+                slider.NextTickIndex = 0;
+                slider.NextRepeatIndex = 1;
+                slider.PartsHit = 0;
+                slider.TickHits = 0;
+                slider.TickMisses = 0;
+                slider.RepeatHits = 0;
+                slider.RepeatMisses = 0;
+                slider.TailHit = false;
+
+                var ticksPerSpan = Math.Max(0, (int)Math.Ceiling(slider.Length / tickDistance) - 1);
+                if (slider.TickInterval > 0)
+                {
+                    for (var span = 0; span < spans; span++)
+                    {
+                        var spanStart = slider.Time + span * slider.SpanDuration;
+                        for (var tick = 1; tick <= ticksPerSpan; tick++)
+                        {
+                            var tickTime = spanStart + tick * slider.TickInterval;
+                            if (tickTime < spanStart + slider.SpanDuration - 0.01)
+                                slider.TickTimes.Add(tickTime);
+                        }
+                    }
+                }
+
+                slider.PartsTotal = 2 + slider.TickTimes.Count + Math.Max(0, spans - 1);
             }
         }
 

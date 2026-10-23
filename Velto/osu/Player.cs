@@ -139,8 +139,6 @@ public class Player
             ActionSecondaryPressed = true;
         if (Input.IsKeyDown(SDL_Scancode.SDL_SCANCODE_X))
             ActionSecondaryDown = true;
-        
-        _gameScreen.Judge(_gameScreen.clock.CurrentTime);
     }
 
     private void UpdateAutoplay()
